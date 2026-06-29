@@ -107,19 +107,19 @@
             // Fallback for local simulation mode (dev mode bypass)
             if (string.IsNullOrEmpty(supabaseUrl) || supabaseUrl.Contains("your-project") || string.IsNullOrEmpty(anonKey))
             {
-                Snackbar.Add("Dev Mode Bypass: Logging in with mockup Admin account.", Severity.Info);
+                var headerJson = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
+                var payloadJson = $"{{\"sub\":\"00000000-0000-0000-0000-000000000001\",\"email\":\"{_loginModel.Email}\",\"role\":\"Admin\",\"name\":\"{_loginModel.Email.Split('@')[0]} (Dev Admin)\"}}";
                 
-                // Construct a mock JWT containing Admin role
-                // For local simulation, we can hit a local dev auth bypass if available, 
-                // or generate a mock token. But wait, since our backend Program.cs validates 
-                // JWT with SymmetricSecurityKey based on JwtSecret, we should login to get a real token.
-                // Wait! To make local development work easily when Supabase is not ready, we can have 
-                // our API expose a dev login route: POST /api/auth/login-dev.
-                // Let's check: did we write a dev login route? We didn't. Let's write a quick mock login 
-                // fallback. We'll simulate it by posting to our API.
-                // Let's call our backend API to get a mock token if in dev mode!
-                // Wait, let's write a dev token generator endpoint in AuthController on the API 
-                // so that users can log in locally without setting up Supabase! This is an amazing developer experience!
+                var headerBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(headerJson)).Replace("=", "").Replace("+", "-").Replace("/", "_");
+                var payloadBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(payloadJson)).Replace("=", "").Replace("+", "-").Replace("/", "_");
+                var mockToken = $"{headerBase64}.{payloadBase64}.mock-signature";
+                
+                await AuthStateProvider.MarkUserAsAuthenticated(mockToken);
+                Snackbar.Add("Logged in via Client-Side Simulation (Admin).", Severity.Success);
+                
+                _loading = false;
+                Navigation.NavigateTo("");
+                return;
             }
 
             // Real Supabase Auth REST Call
