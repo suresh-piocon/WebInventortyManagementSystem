@@ -1,0 +1,274 @@
+@page "/reports/barcode-tracking"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Barcode Movement History - AG Inventory</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="mb-6">
+        <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+            Barcode Tracking History
+        </MudText>
+        <MudText Typo="Typo.body2" Class="text-slate-400">
+            Track full lifecycle and logistics movement logs of any barcode, QR code, or unique tracking number
+        </MudText>
+    </div>
+
+    <!-- Search input -->
+    <MudPaper Class="glass-panel pa-6 mb-6">
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_searchQuery" 
+                              Label="Scan Barcode / QR / Tracking No" 
+                              HelperText="Type code or scan (e.g. ITEM000001, BATCH000001, TRK-2026-000001)"
+                              Variant="Variant.Outlined" 
+                              Adornment="Adornment.End" 
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              OnKeyDown="HandleSearchKeyPress" 
+                              Class="text-slate-100" />
+            </MudItem>
+            <MudItem xs="12" md="3" Class="d-flex align-center">
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           StartIcon="@Icons.Material.Filled.Search"
+                           OnClick="SearchBarcode"
+                           Disabled="@(string.IsNullOrEmpty(_searchQuery) || _loading)"
+                           Style="height: 56px; width: 100%;">
+                    @if (_loading)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    }
+                    else
+                    {
+                        <MudText>Search History</MudText>
+                    }
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-center py-12">
+            <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
+        </div>
+    }
+    else if (_history != null)
+    {
+        <MudGrid>
+            <!-- Inward / Registration Info card -->
+            <MudItem xs="12" md="6">
+                <MudCard Class="glass-panel mb-4" Style="height: 100%;">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6" Class="text-slate-200 font-weight-bold" Style="font-family: 'Outfit';">
+                                <MudIcon Icon="@Icons.Material.Filled.AssignmentReturned" Class="mr-2 text-green" /> 1. Stock Inward Details
+                            </MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudGrid>
+                            <!-- Captured Photo Column -->
+                            <MudItem xs="12" sm="5" Class="d-flex flex-column align-center justify-center">
+                                @if (!string.IsNullOrEmpty(_history.PhotoUrl))
+                                {
+                                    <img src="@_history.PhotoUrl" style="width: 100%; max-width: 160px; aspect-ratio: 1; border-radius: 8px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewImage(_history.PhotoUrl))" />
+                                    <MudText Typo="Typo.caption" Class="text-slate-400 mt-2">Captured Photo</MudText>
+                                }
+                                else
+                                {
+                                    <div class="d-flex flex-column align-center justify-center" style="width: 140px; height: 140px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.1);">
+                                        <MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Size="Size.Large" Color="Color.Dark" />
+                                        <MudText Typo="Typo.caption" Class="text-slate-500 mt-1">No Photo Captured</MudText>
+                                    </div>
+                                }
+                            </MudItem>
+                            
+                            <!-- Inward Metadata -->
+                            <MudItem xs="12" sm="7">
+                                <div class="d-flex flex-column gap-2 text-slate-300">
+                                    <div>Item Name: <b class="text-slate-100">@_history.ItemName</b></div>
+                                    <div>Item Code: <span class="font-mono">@_history.ItemCode</span></div>
+                                    <div>Supplier: <b class="text-slate-200">@_history.SupplierName</b></div>
+                                    <div>Inward Date: <span>@_history.InwardDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</span></div>
+                                    <div>Invoice No: <span>@_history.InvoiceNo</span></div>
+                                    <div>Inward Quantity: <b>@_history.QuantityInward.ToString("N2")</b></div>
+                                    <div>Inward Unit Rate: <span>$@_history.Rate.ToString("N2")</span></div>
+                                    <div>Tracking Ref: <span class="font-mono text-cyan">@_history.TrackingNo</span></div>
+                                    <div>Batch Code: <span class="text-yellow-500 font-weight-bold">@_history.BatchNo</span></div>
+                                </div>
+                            </MudItem>
+                        </MudGrid>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <!-- Outward / Issue Info card -->
+            <MudItem xs="12" md="6">
+                <MudCard Class="glass-panel" Style="height: 100%;">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6" Class="text-slate-200 font-weight-bold" Style="font-family: 'Outfit';">
+                                <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Class="mr-2 text-red" /> 2. Outward / Sales History
+                            </MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (!_history.Issues.Any())
+                        {
+                            <div class="d-flex flex-column align-center justify-center py-8 text-center text-slate-500">
+                                <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Large" Class="mb-2" />
+                                <MudText>This batch/piece is currently in stock (Not yet issued).</MudText>
+                            </div>
+                        }
+                        else
+                        {
+                            <MudTable Items="@_history.Issues" Hover="true" Elevation="0" Style="background: transparent;">
+                                <HeaderContent>
+                                    <MudTh Style="color: #94A3B8;">Issue No</MudTh>
+                                    <MudTh Style="color: #94A3B8;">Customer</MudTh>
+                                    <MudTh Style="color: #94A3B8;">Date</MudTh>
+                                    <MudTh Style="color: #94A3B8; text-align: right;">Qty Issued</MudTh>
+                                    <MudTh Style="color: #94A3B8; text-align: right;">Rate</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Issue No" Class="text-slate-100 font-weight-bold">@context.OutwardNo</MudTd>
+                                    <MudTd DataLabel="Customer" Class="text-slate-200">@context.CustomerName</MudTd>
+                                    <MudTd DataLabel="Date" Class="text-slate-300">@context.OutwardDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                    <MudTd DataLabel="Qty Issued" Style="text-align: right;" Class="text-red-400 font-weight-bold">@context.QuantityIssued.ToString("N2")</MudTd>
+                                    <MudTd DataLabel="Rate" Style="text-align: right;" Class="text-slate-300">$@context.Rate.ToString("N2")</MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <!-- Sibling registered barcodes -->
+            <MudItem xs="12">
+                <MudCard Class="glass-panel">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6" Class="text-slate-200 font-weight-bold" Style="font-family: 'Outfit';">
+                                <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Class="mr-2 text-secondary" /> Registered Barcode Numbers under Tracking No
+                            </MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var bc in _history.RegisteredBarcodes)
+                            {
+                                <MudChip T="string" Color="Color.Primary" Variant="Variant.Text" Icon="@Icons.Material.Filled.QrCode" Class="font-mono">
+                                    @bc
+                                </MudChip>
+                            }
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <!-- Ledger movement history -->
+            <MudItem xs="12">
+                <MudCard Class="glass-panel">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6" Class="text-slate-200 font-weight-bold" Style="font-family: 'Outfit';">
+                                <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-2" /> 3. Detailed Ledger Movements
+                            </MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent Class="pa-0">
+                        <MudTable Items="@_history.LedgerEntries" Hover="true" Elevation="0" Style="background: transparent;">
+                            <HeaderContent>
+                                <MudTh Style="color: #94A3B8;">Ledger Date</MudTh>
+                                <MudTh Style="color: #94A3B8;">Transaction Type</MudTh>
+                                <MudTh Style="color: #94A3B8;">Reference No</MudTh>
+                                <MudTh Style="color: #94A3B8; text-align: right;">Inward Qty</MudTh>
+                                <MudTh Style="color: #94A3B8; text-align: right;">Outward Qty</MudTh>
+                                <MudTh Style="color: #94A3B8; text-align: right;">Price</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Ledger Date" Class="text-slate-300">@context.TransactionDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                                <MudTd DataLabel="Transaction Type">
+                                    @if (context.TransactionType == "Purchase")
+                                    {
+                                        <MudChip T="string" Color="Color.Success" Size="Size.Small">Purchase Inward</MudChip>
+                                    }
+                                    else if (context.TransactionType == "Sales")
+                                    {
+                                        <MudChip T="string" Color="Color.Info" Size="Size.Small">Issue Outward</MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip T="string" Color="Color.Warning" Size="Size.Small">@context.TransactionType</MudChip>
+                                    }
+                                </MudTd>
+                                <MudTd DataLabel="Reference No" Class="text-slate-100 font-weight-bold">@context.ReferenceNo</MudTd>
+                                <MudTd DataLabel="Inward Qty" Style="text-align: right;" Class="text-green-400 font-weight-bold">
+                                    @(context.InwardQty > 0 ? $"+{context.InwardQty.ToString("N2")}" : "-")
+                                </MudTd>
+                                <MudTd DataLabel="Outward Qty" Style="text-align: right;" Class="text-red-400 font-weight-bold">
+                                    @(context.OutwardQty > 0 ? $"-{context.OutwardQty.ToString("N2")}" : "-")
+                                </MudTd>
+                                <MudTd DataLabel="Price" Style="text-align: right;" Class="text-slate-300">$@context.UnitPrice.ToString("N2")</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    private string _searchQuery = "";
+    private bool _loading = false;
+    private BarcodeTrackingReportDto? _history;
+
+    private async Task HandleSearchKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchBarcode();
+        }
+    }
+
+    private async Task SearchBarcode()
+    {
+        if (string.IsNullOrWhiteSpace(_searchQuery)) return;
+
+        _loading = true;
+        _history = null;
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.GetAsync($"api/reports/barcode-tracking/{Uri.EscapeDataString(_searchQuery.Trim())}");
+            if (response.IsSuccessStatusCode)
+            {
+                _history = await response.Content.ReadFromJsonAsync<BarcodeTrackingReportDto>();
+            }
+            else
+            {
+                Snackbar.Add("Barcode details could not be found.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error searching barcode history: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task PreviewImage(string url)
+    {
+        var parameters = new DialogParameters { ["imageUrl"] = url };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
+        await DialogService.ShowAsync<ImagePreviewDialog>("Item Photo", parameters, options);
+    }
+}

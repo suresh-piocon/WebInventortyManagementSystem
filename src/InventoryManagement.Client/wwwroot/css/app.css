@@ -1,0 +1,135 @@
+/* CSS Design System - Inventory Management System */
+
+body {
+    font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+    background-color: #0F172A;
+    color: #F8FAFC;
+    margin: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', sans-serif;
+}
+
+/* Custom Scrollbar for premium feel */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #1E293B;
+}
+::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #5C5CFF;
+}
+
+/* Glassmorphism styling */
+.glass-panel {
+    background: rgba(30, 41, 59, 0.7) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+.glass-card {
+    background: rgba(15, 23, 42, 0.45) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.15) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(92, 92, 255, 0.4) !important;
+    box-shadow: 0 12px 28px 0 rgba(92, 92, 255, 0.1) !important;
+}
+
+/* Gimmicks & Micro-animations */
+.hover-glow {
+    transition: all 0.3s ease;
+}
+.hover-glow:hover {
+    text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+}
+
+.animated-gradient-text {
+    background: linear-gradient(135deg, #5C5CFF 0%, #00E5FF 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Barcode Printable layouts */
+@media print {
+    /* Hide everything on the page except the printable area */
+    body * {
+        visibility: hidden;
+    }
+    
+    #blazor-error-ui, .mud-dialog-container, .mud-overlay {
+        display: none !important;
+    }
+
+    .printable-sheet, .printable-sheet * {
+        visibility: visible;
+    }
+
+    .printable-sheet {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        background: white !important;
+        color: black !important;
+    }
+
+    /* Print Label Sizing Specs */
+    .label-50-25 {
+        width: 50mm;
+        height: 25mm;
+        padding: 1.5mm;
+        margin: 0;
+        box-sizing: border-box;
+        page-break-after: always;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        background: white !important;
+        color: black !important;
+    }
+
+    .label-75-50 {
+        width: 75mm;
+        height: 50mm;
+        padding: 3mm;
+        margin: 0;
+        box-sizing: border-box;
+        page-break-after: always;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        background: white !important;
+        color: black !important;
+    }
+
+    /* Custom sizing default */
+    .label-custom {
+        padding: 4mm;
+        page-break-after: always;
+        background: white !important;
+        color: black !important;
+        box-sizing: border-box;
+    }
+}

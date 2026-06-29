@@ -1,0 +1,387 @@
+@page "/stock-outward"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<PageTitle>Stock Outward Entry - AG Inventory</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="mb-6">
+        <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+            Stock Outward Entry
+        </MudText>
+        <MudText Typo="Typo.body2" Class="text-slate-400">
+            Issue items, scan barcodes/QR codes, and visually verify items against captured photos
+        </MudText>
+    </div>
+
+    <EditForm Model="@_outwardHeader" OnValidSubmit="SaveOutward">
+        <DataAnnotationsValidator />
+
+        <MudGrid>
+            <!-- Outward Header Details -->
+            <MudItem xs="12" md="4">
+                <MudPaper Class="glass-panel pa-6 mb-4">
+                    <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                        <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Class="mr-2" /> Outward Header
+                    </MudText>
+
+                    <MudDatePicker Label="Outward Date" 
+                                   @bind-Date="_outwardDate" 
+                                   Required="true" 
+                                   Variant="Variant.Outlined" 
+                                   Class="mb-4 text-slate-200" />
+
+                    <MudTextField T="string" 
+                                  Label="Customer Name" 
+                                  @bind-Value="_outwardHeader.CustomerName" 
+                                  Required="true"
+                                  RequiredError="Customer name is required"
+                                  Variant="Variant.Outlined" 
+                                  Class="mb-4 text-slate-200" />
+
+                    <MudTextField T="string" 
+                                  Label="Reference Number (e.g. Sales Order)" 
+                                  @bind-Value="_outwardHeader.ReferenceNo" 
+                                  Variant="Variant.Outlined" 
+                                  Class="mb-4 text-slate-200" />
+                </MudPaper>
+
+                <!-- Scanner Simulator Panel -->
+                <MudPaper Class="glass-panel pa-6 mb-4" Style="border: 1px solid rgba(0,229,255,0.15) !important;">
+                    <MudText Typo="Typo.h6" Class="text-slate-200 mb-2" Style="font-family: 'Outfit';">
+                        <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Class="mr-2 text-cyan" /> Scan Barcode / QR Code
+                    </MudText>
+                    <MudText Typo="Typo.caption" Class="text-slate-400 d-block mb-4">
+                        Press Enter after scanning or type manually to resolve item
+                    </MudText>
+
+                    <div class="d-flex align-center gap-2">
+                        <MudTextField @bind-Value="_scanInput" 
+                                      Label="Scan Code" 
+                                      Variant="Variant.Outlined" 
+                                      Adornment="Adornment.End" 
+                                      AdornmentIcon="@Icons.Material.Filled.QrCode" 
+                                      OnKeyDown="HandleScanKeyPress" 
+                                      Disabled="_resolving"
+                                      HelperText="e.g. ITEM000001, BATCH000001"
+                                      Class="text-slate-100" />
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Secondary" 
+                                   OnClick="ResolveCode" 
+                                   Disabled="@(string.IsNullOrEmpty(_scanInput) || _resolving)"
+                                   Style="height: 56px;">
+                            @if (_resolving)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            }
+                            else
+                            {
+                                <MudText>Add</MudText>
+                            }
+                        </MudButton>
+                    </div>
+                </MudPaper>
+
+                <!-- Save Actions -->
+                <MudPaper Class="glass-panel pa-4 d-flex justify-between">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="ResetForm">
+                        Reset
+                    </MudButton>
+                    <MudButton ButtonType="ButtonType.Submit" 
+                               Variant="Variant.Filled" 
+                               Color="Color.Success"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               Disabled="@(!_lineItems.Any() || _saving)"
+                               Style="font-family: 'Outfit'; font-weight: 600;">
+                        @if (_saving)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        }
+                        else
+                        {
+                            <MudText>Submit Issue</MudText>
+                        }
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Line Items Grid -->
+            <MudItem xs="12" md="8">
+                <MudPaper Class="glass-panel pa-6">
+                    <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                        <MudIcon Icon="@Icons.Material.Filled.ListAlt" Class="mr-2" /> Items to Issue
+                    </MudText>
+
+                    @if (!_lineItems.Any())
+                    {
+                        <div class="d-flex flex-column align-center justify-center py-12 text-center text-slate-500">
+                            <MudIcon Icon="@Icons.Material.Filled.CropFree" Size="Size.Large" Class="mb-3" />
+                            <MudText Typo="Typo.body1">Scan a Barcode or QR Code to begin adding items</MudText>
+                            <div class="mt-4 p-2 rounded border border-slate-700 bg-slate-800 text-slate-300 font-mono" style="font-size: 11px;">
+                                Tips: Copy-paste any barcode from the Inward entries to simulate scanning
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="overflow-x: auto;">
+                            <table class="w-100 mud-table" style="border-collapse: collapse;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+                                        <th style="color: #94A3B8; padding: 10px; text-align: left; width: 60px;">Photo</th>
+                                        <th style="color: #94A3B8; padding: 10px; text-align: left;">Item Details</th>
+                                        <th style="color: #94A3B8; padding: 10px; text-align: left;">Batch / Tracking</th>
+                                        <th style="color: #94A3B8; padding: 10px; text-align: right; width: 100px;">Available</th>
+                                        <th style="color: #94A3B8; padding: 10px; text-align: right; width: 110px;">Qty to Issue</th>
+                                        <th style="color: #94A3B8; padding: 10px; text-align: right; width: 100px;">Rate</th>
+                                        <th style="color: #94A3B8; padding: 10px; text-align: right; width: 100px;">Amount</th>
+                                        <th style="color: #94A3B8; padding: 10px; text-align: center; width: 50px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (int i = 0; i < _lineItems.Count; i++)
+                                    {
+                                        var index = i;
+                                        var line = _lineItems[index];
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle;">
+                                            <td style="padding: 10px; text-align: center;">
+                                                @if (!string.IsNullOrEmpty(line.ImageUrl))
+                                                {
+                                                    <img src="@line.ImageUrl" style="width: 45px; height: 45px; border-radius: 6px; object-fit: cover; border: 1px solid #00E5FF; cursor: pointer;" @onclick="@(() => PreviewImage(line.ImageUrl))" />
+                                                }
+                                                else
+                                                {
+                                                    <MudIcon Icon="@Icons.Material.Filled.Image" Color="Color.Dark" Size="Size.Large" />
+                                                }
+                                            </td>
+                                            <td style="padding: 10px;">
+                                                <MudText Typo="Typo.body2" Class="text-slate-100 font-weight-bold">@line.ItemName</MudText>
+                                                <MudText Typo="Typo.caption" Class="text-slate-400 font-mono">@line.ItemCode</MudText>
+                                            </td>
+                                            <td style="padding: 10px;">
+                                                <div class="text-slate-300" style="font-size: 13px;">Batch: <span class="font-weight-bold text-slate-200">@line.BatchNo</span></div>
+                                                <div class="text-slate-400 font-mono" style="font-size: 11px;">@line.TrackingNo</div>
+                                            </td>
+                                            <td style="padding: 10px; text-align: right;" class="text-yellow-500 font-weight-bold">
+                                                @line.AvailableQuantity.ToString("N2") @line.UnitCode
+                                            </td>
+                                            <td style="padding: 10px;">
+                                                <MudNumericField T="decimal" @bind-Value="line.Quantity" Min="0.01M" Max="@line.AvailableQuantity" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right;" />
+                                            </td>
+                                            <td style="padding: 10px;">
+                                                <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right;" />
+                                            </td>
+                                            <td style="padding: 10px; text-align: right;" class="text-slate-100 font-weight-bold">
+                                                $@((line.Quantity * line.Rate).ToString("N2"))
+                                            </td>
+                                            <td style="padding: 10px; text-align: center;">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveLineItem(index))" />
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="d-flex justify-end mt-6">
+                            <MudText Typo="Typo.subtitle1" Class="font-weight-bold text-slate-100">
+                                Total Issue Value: <span class="animated-gradient-text" style="font-size: 20px;">$@(_lineItems.Sum(l => l.Quantity * l.Rate).ToString("N2"))</span>
+                            </MudText>
+                        </div>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </EditForm>
+</MudContainer>
+
+@code {
+    private StockOutwardPostDto _outwardHeader = new();
+    private DateTime? _outwardDate = DateTime.Today;
+    private List<OutwardLineItem> _lineItems = new();
+    
+    private string _scanInput = "";
+    private bool _resolving = false;
+    private bool _saving = false;
+
+    protected override void OnInitialized()
+    {
+        ResetForm();
+    }
+
+    private void ResetForm()
+    {
+        _outwardHeader = new StockOutwardPostDto
+        {
+            OutwardDate = DateTimeOffset.UtcNow
+        };
+        _outwardDate = DateTime.Today;
+        _lineItems.Clear();
+        _scanInput = "";
+    }
+
+    private async Task HandleScanKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ResolveCode();
+        }
+    }
+
+    private async Task ResolveCode()
+    {
+        if (string.IsNullOrWhiteSpace(_scanInput)) return;
+
+        _resolving = true;
+        StateHasChanged();
+
+        try
+        {
+            // Call API resolver endpoint
+            var response = await Http.GetAsync($"api/stockoutward/resolve/{Uri.EscapeDataString(_scanInput.Trim())}");
+            if (response.IsSuccessStatusCode)
+            {
+                var resolved = await response.Content.ReadFromJsonAsync<ScannedItemDto>();
+                if (resolved != null)
+                {
+                    // Check if already added
+                    var existing = _lineItems.FirstOrDefault(l => l.TrackingNo == resolved.TrackingNo && l.BatchNo == resolved.BatchNo);
+                    if (existing != null)
+                    {
+                        if (existing.Quantity < existing.AvailableQuantity)
+                        {
+                            existing.Quantity += 1;
+                            Snackbar.Add($"Incremented quantity for '{resolved.ItemName}'", Severity.Info);
+                        }
+                        else
+                        {
+                            Snackbar.Add($"Cannot issue more than available stock ({existing.AvailableQuantity}) for '{resolved.ItemName}'", Severity.Warning);
+                        }
+                    }
+                    else
+                    {
+                        if (resolved.AvailableQuantity <= 0)
+                        {
+                            Snackbar.Add($"This item batch '{resolved.ItemName}' (Batch: {resolved.BatchNo}) has 0 stock remaining. Cannot issue.", Severity.Warning);
+                        }
+                        else
+                        {
+                            _lineItems.Add(new OutwardLineItem
+                            {
+                                ItemId = resolved.ItemId,
+                                ItemCode = resolved.ItemCode,
+                                ItemName = resolved.ItemName,
+                                UnitCode = resolved.UnitCode,
+                                BatchNo = resolved.BatchNo,
+                                TrackingNo = resolved.TrackingNo,
+                                Barcode = resolved.Barcode,
+                                AvailableQuantity = resolved.AvailableQuantity,
+                                Quantity = 1,
+                                Rate = resolved.Rate,
+                                ImageUrl = resolved.ImageUrl
+                            });
+                            Snackbar.Add($"Added '{resolved.ItemName}' to list.", Severity.Success);
+                        }
+                    }
+                    _scanInput = ""; // Clear input on success
+                }
+            }
+            else
+            {
+                Snackbar.Add("Scanned barcode or QR code could not be resolved or is not in inventory.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error resolving barcode: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _resolving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void RemoveLineItem(int index)
+    {
+        if (index >= 0 && index < _lineItems.Count)
+        {
+            _lineItems.RemoveAt(index);
+        }
+    }
+
+    private async Task PreviewImage(string url)
+    {
+        var parameters = new DialogParameters { ["imageUrl"] = url };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
+        await DialogService.ShowAsync<ImagePreviewDialog>("Photo View", parameters, options);
+    }
+
+    private async Task SaveOutward()
+    {
+        if (!_lineItems.Any()) return;
+
+        // Perform final check to prevent negative stock before API post
+        foreach (var line in _lineItems)
+        {
+            if (line.Quantity > line.AvailableQuantity)
+            {
+                Snackbar.Add($"Negative stock violation! Item '{line.ItemName}' quantity ({line.Quantity}) exceeds available stock ({line.AvailableQuantity}).", Severity.Error);
+                return;
+            }
+        }
+
+        _saving = true;
+        try
+        {
+            _outwardHeader.OutwardDate = _outwardDate ?? DateTimeOffset.UtcNow;
+            
+            _outwardHeader.Details = _lineItems.Select(l => new StockOutwardDetailDto
+            {
+                ItemId = l.ItemId,
+                BatchNo = l.BatchNo,
+                TrackingNo = l.TrackingNo,
+                Barcode = l.Barcode,
+                Quantity = l.Quantity,
+                Rate = l.Rate
+            }).ToList();
+
+            var response = await Http.PostAsJsonAsync("api/stockoutward", _outwardHeader);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Stock Outward issued successfully! Stock balances updated.", Severity.Success);
+                ResetForm();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Submitting outward failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving outward entry: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    public class OutwardLineItem
+    {
+        public Guid ItemId { get; set; }
+        public string ItemCode { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public string UnitCode { get; set; } = "PCS";
+        public string BatchNo { get; set; } = string.Empty;
+        public string TrackingNo { get; set; } = string.Empty;
+        public string Barcode { get; set; } = string.Empty;
+        public decimal AvailableQuantity { get; set; }
+        public decimal Quantity { get; set; }
+        public decimal Rate { get; set; }
+        public string? ImageUrl { get; set; }
+    }
+}

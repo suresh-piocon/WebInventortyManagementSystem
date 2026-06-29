@@ -1,0 +1,223 @@
+@page "/users"
+@attribute [Authorize(Roles = "Admin")]
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>User Management - AG Inventory</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="mb-6">
+        <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+            User Role Management
+        </MudText>
+        <MudText Typo="Typo.body2" Class="text-slate-400">
+            Authorize user access, allocate system roles, and toggle operational statuses
+        </MudText>
+    </div>
+
+    <MudTable Items="@_users" 
+              Hover="true" 
+              Loading="@_loading" 
+              SearchString="@_searchString" 
+              Filter="new Func<UserProfile, bool>(FilterFunc)"
+              Class="glass-panel text-slate-200">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">System Users</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString" 
+                          Placeholder="Search users by name, email..." 
+                          Adornment="Adornment.Start" 
+                          AdornmentIcon="@Icons.Material.Filled.Search" 
+                          IconSize="Size.Medium" 
+                          Class="mt-0 text-slate-200" 
+                          Style="color: white;"/>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh Style="color: #94A3B8;">User Name</MudTh>
+            <MudTh Style="color: #94A3B8;">Email Address</MudTh>
+            <MudTh Style="color: #94A3B8;">System Role</MudTh>
+            <MudTh Style="color: #94A3B8;">Status</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Action</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="User Name" Class="text-slate-100 font-weight-bold">
+                <div class="d-flex align-center">
+                    <MudAvatar Color="Color.Primary" Size="Size.Small" Class="mr-2">@context.FullName?[0].ToString().ToUpper()</MudAvatar>
+                    @context.FullName
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Email Address" Class="text-slate-300">@context.Email</MudTd>
+            <MudTd DataLabel="System Role">
+                @if (context.Role == "Admin")
+                {
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Text">Administrator</MudChip>
+                }
+                else if (context.Role == "StoreManager")
+                {
+                    <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Text">Store Manager</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Text">Viewer / Guest</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.Status == "Active")
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">Active</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Text">Suspended</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Action" Style="text-align: right;">
+                <MudIconButton Icon="@Icons.Material.Filled.ManageAccounts" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+<!-- Dialog for Role Edit -->
+<MudDialog @bind-Visible="_dialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">Manage User Permissions</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm>
+            <div class="d-flex flex-column gap-4">
+                <MudText Typo="Typo.body2" Class="text-slate-300">
+                    Modifying authorization for: <b>@_editUser.Email</b>
+                </MudText>
+
+                <MudSelect T="string" Label="System Role" @bind-Value="_editUser.Role" Variant="Variant.Outlined" Class="text-slate-200">
+                    <MudSelectItem Value="@("Admin")">Administrator</MudSelectItem>
+                    <MudSelectItem Value="@("StoreManager")">Store Manager</MudSelectItem>
+                    <MudSelectItem Value="@("Viewer")">Viewer Only</MudSelectItem>
+                </MudSelect>
+
+                <MudSelect T="string" Label="Status" @bind-Value="_editUser.Status" Variant="Variant.Outlined" Class="text-slate-200">
+                    <MudSelectItem Value="@("Active")">Active</MudSelectItem>
+                    <MudSelectItem Value="@("Inactive")">Suspended</MudSelectItem>
+                </MudSelect>
+            </div>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog" Variant="Variant.Text" Color="Color.Secondary">Cancel</MudButton>
+        <MudButton OnClick="SaveUserRole" Variant="Variant.Filled" Color="Color.Primary" Disabled="_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                <MudText>Update</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<UserProfile> _users = new();
+    private bool _loading = true;
+    private bool _saving = false;
+    private string _searchString = "";
+
+    // Dialog state
+    private bool _dialogOpen = false;
+    private UserProfile _editUser = new();
+    private readonly DialogOptions _dialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        _loading = true;
+        try
+        {
+            _users = await Http.GetFromJsonAsync<List<UserProfile>>("api/auth/users") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading user list: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool FilterFunc(UserProfile element) =>
+        string.IsNullOrWhiteSpace(_searchString) ||
+        element.Email.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        (element.FullName != null && element.FullName.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+
+    private void OpenEditDialog(UserProfile user)
+    {
+        _editUser = new UserProfile
+        {
+            Id = user.Id,
+            Email = user.Email,
+            FullName = user.FullName,
+            Role = user.Role,
+            Status = user.Status,
+            CreatedAt = user.CreatedAt
+        };
+        _dialogOpen = true;
+    }
+
+    private void CloseDialog()
+    {
+        _dialogOpen = false;
+    }
+
+    private async Task SaveUserRole()
+    {
+        _saving = true;
+        try
+        {
+            var dto = new UserRoleUpdateDto
+            {
+                UserId = _editUser.Id,
+                Role = _editUser.Role,
+                Status = _editUser.Status
+            };
+
+            var response = await Http.PostAsJsonAsync("api/auth/update-role", dto);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("User permissions updated successfully!", Severity.Success);
+                _dialogOpen = false;
+                await LoadUsers();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Update failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    // Mirror UserRoleUpdateDto in Razor
+    private class UserRoleUpdateDto
+    {
+        public Guid UserId { get; set; }
+        public string Role { get; set; } = "Viewer";
+        public string Status { get; set; } = "Active";
+    }
+}

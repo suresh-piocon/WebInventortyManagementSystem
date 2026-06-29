@@ -1,0 +1,20 @@
+<MudDialog>
+    <DialogContent>
+        <div class="d-flex justify-center align-center pa-2">
+            <img src="@imageUrl" style="max-width: 100%; max-height: 70vh; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 25px rgba(0,0,0,0.5);" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Close" Variant="Variant.Filled" Style="font-family: 'Outfit';">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] 
+    public string imageUrl { get; set; } = string.Empty;
+
+    private void Close() => MudDialog.Close();
+}

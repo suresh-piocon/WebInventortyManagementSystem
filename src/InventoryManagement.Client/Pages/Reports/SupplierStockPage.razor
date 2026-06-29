@@ -1,0 +1,170 @@
+@page "/reports/supplier-stock"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Supplier Stock Report - AG Inventory</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="d-flex justify-between align-center mb-6">
+        <div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+                Supplier Stock Report
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-slate-400">
+                View current stock balances grouped by supplier, batch codes, and tracking numbers
+            </MudText>
+        </div>
+        <div class="d-flex align-center gap-2">
+            <MudSelect T="string" Label="Valuation Mode" Value="@_valuationMethod" ValueChanged="OnValuationChanged" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 200px; color: white;">
+                <MudSelectItem Value="@("WeightedAverage")">Weighted Average</MudSelectItem>
+                <MudSelectItem Value="@("FIFO")">FIFO Method</MudSelectItem>
+            </MudSelect>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Primary" OnClick="LoadReport" />
+        </div>
+    </div>
+
+    <MudTable Items="@_reportLines" 
+              Hover="true" 
+              Loading="@_loading" 
+              SearchString="@_searchString" 
+              Filter="new Func<SupplierStockReportDto, bool>(FilterFunc)"
+              Class="glass-panel text-slate-200">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">Stock Ledger Balances</MudText>
+            <MudSpacer />
+            
+            <MudTextField @bind-Value="_searchString" 
+                          Placeholder="Search by item, supplier, batch..." 
+                          Adornment="Adornment.Start" 
+                          AdornmentIcon="@Icons.Material.Filled.Search" 
+                          IconSize="Size.Medium" 
+                          Class="mt-0 mr-4 text-slate-200" 
+                          Style="color: white;"/>
+
+            <MudMenu StartIcon="@Icons.Material.Filled.Download" Label="Export Data" Color="Color.Secondary" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.KeyboardArrowDown">
+                <MudMenuItem OnClick="@(() => ExportFile("excel"))" Icon="@Icons.Custom.FileFormats.FileExcel" IconColor="Color.Success">Excel (.xlsx)</MudMenuItem>
+                <MudMenuItem OnClick="@(() => ExportFile("csv"))" Icon="@Icons.Material.Filled.TextSnippet" IconColor="Color.Info">CSV (.csv)</MudMenuItem>
+            </MudMenu>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh Style="color: #94A3B8; text-align: center; width: 60px;">Photo</MudTh>
+            <MudTh Style="color: #94A3B8;">Supplier</MudTh>
+            <MudTh Style="color: #94A3B8;">Item Name</MudTh>
+            <MudTh Style="color: #94A3B8;">Batch No</MudTh>
+            <MudTh Style="color: #94A3B8;">Tracking No</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Inward Qty</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Outward Qty</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Balance Qty</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Unit Cost</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Total Value</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Photo" Style="text-align: center;">
+                @if (!string.IsNullOrEmpty(context.ImageUrl))
+                {
+                    <img src="@context.ImageUrl" style="width: 38px; height: 38px; border-radius: 4px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewImage(context.ImageUrl))" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Color="Color.Dark" />
+                }
+            </MudTd>
+            <MudTd DataLabel="Supplier" Class="text-slate-200">@context.SupplierName</MudTd>
+            <MudTd DataLabel="Item Name" Class="text-slate-100 font-weight-bold">
+                @context.ItemName <br/>
+                <span class="text-slate-400 font-mono" style="font-size: 11px;">@context.ItemCode</span>
+            </MudTd>
+            <MudTd DataLabel="Batch No" Class="text-slate-200">@context.BatchNo</MudTd>
+            <MudTd DataLabel="Tracking No" Class="text-slate-300 font-mono" Style="font-size: 12px;">@context.TrackingNo</MudTd>
+            <MudTd DataLabel="Inward Qty" Style="text-align: right;" Class="text-slate-300">@context.InwardQty.ToString("N2")</MudTd>
+            <MudTd DataLabel="Outward Qty" Style="text-align: right;" Class="text-slate-300">@context.OutwardQty.ToString("N2")</MudTd>
+            <MudTd DataLabel="Balance Qty" Style="text-align: right;" Class="text-yellow-500 font-weight-bold">@context.BalanceQty.ToString("N2")</MudTd>
+            <MudTd DataLabel="Unit Cost" Style="text-align: right;" Class="text-slate-300">$@context.UnitCost.ToString("N4")</MudTd>
+            <MudTd DataLabel="Total Value" Style="text-align: right;" Class="text-slate-100 font-weight-bold">$@context.Value.ToString("N2")</MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+@code {
+    private List<SupplierStockReportDto> _reportLines = new();
+    private bool _loading = true;
+    private string _searchString = "";
+    private string _valuationMethod = "WeightedAverage";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReport();
+    }
+
+    private async Task OnValuationChanged(string method)
+    {
+        _valuationMethod = method;
+        await LoadReport();
+    }
+
+    private async Task LoadReport()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            _reportLines = await Http.GetFromJsonAsync<List<SupplierStockReportDto>>($"api/reports/supplier-stock?valuationMethod={_valuationMethod}") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading stock report: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private bool FilterFunc(SupplierStockReportDto element) =>
+        string.IsNullOrWhiteSpace(_searchString) ||
+        element.ItemName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        element.ItemCode.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        element.SupplierName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        element.BatchNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        element.TrackingNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+
+    private async Task PreviewImage(string url)
+    {
+        var parameters = new DialogParameters { ["imageUrl"] = url };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
+        await DialogService.ShowAsync<ImagePreviewDialog>("Item Photo", parameters, options);
+    }
+
+    private async Task ExportFile(string format)
+    {
+        try
+        {
+            var fileName = $"SupplierStockReport_{_valuationMethod}_{DateTime.Now:yyyyMMddHHmmss}.{(format == "csv" ? "csv" : "xlsx")}";
+            var contentType = format == "csv" ? "text/csv" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            
+            var response = await Http.GetAsync($"api/reports/export/supplier-stock?format={format}&valuationMethod={_valuationMethod}");
+            if (response.IsSuccessStatusCode)
+            {
+                var fileBytes = await response.Content.ReadAsByteArrayAsync();
+                var base64 = Convert.ToBase64String(fileBytes);
+                
+                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, contentType, base64);
+                Snackbar.Add("Report exported successfully!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Export failed.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error exporting: {ex.Message}", Severity.Error);
+        }
+    }
+}

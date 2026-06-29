@@ -1,0 +1,24 @@
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(Program).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <Authorizing>
+                    <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: #0F172A; color: white;">
+                        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+                        <MudText Typo="Typo.h6" Class="mt-4 font-weight-bold">Verifying Permissions...</MudText>
+                    </div>
+                </Authorizing>
+                <NotAuthorized>
+                    <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Error">You are not authorized to view this page.</MudText>
+                </NotAuthorized>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <PageTitle>Not found</PageTitle>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <p role="alert">Sorry, there's nothing at this address.</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>

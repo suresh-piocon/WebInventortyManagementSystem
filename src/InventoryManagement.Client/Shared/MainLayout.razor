@@ -1,0 +1,170 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ApiAuthenticationStateProvider CustomAuthStateProvider
+
+<MudThemeProvider Theme="_customTheme" @bind-IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider FullWidth="true" CloseButton="true" MaxWidth="MaxWidth.ExtraSmall" Position="DialogPosition.Center" />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <AuthorizeView>
+        <Authorized>
+            <MudAppBar Elevation="1" Class="glass-panel" Style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+                <MudText Typo="Typo.h5" Class="animated-gradient-text ml-3 font-weight-bold" Style="font-family: 'Outfit'; font-weight: 700; letter-spacing: 0.5px;">
+                    AG INVENTORY
+                </MudText>
+                
+                <MudSpacer />
+
+                <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" 
+                               Color="Color.Inherit" 
+                               OnClick="@ToggleDarkMode" 
+                               Class="mr-2" />
+
+                <!-- User profile menu -->
+                <div class="d-flex align-center mr-4">
+                    <MudAvatar Color="Color.Primary" Size="Size.Small" Class="mr-2">
+                        @context.User.Identity?.Name?[0].ToString().ToUpper()
+                    </MudAvatar>
+                    <div class="d-none d-sm-flex flex-column">
+                        <MudText Typo="Typo.body2" Class="font-weight-bold text-slate-200">
+                            @context.User.Identity?.Name
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-size: 10px;">
+                            @context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
+                        </MudText>
+                    </div>
+                </div>
+
+                <MudButton Variant="Variant.Outlined" 
+                           Color="Color.Error" 
+                           StartIcon="@Icons.Material.Filled.Logout" 
+                           Size="Size.Small"
+                           OnClick="Logout">
+                    Logout
+                </MudButton>
+            </MudAppBar>
+
+            <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2" Class="glass-panel" Style="border-right: 1px solid rgba(255,255,255,0.08);">
+                <MudDrawerHeader Class="d-flex align-center py-2 px-4">
+                    <MudIcon Icon="@Icons.Material.Filled.Warehouse" Color="Color.Primary" Class="mr-2" Size="Size.Medium" />
+                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold text-slate-200" Style="font-family: 'Outfit';">MAIN MENU</MudText>
+                </MudDrawerHeader>
+                <MudNavMenu>
+                    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+                    
+                    <AuthorizeView Roles="Admin,StoreManager" Context="managerContext">
+                        <MudNavGroup Title="Masters" Icon="@Icons.Material.Filled.Settings" Expanded="false">
+                            <MudNavLink Href="masters/items" Icon="@Icons.Material.Filled.Layers">Item Master</MudNavLink>
+                            <MudNavLink Href="masters/suppliers" Icon="@Icons.Material.Filled.Business">Supplier Master</MudNavLink>
+                            <MudNavLink Href="masters/categories" Icon="@Icons.Material.Filled.Category">Category Master</MudNavLink>
+                            <MudNavLink Href="masters/units" Icon="@Icons.Material.Filled.Straighten">Unit Master</MudNavLink>
+                        </MudNavGroup>
+
+                        <MudNavLink Href="stock-inward" Icon="@Icons.Material.Filled.MoveToInbox">Stock Inward</MudNavLink>
+                        <MudNavLink Href="stock-outward" Icon="@Icons.Material.Filled.Outbox">Stock Outward</MudNavLink>
+                        <MudNavLink Href="barcode-printer" Icon="@Icons.Material.Filled.Print">Print Barcodes</MudNavLink>
+                    </AuthorizeView>
+
+                    <MudNavGroup Title="Reports" Icon="@Icons.Material.Filled.Assessment" Expanded="false">
+                        <MudNavLink Href="reports/ledger" Icon="@Icons.Material.Filled.Book">Stock Ledger</MudNavLink>
+                        <MudNavLink Href="reports/supplier-stock" Icon="@Icons.Material.Filled.Assignment">Supplier Stock</MudNavLink>
+                        <MudNavLink Href="reports/supplier-purchase" Icon="@Icons.Material.Filled.ReceiptLong">Purchase History</MudNavLink>
+                        <MudNavLink Href="reports/barcode-tracking" Icon="@Icons.Material.Filled.QrCodeScanner">Barcode History</MudNavLink>
+                        <AuthorizeView Roles="Admin" Context="auditContext">
+                            <MudNavLink Href="reports/audit" Icon="@Icons.Material.Filled.History">Audit Trail</MudNavLink>
+                        </AuthorizeView>
+                    </MudNavGroup>
+
+                    <AuthorizeView Roles="Admin" Context="userAdminContext">
+                        <MudNavLink Href="users" Icon="@Icons.Material.Filled.People">User Management</MudNavLink>
+                    </AuthorizeView>
+                </MudNavMenu>
+            </MudDrawer>
+
+            <MudMainContent Class="pa-6" Style="background: #090D1A; min-height: 100vh;">
+                @Body
+            </MudMainContent>
+        </Authorized>
+        <NotAuthorized>
+            <!-- Show only login / unauthorized layout -->
+            <div style="background: #090D1A; min-height: 100vh;">
+                @Body
+            </div>
+        </NotAuthorized>
+    </AuthorizeView>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+    private bool _isDarkMode = true;
+
+    private readonly MudTheme _customTheme = new()
+    {
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#5C5CFF", // Royal Blue
+            Secondary = "#00E5FF", // Cyan
+            Background = "#090D1A", // Dark Slate Blue
+            Surface = "#0F172A", // Dark Grayish Blue
+            AppbarBackground = "#0F172A",
+            DrawerBackground = "#0F172A",
+            TextPrimary = "#F8FAFC",
+            TextSecondary = "#94A3B8",
+            Divider = "rgba(255,255,255,0.08)",
+            Success = "#10B981",
+            Error = "#EF4444"
+        },
+        PaletteLight = new PaletteLight()
+        {
+            Primary = "#5C5CFF",
+            Secondary = "#00E5FF",
+            Background = "#F8FAFC",
+            Surface = "#FFFFFF",
+            AppbarBackground = "#FFFFFF",
+            DrawerBackground = "#FFFFFF",
+            TextPrimary = "#0F172A",
+            TextSecondary = "#475569",
+            Divider = "rgba(0,0,0,0.08)"
+        },
+        LayoutProperties = new LayoutProperties()
+        {
+            DefaultBorderRadius = "8px"
+        }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            // Redirect to login if not authenticated and not already on the login page
+            var relativeUri = Navigation.ToBaseRelativePath(Navigation.Uri);
+            if (relativeUri != "login")
+            {
+                Navigation.NavigateTo("login");
+            }
+        }
+    }
+
+    private void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    private void ToggleDarkMode()
+    {
+        _isDarkMode = !_isDarkMode;
+    }
+
+    private async Task Logout()
+    {
+        await CustomAuthStateProvider.MarkUserAsLoggedOut();
+        Navigation.NavigateTo("login");
+    }
+}

@@ -1,0 +1,368 @@
+@page "/barcode-printer"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@inject BarcodeGeneratorService BarcodeGen
+
+<PageTitle>Print Barcode Labels - AG Inventory</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2 no-print">
+    <div class="mb-6">
+        <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+            Print Barcode & QR Labels
+        </MudText>
+        <MudText Typo="Typo.body2" Class="text-slate-400">
+            Generate and print vector-precision Code128 barcodes and QR codes for item tracking
+        </MudText>
+    </div>
+
+    <MudGrid>
+        <!-- Print Configuration Panel -->
+        <MudItem xs="12" md="4">
+            <MudPaper Class="glass-panel pa-6 mb-4">
+                <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                    <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-2" /> Label Config
+                </MudText>
+
+                <MudSelect T="Guid" 
+                           Label="Select Item" 
+                           Value="@_selectedItemId" 
+                           ValueChanged="OnItemChanged"
+                           Variant="Variant.Outlined" 
+                           Class="mb-4 text-slate-200">
+                    @foreach (var item in _items)
+                    {
+                        <MudSelectItem Value="@item.Id">@item.Code - @item.Name (@item.BarcodeType)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="string" 
+                           Label="Label Format Size" 
+                           @bind-Value="_labelSize" 
+                           Variant="Variant.Outlined" 
+                           Class="mb-4 text-slate-200">
+                    <MudSelectItem Value="@("50x25")">50 x 25 mm (2 x 1 inch)</MudSelectItem>
+                    <MudSelectItem Value="@("75x50")">75 x 50 mm (3 x 2 inch)</MudSelectItem>
+                </MudSelect>
+
+                <MudNumericField T="int" 
+                                 Label="Print Copies Per Barcode" 
+                                 @bind-Value="_copies" 
+                                 Min="1" 
+                                 Max="50"
+                                 Variant="Variant.Outlined" 
+                                 Class="mb-6 text-slate-200" />
+
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           StartIcon="@Icons.Material.Filled.Print" 
+                           FullWidth="true"
+                           Size="Size.Large"
+                           OnClick="TriggerPrint"
+                           Disabled="@(!_selectedBarcodes.Any())"
+                           Style="background: linear-gradient(135deg, #5C5CFF 0%, #00E5FF 100%); font-family: 'Outfit'; font-weight: 600;">
+                    Print Selected Labels (@(_selectedBarcodes.Count * _copies) total)
+                </MudButton>
+            </MudPaper>
+        </MudItem>
+
+        <!-- Barcode Selection List -->
+        <MudItem xs="12" md="8">
+            <MudPaper Class="glass-panel pa-6">
+                <div class="d-flex justify-between align-center mb-4">
+                    <MudText Typo="Typo.h6" Class="text-slate-200" Style="font-family: 'Outfit';">
+                        <MudIcon Icon="@Icons.Material.Filled.FormatListBulleted" Class="mr-2" /> Select Barcodes to Print
+                    </MudText>
+                    @if (_barcodes.Any())
+                    {
+                        <div class="d-flex gap-2">
+                            <MudButton Variant="Variant.Text" Color="Color.Secondary" Size="Size.Small" OnClick="SelectAll">Select All</MudButton>
+                            <MudButton Variant="Variant.Text" Color="Color.Secondary" Size="Size.Small" OnClick="ClearSelection">Deselect All</MudButton>
+                        </div>
+                    }
+                </div>
+
+                @if (_loading)
+                {
+                    <div class="d-flex justify-center py-8">
+                        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                    </div>
+                }
+                else if (!_barcodes.Any())
+                {
+                    <div class="d-flex flex-column align-center justify-center py-8 text-center text-slate-500">
+                        <MudIcon Icon="@Icons.Material.Filled.QrCode" Size="Size.Large" Class="mb-2" />
+                        @if (_selectedItemId == Guid.Empty)
+                        {
+                            <MudText>Select an item on the left panel to list registered tracking barcodes.</MudText>
+                        }
+                        else
+                        {
+                            <MudText>No barcodes registered for this item yet. Make a Stock Inward entry first.</MudText>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div style="max-height: 450px; overflow-y: auto;">
+                        <MudTable Items="@_barcodes" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0" MultiSelection="true" @bind-SelectedItems="_selectedBarcodes" Style="background: transparent;">
+                            <HeaderContent>
+                                <MudTh Style="color: #94A3B8;">Barcode Number</MudTh>
+                                <MudTh Style="color: #94A3B8;">Batch No</MudTh>
+                                <MudTh Style="color: #94A3B8;">Tracking No</MudTh>
+                                <MudTh Style="color: #94A3B8;">Type</MudTh>
+                                <MudTh Style="color: #94A3B8;">Status</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Barcode Number" Class="text-slate-100 font-mono font-weight-bold">@context.Barcode</MudTd>
+                                <MudTd DataLabel="Batch No" Class="text-slate-200">@context.BatchNo</MudTd>
+                                <MudTd DataLabel="Tracking No" Class="text-slate-300 font-mono" Style="font-size: 12px;">@context.TrackingNo</MudTd>
+                                <MudTd DataLabel="Type" Class="text-slate-300">@context.Type</MudTd>
+                                <MudTd DataLabel="Status">
+                                    @if (context.IsUsed)
+                                    {
+                                        <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Text">Used / Outward</MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">Available</MudChip>
+                                    }
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Visual Interactive Screen Preview (Non-printed layout) -->
+    @if (_selectedBarcodes.Any())
+    {
+        <MudPaper Class="glass-panel pa-6 mt-6">
+            <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                Label Screen Preview (Grid Visualization)
+            </MudText>
+            <div class="d-flex flex-wrap gap-4 justify-center">
+                @foreach (var codeItem in _selectedBarcodes)
+                {
+                    var barcodeSvg = BarcodeGen.GenerateBarcodeSvg(codeItem.Barcode);
+                    var qrContent = GetQRJson(codeItem);
+                    var qrSvg = BarcodeGen.GenerateQRCodeSvg(qrContent);
+
+                    @if (_labelSize == "50x25")
+                    {
+                        <!-- Screen Preview for 50x25mm -->
+                        <div class="pa-2 rounded d-flex flex-column align-center justify-between" style="width: 250px; height: 125px; background: white; color: black; border: 1px dashed #5C5CFF; box-shadow: 0 0 10px rgba(92,92,255,0.15);">
+                            <div class="w-100 d-flex justify-between" style="font-size: 10px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 2px;">
+                                <div style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@_selectedItemName</div>
+                                <div>@codeItem.BatchNo</div>
+                            </div>
+                            <div class="d-flex align-center justify-space-between w-100 px-1 py-1">
+                                <div style="width: 155px; height: auto;">
+                                    @((MarkupString)barcodeSvg)
+                                </div>
+                                <div style="width: 45px; height: 45px;">
+                                    @((MarkupString)qrSvg)
+                                </div>
+                            </div>
+                            <div style="font-size: 8px; font-family: monospace; color: #555;">@codeItem.TrackingNo</div>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Screen Preview for 75x50mm -->
+                        <div class="pa-4 rounded d-flex flex-column align-center justify-between" style="width: 300px; height: 200px; background: white; color: black; border: 1px dashed #5C5CFF; box-shadow: 0 0 10px rgba(92,92,255,0.15);">
+                            <div class="w-100 text-center" style="border-bottom: 2px solid black; padding-bottom: 4px; margin-bottom: 4px;">
+                                <div class="font-weight-bold" style="font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@_selectedItemName</div>
+                                <div style="font-size: 11px; color: #444;">Batch No: <b>@codeItem.BatchNo</b></div>
+                            </div>
+                            
+                            <div class="d-flex align-center justify-between w-100 py-2">
+                                <div style="width: 180px; height: auto;">
+                                    @((MarkupString)barcodeSvg)
+                                </div>
+                                <div style="width: 70px; height: 70px;">
+                                    @((MarkupString)qrSvg)
+                                </div>
+                            </div>
+                            
+                            <div class="w-100 d-flex justify-between" style="font-size: 9px; font-family: monospace; color: #333; border-top: 1px solid #eee; padding-top: 2px;">
+                                <div>Track: @codeItem.TrackingNo</div>
+                                <div>Size: 75x50mm</div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </MudPaper>
+    }
+</MudContainer>
+
+<!-- Printable Sheet (Only visible during @media print) -->
+<div class="printable-sheet d-none">
+    @foreach (var codeItem in _selectedBarcodes)
+    {
+        var barcodeSvg = BarcodeGen.GenerateBarcodeSvg(codeItem.Barcode);
+        var qrContent = GetQRJson(codeItem);
+        var qrSvg = BarcodeGen.GenerateQRCodeSvg(qrContent);
+
+        @for (int c = 0; c < _copies; c++)
+        {
+            @if (_labelSize == "50x25")
+            {
+                <!-- Physical Label print template for 50x25mm -->
+                <div class="label-50-25">
+                    <div style="width: 100%; display: flex; justify-content: space-between; font-size: 8px; font-weight: bold; border-bottom: 0.5px solid #000; padding-bottom: 1px; font-family: sans-serif;">
+                        <span style="max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@_selectedItemName</span>
+                        <span>@codeItem.BatchNo</span>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; height: 16mm;">
+                        <div style="width: 32mm; height: 12mm; overflow: hidden;">
+                            @((MarkupString)barcodeSvg)
+                        </div>
+                        <div style="width: 11mm; height: 11mm;">
+                            @((MarkupString)qrSvg)
+                        </div>
+                    </div>
+                    <div style="font-size: 7px; font-family: monospace; text-align: center; width: 100%;">@codeItem.TrackingNo</div>
+                </div>
+            }
+            else
+            {
+                <!-- Physical Label print template for 75x50mm -->
+                <div class="label-75-50">
+                    <div style="width: 100%; text-align: center; border-bottom: 1px solid #000; padding-bottom: 2px; font-family: sans-serif;">
+                        <div style="font-size: 11px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@_selectedItemName</div>
+                        <div style="font-size: 8px; color: #333;">Batch: <b>@codeItem.BatchNo</b></div>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; height: 32mm;">
+                        <div style="width: 50mm; height: auto;">
+                            @((MarkupString)barcodeSvg)
+                        </div>
+                        <div style="width: 18mm; height: 18mm;">
+                            @((MarkupString)qrSvg)
+                        </div>
+                    </div>
+                    
+                    <div style="width: 100%; display: flex; justify-content: space-between; font-size: 7px; font-family: monospace; border-top: 0.5px solid #ccc; padding-top: 1px;">
+                        <div>Tracking: @codeItem.TrackingNo</div>
+                        <div>AG INVENTORY</div>
+                    </div>
+                </div>
+            }
+        }
+    }
+</div>
+
+<style>
+    /* Styling to hide sidebar and main layout when printing, and show printable-sheet */
+    @@media print {
+        .no-print {
+            display: none !important;
+        }
+        .printable-sheet {
+            display: block !important;
+        }
+    }
+</style>
+
+@code {
+    private List<Item> _items = new();
+    private Guid _selectedItemId = Guid.Empty;
+    private string _selectedItemName = "";
+    
+    private List<BarcodeMaster> _barcodes = new();
+    private HashSet<BarcodeMaster> _selectedBarcodes = new();
+    
+    private string _labelSize = "50x25";
+    private int _copies = 1;
+    private bool _loading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadItems();
+    }
+
+    private async Task LoadItems()
+    {
+        try
+        {
+            _items = await Http.GetFromJsonAsync<List<Item>>("api/masters/items") ?? new();
+            if (_items.Any())
+            {
+                _selectedItemId = _items.First().Id;
+                _selectedItemName = _items.First().Name;
+                await LoadBarcodes();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading items list: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OnItemChanged(Guid itemId)
+    {
+        _selectedItemId = itemId;
+        _selectedItemName = _items.FirstOrDefault(i => i.Id == itemId)?.Name ?? "";
+        await LoadBarcodes();
+    }
+
+    private async Task LoadBarcodes()
+    {
+        if (_selectedItemId == Guid.Empty) return;
+
+        _loading = true;
+        _selectedBarcodes.Clear();
+        StateHasChanged();
+
+        try
+        {
+            _barcodes = await Http.GetFromJsonAsync<List<BarcodeMaster>>($"api/reports/barcodes/item/{_selectedItemId}") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading barcodes: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void SelectAll()
+    {
+        _selectedBarcodes = new HashSet<BarcodeMaster>(_barcodes);
+    }
+
+    private void ClearSelection()
+    {
+        _selectedBarcodes.Clear();
+    }
+
+    private string GetQRJson(BarcodeMaster codeItem)
+    {
+        var qrData = new
+        {
+            TrackingNo = codeItem.TrackingNo,
+            Item = _selectedItemName,
+            Batch = codeItem.BatchNo,
+            Barcode = codeItem.Barcode
+        };
+        return System.Text.Json.JsonSerializer.Serialize(qrData);
+    }
+
+    private async Task TriggerPrint()
+    {
+        if (!_selectedBarcodes.Any()) return;
+        
+        // Brief delay to allow DOM to synchronize
+        await Task.Delay(200);
+        
+        // Trigger browser print dialog
+        await JSRuntime.InvokeVoidAsync("window.print");
+    }
+}

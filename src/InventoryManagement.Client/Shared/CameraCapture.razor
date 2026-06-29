@@ -1,0 +1,228 @@
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudCard Class="glass-panel mt-2 mud-elevation-4">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6" Class="animated-gradient-text font-weight-bold">
+                <MudIcon Icon="@Icons.Material.Filled.PhotoCamera" Class="mr-2" /> Item Photo Capture
+            </MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudToggleGroup T="string" Value="@_captureMode" ValueChanged="OnCaptureModeChanged" Color="Color.Primary" Size="Size.Small" Delimiters="true">
+                <MudToggleItem Value="@("Webcam")">Webcam</MudToggleItem>
+                <MudToggleItem Value="@("Upload")">Mobile / File</MudToggleItem>
+            </MudToggleGroup>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (_isUploading)
+        {
+            <div class="d-flex flex-column align-items-center justify-content-center py-4">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" Class="mb-2" />
+                <MudText Typo="Typo.body2">Uploading photo to inventory server...</MudText>
+            </div>
+        }
+        else
+        {
+            <div class="d-flex flex-column align-center justify-center">
+                @if (_captureMode == "Webcam")
+                {
+                    <div style="position: relative; width: 100%; max-width: 480px; aspect-ratio: 4/3; background: #1E293B; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);" class="@(string.IsNullOrEmpty(_capturedImageBase64) ? "d-block" : "d-none")">
+                        <video id="webcamVideo" style="width: 100%; height: 100%; object-fit: cover;"></video>
+                        <canvas id="webcamCanvas" style="display: none;"></canvas>
+                        
+                        <div style="position: absolute; bottom: 12px; left: 0; right: 0; display: flex; justify-content: center;">
+                            <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Camera" OnClick="CaptureWebcamPhoto" Size="Size.Medium">
+                                Snap Photo
+                            </MudButton>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="@(string.IsNullOrEmpty(_capturedImageBase64) ? "d-block w-100" : "d-none")">
+                        <div class="d-flex flex-column align-center justify-center p-4 border-2 border-dashed border-slate-500 rounded-lg text-center" style="cursor: pointer; min-height: 150px; background: rgba(30, 41, 59, 0.3);">
+                             <MudFileUpload T="IBrowserFile" OnFilesChanged="UploadFiles" Accept="image/*" Class="w-100">
+                                 <ActivatorContent>
+                                     <MudButton Variant="Variant.Filled"
+                                                Color="Color.Primary"
+                                                StartIcon="@Icons.Material.Filled.PhotoCamera"
+                                                Class="mx-auto">
+                                         Take Mobile Photo / Browse
+                                     </MudButton>
+                                 </ActivatorContent>
+                             </MudFileUpload>
+                            <MudText Typo="Typo.caption" Class="mt-2 text-slate-400">Supports native camera capture on mobile phones</MudText>
+                        </div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(_capturedImageBase64))
+                {
+                    <div style="position: relative; width: 100%; max-width: 480px;" class="d-flex flex-column align-center">
+                        <img src="@_capturedImageBase64" style="width: 100%; border-radius: 8px; border: 1px solid #5C5CFF; box-shadow: 0 0 15px rgba(92,92,255,0.2);" />
+                        <div class="mt-3 d-flex gap-2">
+                            <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.CheckCircle" OnClick="SaveAndUploadPhoto" Size="Size.Small">
+                                Use Photo
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Refresh" OnClick="RetakePhoto" Size="Size.Small">
+                                Retake
+                            </MudButton>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter]
+    public EventCallback<string> OnPhotoCaptured { get; set; }
+
+    private string _captureMode = "Webcam";
+    private string? _capturedImageBase64;
+    private bool _isStreamActive = false;
+    private bool _isUploading = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _captureMode == "Webcam")
+        {
+            await StartWebcamAsync();
+        }
+    }
+
+    private async Task OnCaptureModeChanged(string newMode)
+    {
+        _captureMode = newMode;
+        _capturedImageBase64 = null;
+        
+        if (_captureMode == "Webcam")
+        {
+            await StartWebcamAsync();
+        }
+        else
+        {
+            await StopWebcamAsync();
+        }
+    }
+
+    private async Task StartWebcamAsync()
+    {
+        if (_isStreamActive) return;
+        
+        // Brief delay to ensure HTML elements render
+        await Task.Delay(200);
+        
+        bool success = await JSRuntime.InvokeAsync<bool>("webcamInterop.startStream", "webcamVideo");
+        if (success)
+        {
+            _isStreamActive = true;
+        }
+        else
+        {
+            Snackbar.Add("Could not access camera. Please make sure camera is connected and permissions are granted. Switched to File Upload.", Severity.Warning);
+            _captureMode = "Upload";
+            StateHasChanged();
+        }
+    }
+
+    private async Task StopWebcamAsync()
+    {
+        if (!_isStreamActive) return;
+        await JSRuntime.InvokeVoidAsync("webcamInterop.stopStream");
+        _isStreamActive = false;
+    }
+
+    private async Task CaptureWebcamPhoto()
+    {
+        var photoBase64 = await JSRuntime.InvokeAsync<string>("webcamInterop.capturePhoto", "webcamVideo", "webcamCanvas");
+        if (!string.IsNullOrEmpty(photoBase64))
+        {
+            _capturedImageBase64 = photoBase64;
+            await StopWebcamAsync();
+        }
+    }
+
+    private async Task UploadFiles(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            // Resize image to max 800x600 for performance
+            var resizedFile = await file.RequestImageFileAsync("image/jpeg", 800, 600);
+            using var ms = new System.IO.MemoryStream();
+            await resizedFile.OpenReadStream(1024 * 1024 * 5).CopyToAsync(ms); // Max 5MB
+            var bytes = ms.ToArray();
+            _capturedImageBase64 = $"data:image/jpeg;base64,{Convert.ToBase64String(bytes)}";
+        }
+    }
+
+    private async Task SaveAndUploadPhoto()
+    {
+        if (string.IsNullOrEmpty(_capturedImageBase64)) return;
+
+        _isUploading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Extract pure base64 bytes
+            var base64Data = _capturedImageBase64.Split(',')[1];
+            var imageBytes = Convert.FromBase64String(base64Data);
+
+            using var content = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent(imageBytes);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
+            content.Add(fileContent, "file", "photo.jpg");
+
+            var response = await Http.PostAsync("api/storage/upload", content);
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadFromJsonAsync<UploadResponse>();
+                if (responseContent != null && !string.IsNullOrEmpty(responseContent.Url))
+                {
+                    Snackbar.Add("Photo uploaded successfully!", Severity.Success);
+                    await OnPhotoCaptured.InvokeAsync(responseContent.Url);
+                    _capturedImageBase64 = null; // Clear state
+                }
+            }
+            else
+            {
+                var errorMsg = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Upload failed: {errorMsg}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error uploading photo: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isUploading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RetakePhoto()
+    {
+        _capturedImageBase64 = null;
+        if (_captureMode == "Webcam")
+        {
+            await StartWebcamAsync();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await StopWebcamAsync();
+    }
+
+    private class UploadResponse
+    {
+        public string Url { get; set; } = string.Empty;
+    }
+}

@@ -1,0 +1,276 @@
+@page "/masters/suppliers"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Supplier Master - AG Inventory</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="d-flex justify-between align-center mb-6">
+        <div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+                Supplier Master
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-slate-400">
+                Manage vendor profiles, contact details, and GST registrations
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog"
+                   Style="background: linear-gradient(135deg, #5C5CFF 0%, #00E5FF 100%); font-family: 'Outfit'; font-weight: 600;">
+            Add Supplier
+        </MudButton>
+    </div>
+
+    <MudTable Items="@_suppliers" 
+              Hover="true" 
+              Loading="@_loading" 
+              SearchString="@_searchString" 
+              Filter="new Func<Supplier, bool>(FilterFunc)"
+              Class="glass-panel text-slate-200">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">Suppliers list</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString" 
+                          Placeholder="Search suppliers..." 
+                          Adornment="Adornment.Start" 
+                          AdornmentIcon="@Icons.Material.Filled.Search" 
+                          IconSize="Size.Medium" 
+                          Class="mt-0 text-slate-200" 
+                          Style="color: white;"/>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh Style="color: #94A3B8;">Code</MudTh>
+            <MudTh Style="color: #94A3B8;">Supplier Name</MudTh>
+            <MudTh Style="color: #94A3B8;">Contact Person</MudTh>
+            <MudTh Style="color: #94A3B8;">Mobile No</MudTh>
+            <MudTh Style="color: #94A3B8;">GST No</MudTh>
+            <MudTh Style="color: #94A3B8;">Status</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Code" Class="text-slate-100 font-weight-bold">@context.Code</MudTd>
+            <MudTd DataLabel="Supplier Name" Class="text-slate-200 font-weight-bold">@context.Name</MudTd>
+            <MudTd DataLabel="Contact Person" Class="text-slate-300">@context.ContactPerson</MudTd>
+            <MudTd DataLabel="Mobile No" Class="text-slate-300">@context.MobileNo</MudTd>
+            <MudTd DataLabel="GST No" Class="text-slate-300">@context.GSTNo</MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.Status == "Active")
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">Active</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Text">Inactive</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Actions" Style="text-align: right;">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => ConfirmDelete(context))" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+<!-- Dialog for Add/Edit -->
+<MudDialog @bind-Visible="_dialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
+            @(_editSupplier.Id == Guid.Empty ? "Create New Supplier" : "Edit Supplier")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isFormValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Supplier Code" @bind-Value="_editSupplier.Code" Required="true" RequiredError="Supplier code is required" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Supplier Name" @bind-Value="_editSupplier.Name" Required="true" RequiredError="Supplier name is required" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Contact Person" @bind-Value="_editSupplier.ContactPerson" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Mobile No" @bind-Value="_editSupplier.MobileNo" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="GST No" @bind-Value="_editSupplier.GSTNo" MaxLength="15" HelperText="15-digit GSTIN format" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Email Address" @bind-Value="_editSupplier.Email" InputType="InputType.Email" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField T="string" Label="Supplier Address" @bind-Value="_editSupplier.Address" Lines="3" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" Label="Status" @bind-Value="_editSupplier.Status" Class="text-slate-200">
+                        <MudSelectItem Value="@("Active")">Active</MudSelectItem>
+                        <MudSelectItem Value="@("Inactive")">Inactive</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog" Variant="Variant.Text" Color="Color.Secondary">Cancel</MudButton>
+        <MudButton OnClick="SaveSupplier" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_isFormValid || _saving)">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<Supplier> _suppliers = new();
+    private bool _loading = true;
+    private bool _saving = false;
+    private string _searchString = "";
+
+    // Dialog state
+    private bool _dialogOpen = false;
+    private bool _isFormValid = false;
+    private MudForm? _form;
+    private Supplier _editSupplier = new();
+    private readonly DialogOptions _dialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSuppliers();
+    }
+
+    private async Task LoadSuppliers()
+    {
+        _loading = true;
+        try
+        {
+            _suppliers = await Http.GetFromJsonAsync<List<Supplier>>("api/masters/suppliers") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading suppliers: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool FilterFunc(Supplier element) => 
+        string.IsNullOrWhiteSpace(_searchString) || 
+        element.Code.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        element.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        (element.ContactPerson != null && element.ContactPerson.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) ||
+        (element.GSTNo != null && element.GSTNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+
+    private void OpenAddDialog()
+    {
+        _editSupplier = new Supplier { Status = "Active" };
+        _dialogOpen = true;
+    }
+
+    private void OpenEditDialog(Supplier supplier)
+    {
+        _editSupplier = new Supplier
+        {
+            Id = supplier.Id,
+            Code = supplier.Code,
+            Name = supplier.Name,
+            ContactPerson = supplier.ContactPerson,
+            MobileNo = supplier.MobileNo,
+            GSTNo = supplier.GSTNo,
+            Address = supplier.Address,
+            Email = supplier.Email,
+            Status = supplier.Status,
+            CreatedAt = supplier.CreatedAt
+        };
+        _dialogOpen = true;
+    }
+
+    private void CloseDialog()
+    {
+        _dialogOpen = false;
+    }
+
+    private async Task SaveSupplier()
+    {
+        if (_form == null) return;
+        await _form.Validate();
+        if (!_form.IsValid) return;
+
+        _saving = true;
+        try
+        {
+            HttpResponseMessage response;
+            if (_editSupplier.Id == Guid.Empty)
+            {
+                response = await Http.PostAsJsonAsync("api/masters/suppliers", _editSupplier);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"api/masters/suppliers/{_editSupplier.Id}", _editSupplier);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Supplier profile saved successfully!", Severity.Success);
+                _dialogOpen = false;
+                await LoadSuppliers();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Save failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ConfirmDelete(Supplier supplier)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Delete Supplier", 
+            $"Are you sure you want to delete supplier '{supplier.Name}'?", 
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/masters/suppliers/{supplier.Id}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Supplier deleted successfully!", Severity.Success);
+                    await LoadSuppliers();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Delete failed: {error}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

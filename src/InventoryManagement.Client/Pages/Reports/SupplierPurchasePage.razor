@@ -1,0 +1,151 @@
+@page "/reports/supplier-purchase"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Supplier Purchase History - AG Inventory</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="mb-6">
+        <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+            Supplier Purchase Report
+        </MudText>
+        <MudText Typo="Typo.body2" Class="text-slate-400">
+            Audit historical stock inward purchases filtered by transaction date range
+        </MudText>
+    </div>
+
+    <!-- Filter Bar -->
+    <MudPaper Class="glass-panel pa-4 mb-6 d-flex align-center justify-between flex-wrap gap-4">
+        <div class="d-flex align-center gap-4 flex-wrap">
+            <MudDatePicker Label="From Date" @bind-Date="_startDate" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 180px; color: white;" />
+            <MudDatePicker Label="To Date" @bind-Date="_endDate" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 180px; color: white;" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadReport" StartIcon="@Icons.Material.Filled.FilterAlt" Class="mt-1">
+                Filter
+            </MudButton>
+        </div>
+        <div class="d-flex gap-2">
+            <MudMenu StartIcon="@Icons.Material.Filled.Download" Label="Export" Color="Color.Secondary" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.KeyboardArrowDown">
+                <MudMenuItem OnClick="@(() => ExportFile("excel"))" Icon="@Icons.Custom.FileFormats.FileExcel" IconColor="Color.Success">Excel (.xlsx)</MudMenuItem>
+                <MudMenuItem OnClick="@(() => ExportFile("csv"))" Icon="@Icons.Material.Filled.TextSnippet" IconColor="Color.Info">CSV (.csv)</MudMenuItem>
+            </MudMenu>
+        </div>
+    </MudPaper>
+
+    <MudTable Items="@_purchases" 
+              Hover="true" 
+              Loading="@_loading" 
+              SearchString="@_searchString" 
+              Filter="new Func<SupplierPurchaseReportDto, bool>(FilterFunc)"
+              Class="glass-panel text-slate-200">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">Purchase Entries</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString" 
+                          Placeholder="Search item or supplier..." 
+                          Adornment="Adornment.Start" 
+                          AdornmentIcon="@Icons.Material.Filled.Search" 
+                          IconSize="Size.Medium" 
+                          Class="mt-0 text-slate-200" 
+                          Style="color: white;"/>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh Style="color: #94A3B8;">Purchase Date</MudTh>
+            <MudTh Style="color: #94A3B8;">Supplier Name</MudTh>
+            <MudTh Style="color: #94A3B8;">Invoice No</MudTh>
+            <MudTh Style="color: #94A3B8;">Item Code</MudTh>
+            <MudTh Style="color: #94A3B8;">Item Name</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Quantity</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Purchase Rate</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Total Amount</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Purchase Date" Class="text-slate-300">@context.InwardDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</MudTd>
+            <MudTd DataLabel="Supplier Name" Class="text-slate-200 font-weight-bold">@context.SupplierName</MudTd>
+            <MudTd DataLabel="Invoice No" Class="text-slate-300">@context.InvoiceNo</MudTd>
+            <MudTd DataLabel="Item Code" Class="text-slate-400 font-mono" Style="font-size: 12px;">@context.ItemCode</MudTd>
+            <MudTd DataLabel="Item Name" Class="text-slate-100 font-weight-bold">@context.ItemName</MudTd>
+            <MudTd DataLabel="Quantity" Style="text-align: right;" Class="text-slate-300">@context.Quantity.ToString("N2")</MudTd>
+            <MudTd DataLabel="Purchase Rate" Style="text-align: right;" Class="text-slate-300">$@context.Rate.ToString("N4")</MudTd>
+            <MudTd DataLabel="Total Amount" Style="text-align: right;" Class="text-slate-100 font-weight-bold">$@context.Amount.ToString("N2")</MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+@code {
+    private List<SupplierPurchaseReportDto> _purchases = new();
+    private bool _loading = true;
+    private string _searchString = "";
+    
+    private DateTime? _startDate = DateTime.Today.AddMonths(-1);
+    private DateTime? _endDate = DateTime.Today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReport();
+    }
+
+    private async Task LoadReport()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            var startQuery = _startDate.HasValue ? $"startDate={_startDate.Value:yyyy-MM-dd}" : "";
+            var endQuery = _endDate.HasValue ? $"endDate={_endDate.Value:yyyy-MM-dd}" : "";
+            var query = string.Join("&", new[] { startQuery, endQuery }.Where(s => !string.IsNullOrEmpty(s)));
+            
+            _purchases = await Http.GetFromJsonAsync<List<SupplierPurchaseReportDto>>($"api/reports/supplier-purchase?{query}") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading purchase records: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private bool FilterFunc(SupplierPurchaseReportDto element) =>
+        string.IsNullOrWhiteSpace(_searchString) ||
+        element.ItemName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        element.ItemCode.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        element.SupplierName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        element.InvoiceNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+
+    private async Task ExportFile(string format)
+    {
+        try
+        {
+            var startQuery = _startDate.HasValue ? $"startDate={_startDate.Value:yyyy-MM-dd}" : "";
+            var endQuery = _endDate.HasValue ? $"endDate={_endDate.Value:yyyy-MM-dd}" : "";
+            var query = string.Join("&", new[] { $"format={format}", startQuery, endQuery }.Where(s => !string.IsNullOrEmpty(s)));
+
+            var fileName = $"PurchaseReport_{DateTime.Now:yyyyMMddHHmmss}.{(format == "csv" ? "csv" : "xlsx")}";
+            var contentType = format == "csv" ? "text/csv" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+            var response = await Http.GetAsync($"api/reports/export/supplier-purchase?{query}");
+            if (response.IsSuccessStatusCode)
+            {
+                var fileBytes = await response.Content.ReadAsByteArrayAsync();
+                var base64 = Convert.ToBase64String(fileBytes);
+
+                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, contentType, base64);
+                Snackbar.Add("Report exported successfully!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Export failed.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error exporting: {ex.Message}", Severity.Error);
+        }
+    }
+}

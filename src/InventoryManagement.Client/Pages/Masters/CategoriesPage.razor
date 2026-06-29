@@ -1,0 +1,223 @@
+@page "/masters/categories"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Category Master - AG Inventory</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="d-flex justify-between align-center mb-6">
+        <div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+                Category Master
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-slate-400">
+                Organize inventory items into logical classification groups
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog"
+                   Style="background: linear-gradient(135deg, #5C5CFF 0%, #00E5FF 100%); font-family: 'Outfit'; font-weight: 600;">
+            Add Category
+        </MudButton>
+    </div>
+
+    <MudTable Items="@_categories" 
+              Hover="true" 
+              Loading="@_loading" 
+              SearchString="@_searchString" 
+              Filter="new Func<Category, bool>(FilterFunc)"
+              Class="glass-panel text-slate-200">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">Categories list</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString" 
+                          Placeholder="Search by name..." 
+                          Adornment="Adornment.Start" 
+                          AdornmentIcon="@Icons.Material.Filled.Search" 
+                          IconSize="Size.Medium" 
+                          Class="mt-0 text-slate-200" 
+                          Style="color: white;"/>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh Style="color: #94A3B8;">ID</MudTh>
+            <MudTh Style="color: #94A3B8;">Category Name</MudTh>
+            <MudTh Style="color: #94A3B8;">Created Date</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="ID" Class="text-slate-400" Style="font-size: 11px;">@context.Id</MudTd>
+            <MudTd DataLabel="Category Name" Class="text-slate-100 font-weight-bold">@context.Name</MudTd>
+            <MudTd DataLabel="Created Date" Class="text-slate-300">@context.CreatedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</MudTd>
+            <MudTd DataLabel="Actions" Style="text-align: right;">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => ConfirmDelete(context))" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+<!-- Dialog for Add/Edit -->
+<MudDialog @bind-Visible="_dialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
+            @(_editCategory.Id == Guid.Empty ? "Create New Category" : "Edit Category")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isFormValid">
+            <MudTextField T="string" 
+                          Label="Category Name" 
+                          @bind-Value="_editCategory.Name" 
+                          Required="true" 
+                          RequiredError="Category name is required" 
+                          Class="text-slate-200" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog" Variant="Variant.Text" Color="Color.Secondary">Cancel</MudButton>
+        <MudButton OnClick="SaveCategory" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_isFormValid || _saving)">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<Category> _categories = new();
+    private bool _loading = true;
+    private bool _saving = false;
+    private string _searchString = "";
+
+    // Dialog state
+    private bool _dialogOpen = false;
+    private bool _isFormValid = false;
+    private MudForm? _form;
+    private Category _editCategory = new();
+    private readonly DialogOptions _dialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+    }
+
+    private async Task LoadCategories()
+    {
+        _loading = true;
+        try
+        {
+            _categories = await Http.GetFromJsonAsync<List<Category>>("api/masters/categories") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading categories: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool FilterFunc(Category element) => 
+        string.IsNullOrWhiteSpace(_searchString) || 
+        element.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+
+    private void OpenAddDialog()
+    {
+        _editCategory = new Category();
+        _dialogOpen = true;
+    }
+
+    private void OpenEditDialog(Category category)
+    {
+        _editCategory = new Category { Id = category.Id, Name = category.Name, CreatedAt = category.CreatedAt };
+        _dialogOpen = true;
+    }
+
+    private void CloseDialog()
+    {
+        _dialogOpen = false;
+    }
+
+    private async Task SaveCategory()
+    {
+        if (_form == null) return;
+        await _form.Validate();
+        if (!_form.IsValid) return;
+
+        _saving = true;
+        try
+        {
+            HttpResponseMessage response;
+            if (_editCategory.Id == Guid.Empty)
+            {
+                response = await Http.PostAsJsonAsync("api/masters/categories", _editCategory);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"api/masters/categories/{_editCategory.Id}", _editCategory);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Category saved successfully!", Severity.Success);
+                _dialogOpen = false;
+                await LoadCategories();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Save failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ConfirmDelete(Category category)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Delete Category", 
+            $"Are you sure you want to delete category '{category.Name}'?", 
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/masters/categories/{category.Id}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Category deleted successfully!", Severity.Success);
+                    await LoadCategories();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Delete failed: {error}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

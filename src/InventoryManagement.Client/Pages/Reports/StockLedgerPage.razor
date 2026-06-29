@@ -1,0 +1,156 @@
+@page "/reports/ledger"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Stock Ledger - AG Inventory</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="mb-6">
+        <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+            Stock Ledger Report
+        </MudText>
+        <MudText Typo="Typo.body2" Class="text-slate-400">
+            Audit item transaction history: Purchases, Sales, Adjustments, and running balances
+        </MudText>
+    </div>
+
+    <!-- Selection Panel -->
+    <MudPaper Class="glass-panel pa-6 mb-6">
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="4">
+                <MudSelect T="Guid" 
+                           Label="Select Inventory Item" 
+                           Value="@_selectedItemId" 
+                           ValueChanged="OnItemChanged"
+                           Variant="Variant.Outlined" 
+                           Class="text-slate-200">
+                    @foreach (var item in _items)
+                    {
+                        <MudSelectItem Value="@item.Id">@item.Code - @item.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4" Class="d-flex align-center">
+                @if (_selectedItem != null)
+                {
+                    <div class="d-flex flex-column text-slate-300">
+                        <span>Category: <b>@_selectedItem.Category?.Name</b></span>
+                        <span>Tracking Mode: <b>@_selectedItem.BarcodeType</b></span>
+                    </div>
+                }
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudTable Items="@_ledger" 
+              Hover="true" 
+              Loading="@_loading" 
+              Class="glass-panel text-slate-200">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">Transaction ledger</MudText>
+            <MudSpacer />
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh Style="color: #94A3B8;">Date & Time</MudTh>
+            <MudTh Style="color: #94A3B8;">Type</MudTh>
+            <MudTh Style="color: #94A3B8;">Reference No</MudTh>
+            <MudTh Style="color: #94A3B8;">Batch No</MudTh>
+            <MudTh Style="color: #94A3B8;">Tracking No</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Inward Qty</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Outward Qty</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Running Balance</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Unit Price</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Date & Time" Class="text-slate-300">@context.TransactionDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</MudTd>
+            <MudTd DataLabel="Type">
+                @if (context.TransactionType == "Purchase")
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Inward</MudChip>
+                }
+                else if (context.TransactionType == "Sales")
+                {
+                    <MudChip T="string" Color="Color.Info" Size="Size.Small">Outward</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">@context.TransactionType</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Reference No" Class="text-slate-200 font-weight-bold">@context.ReferenceNo</MudTd>
+            <MudTd DataLabel="Batch No" Class="text-slate-200">@context.BatchNo</MudTd>
+            <MudTd DataLabel="Tracking No" Class="text-slate-400 font-mono" Style="font-size: 11px;">@context.TrackingNo</MudTd>
+            <MudTd DataLabel="Inward Qty" Style="text-align: right;" Class="text-green-400 font-weight-bold">
+                @(context.InwardQty > 0 ? $"+{context.InwardQty.ToString("N2")}" : "-")
+            </MudTd>
+            <MudTd DataLabel="Outward Qty" Style="text-align: right;" Class="text-red-400 font-weight-bold">
+                @(context.OutwardQty > 0 ? $"-{context.OutwardQty.ToString("N2")}" : "-")
+            </MudTd>
+            <MudTd DataLabel="Running Balance" Style="text-align: right;" Class="text-slate-100 font-weight-bold">@context.BalanceQty.ToString("N2")</MudTd>
+            <MudTd DataLabel="Unit Price" Style="text-align: right;" Class="text-slate-300">$@context.UnitPrice.ToString("N2")</MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+@code {
+    private List<Item> _items = new();
+    private Guid _selectedItemId = Guid.Empty;
+    private Item? _selectedItem;
+    
+    private List<StockLedger> _ledger = new();
+    private bool _loading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadItems();
+    }
+
+    private async Task LoadItems()
+    {
+        try
+        {
+            _items = await Http.GetFromJsonAsync<List<Item>>("api/masters/items") ?? new();
+            if (_items.Any())
+            {
+                _selectedItemId = _items.First().Id;
+                _selectedItem = _items.First();
+                await LoadLedger();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading items: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OnItemChanged(Guid itemId)
+    {
+        _selectedItemId = itemId;
+        _selectedItem = _items.FirstOrDefault(i => i.Id == itemId);
+        await LoadLedger();
+    }
+
+    private async Task LoadLedger()
+    {
+        if (_selectedItemId == Guid.Empty) return;
+        
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            _ledger = await Http.GetFromJsonAsync<List<StockLedger>>($"api/reports/ledger/{_selectedItemId}") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading ledger records: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+}

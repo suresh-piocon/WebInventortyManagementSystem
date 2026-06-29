@@ -1,0 +1,353 @@
+@page "/stock-inward"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<PageTitle>Stock Inward Entry - AG Inventory</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="mb-6">
+        <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+            Stock Inward Entry
+        </MudText>
+        <MudText Typo="Typo.body2" Class="text-slate-400">
+            Record supplier stock delivery, generate tracking codes, and snap item photos
+        </MudText>
+    </div>
+
+    <EditForm Model="@_inwardHeader" OnValidSubmit="SaveInward">
+        <DataAnnotationsValidator />
+        
+        <MudGrid>
+            <!-- Inward Header Panel -->
+            <MudItem xs="12" md="4">
+                <MudPaper Class="glass-panel pa-6 mb-4">
+                    <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" /> Header Info
+                    </MudText>
+
+                    <MudDatePicker Label="Inward Date" 
+                                   @bind-Date="_inwardDate" 
+                                   Required="true" 
+                                   Variant="Variant.Outlined" 
+                                   Class="mb-4 text-slate-200" />
+
+                    <MudSelect T="Guid" 
+                               Label="Supplier" 
+                               @bind-Value="_inwardHeader.SupplierId" 
+                               Required="true" 
+                               RequiredError="Supplier is required"
+                               Variant="Variant.Outlined" 
+                               Class="mb-4 text-slate-200">
+                        @foreach (var sup in _suppliers)
+                        {
+                            <MudSelectItem Value="@sup.Id">@sup.Code - @sup.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudTextField T="string" 
+                                  Label="Invoice Number" 
+                                  @bind-Value="_inwardHeader.InvoiceNo" 
+                                  Variant="Variant.Outlined" 
+                                  Class="mb-4 text-slate-200" />
+
+                    <MudDatePicker Label="Invoice Date" 
+                                   @bind-Date="_invoiceDate" 
+                                   Variant="Variant.Outlined" 
+                                   Class="mb-4 text-slate-200" />
+                </MudPaper>
+
+                <!-- Actions -->
+                <MudPaper Class="glass-panel pa-4 d-flex justify-between">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="ResetForm">
+                        Reset
+                    </MudButton>
+                    <MudButton ButtonType="ButtonType.Submit" 
+                               Variant="Variant.Filled" 
+                               Color="Color.Success"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               Disabled="@(!_lineItems.Any() || _saving)"
+                               Style="font-family: 'Outfit'; font-weight: 600;">
+                        @if (_saving)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        }
+                        else
+                        {
+                            <MudText>Submit Inward</MudText>
+                        }
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Line Items Grid -->
+            <MudItem xs="12" md="8">
+                <MudPaper Class="glass-panel pa-6 mb-4">
+                    <div class="d-flex justify-between align-center mb-4">
+                        <MudText Typo="Typo.h6" Class="text-slate-200" Style="font-family: 'Outfit';">
+                            <MudIcon Icon="@Icons.Material.Filled.List" Class="mr-2" /> Delivery Line Items
+                        </MudText>
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Primary" 
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="AddLineItem"
+                                   Size="Size.Small">
+                            Add Line Row
+                        </MudButton>
+                    </div>
+
+                    @if (!_lineItems.Any())
+                    {
+                        <div class="d-flex flex-column align-center justify-center py-8 text-center text-slate-500">
+                            <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Size="Size.Large" Class="mb-2" />
+                            <MudText>No items added yet. Click "Add Line Row" above.</MudText>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="overflow-x: auto;">
+                            <table class="w-100 mud-table" style="border-collapse: collapse;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 250px;">Item</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: left;">Color/Size</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 120px;">Batch No</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 90px;">Quantity</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 100px;">Rate</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 100px;">Amount</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: center; width: 80px;">Photo</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: center; width: 50px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (int i = 0; i < _lineItems.Count; i++)
+                                    {
+                                        var index = i;
+                                        var line = _lineItems[index];
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle;">
+                                            <td style="padding: 6px;">
+                                                <MudSelect T="Guid" @bind-Value="line.ItemId" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white;">
+                                                    @foreach (var item in _items)
+                                                    {
+                                                        <MudSelectItem Value="@item.Id">@item.Code - @item.Name (@item.BarcodeType)</MudSelectItem>
+                                                    }
+                                                </MudSelect>
+                                            </td>
+                                            <td style="padding: 6px;">
+                                                <div class="d-flex gap-1">
+                                                    <MudTextField T="string" Placeholder="Color" @bind-Value="line.Color" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; font-size: 12px;" />
+                                                    <MudTextField T="string" Placeholder="Size" @bind-Value="line.Size" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; font-size: 12px;" />
+                                                </div>
+                                            </td>
+                                            <td style="padding: 6px;">
+                                                <MudTextField T="string" @bind-Value="line.BatchNo" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white;" />
+                                            </td>
+                                            <td style="padding: 6px;">
+                                                <MudNumericField T="decimal" @bind-Value="line.Quantity" Min="0.01M" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right;" />
+                                            </td>
+                                            <td style="padding: 6px;">
+                                                <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right;" />
+                                            </td>
+                                            <td style="padding: 6px; text-align: right;" class="text-slate-300 font-weight-bold">
+                                                $@((line.Quantity * line.Rate).ToString("N2"))
+                                            </td>
+                                            <td style="padding: 6px; text-align: center;">
+                                                @if (!string.IsNullOrEmpty(line.ImageUrl))
+                                                {
+                                                    <div style="position: relative; display: inline-block;">
+                                                        <img src="@line.ImageUrl" style="width: 32px; height: 32px; border-radius: 4px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewImage(line.ImageUrl))" />
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Small" Style="position: absolute; top: -10px; right: -10px; padding: 0;" OnClick="@(() => line.ImageUrl = null)" />
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <MudIconButton Icon="@Icons.Material.Filled.AddAPhoto" Color="Color.Secondary" Size="Size.Medium" OnClick="@(() => OpenCameraDialog(index))" />
+                                                }
+                                            </td>
+                                            <td style="padding: 6px; text-align: center;">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveLineItem(index))" />
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="d-flex justify-end mt-4">
+                            <MudText Typo="Typo.subtitle1" Class="font-weight-bold text-slate-100">
+                                Total Invoice Value: <span class="animated-gradient-text" style="font-size: 20px;">$@(_lineItems.Sum(l => l.Quantity * l.Rate).ToString("N2"))</span>
+                            </MudText>
+                        </div>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </EditForm>
+</MudContainer>
+
+<!-- Webcam snapping dialog -->
+<MudDialog @bind-Visible="_cameraDialogOpen" Options="_cameraDialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">Capture Item Image</MudText>
+    </TitleContent>
+    <DialogContent>
+        <CameraCapture OnPhotoCaptured="OnPhotoUploaded" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseCameraDialog" Variant="Variant.Text" Color="Color.Secondary">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<Supplier> _suppliers = new();
+    private List<Item> _items = new();
+    
+    private StockInwardPostDto _inwardHeader = new();
+    private DateTime? _inwardDate = DateTime.Today;
+    private DateTime? _invoiceDate;
+    private List<InwardLineItem> _lineItems = new();
+
+    private bool _saving = false;
+    
+    // Camera Dialog state
+    private bool _cameraDialogOpen = false;
+    private int _activeLineIndex = 0;
+    private readonly DialogOptions _cameraDialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLookups();
+        ResetForm();
+    }
+
+    private async Task LoadLookups()
+    {
+        try
+        {
+            _suppliers = await Http.GetFromJsonAsync<List<Supplier>>("api/masters/suppliers") ?? new();
+            _items = await Http.GetFromJsonAsync<List<Item>>("api/masters/items") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading setup masters: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void AddLineItem()
+    {
+        _lineItems.Add(new InwardLineItem
+        {
+            ItemId = _items.FirstOrDefault()?.Id ?? Guid.Empty,
+            BatchNo = $"BAT{DateTime.UtcNow:yyMMddHHmmss}"
+        });
+    }
+
+    private void RemoveLineItem(int index)
+    {
+        if (index >= 0 && index < _lineItems.Count)
+        {
+            _lineItems.RemoveAt(index);
+        }
+    }
+
+    private void OpenCameraDialog(int index)
+    {
+        _activeLineIndex = index;
+        _cameraDialogOpen = true;
+    }
+
+    private void CloseCameraDialog()
+    {
+        _cameraDialogOpen = false;
+    }
+
+    private void OnPhotoUploaded(string publicUrl)
+    {
+        if (_activeLineIndex >= 0 && _activeLineIndex < _lineItems.Count)
+        {
+            _lineItems[_activeLineIndex].ImageUrl = publicUrl;
+            _cameraDialogOpen = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task PreviewImage(string url)
+    {
+        var parameters = new DialogParameters { ["imageUrl"] = url };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
+        
+        // Inline simple view dialog
+        await DialogService.ShowAsync<ImagePreviewDialog>("Photo View", parameters, options);
+    }
+
+    private void ResetForm()
+    {
+        _inwardHeader = new StockInwardPostDto
+        {
+            InwardDate = DateTimeOffset.UtcNow,
+            SupplierId = _suppliers.FirstOrDefault()?.Id ?? Guid.Empty
+        };
+        _inwardDate = DateTime.Today;
+        _invoiceDate = null;
+        _lineItems.Clear();
+        AddLineItem();
+    }
+
+    private async Task SaveInward()
+    {
+        if (!_lineItems.Any()) return;
+        
+        _saving = true;
+        try
+        {
+            _inwardHeader.InwardDate = _inwardDate ?? DateTimeOffset.UtcNow;
+            _inwardHeader.InvoiceDate = _invoiceDate;
+            
+            // Map details DTO
+            _inwardHeader.Details = _lineItems.Select(l => new StockInwardDetailDto
+            {
+                ItemId = l.ItemId,
+                Color = l.Color,
+                Design = l.Design,
+                Size = l.Size,
+                BatchNo = l.BatchNo,
+                Quantity = l.Quantity,
+                Rate = l.Rate,
+                ImageUrl = l.ImageUrl
+            }).ToList();
+
+            var response = await Http.PostAsJsonAsync("api/stockinward", _inwardHeader);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Stock Inward recorded successfully! Barcodes and QR Codes registered.", Severity.Success);
+                ResetForm();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Submitting inward failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving inward entry: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    public class InwardLineItem
+    {
+        public Guid ItemId { get; set; }
+        public string? Color { get; set; }
+        public string? Design { get; set; }
+        public string? Size { get; set; }
+        public string BatchNo { get; set; } = string.Empty;
+        public decimal Quantity { get; set; } = 1;
+        public decimal Rate { get; set; } = 0;
+        public string? ImageUrl { get; set; }
+    }
+}

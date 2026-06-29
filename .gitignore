@@ -1,0 +1,23 @@
+# Built-in build outputs
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+
+# Local SQLite Database files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Visual Studio / VS Code configurations
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# OS-specific files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
