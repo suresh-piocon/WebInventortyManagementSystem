@@ -94,7 +94,7 @@
                                     <div>Inward Date: <span>@_history.InwardDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</span></div>
                                     <div>Invoice No: <span>@_history.InvoiceNo</span></div>
                                     <div>Inward Quantity: <b>@_history.QuantityInward.ToString("N2")</b></div>
-                                    <div>Inward Unit Rate: <span>$@_history.Rate.ToString("N2")</span></div>
+                                    <div>Inward Unit Rate: <span>₹@_history.Rate.ToString("N2")</span></div>
                                     <div>Tracking Ref: <span class="font-mono text-cyan">@_history.TrackingNo</span></div>
                                     <div>Batch Code: <span class="text-yellow-500 font-weight-bold">@_history.BatchNo</span></div>
                                 </div>
@@ -137,7 +137,7 @@
                                     <MudTd DataLabel="Customer" Class="text-slate-200">@context.CustomerName</MudTd>
                                     <MudTd DataLabel="Date" Class="text-slate-300">@context.OutwardDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</MudTd>
                                     <MudTd DataLabel="Qty Issued" Style="text-align: right;" Class="text-red-400 font-weight-bold">@context.QuantityIssued.ToString("N2")</MudTd>
-                                    <MudTd DataLabel="Rate" Style="text-align: right;" Class="text-slate-300">$@context.Rate.ToString("N2")</MudTd>
+                                    <MudTd DataLabel="Rate" Style="text-align: right;" Class="text-slate-300">₹@context.Rate.ToString("N2")</MudTd>
                                 </RowTemplate>
                             </MudTable>
                         }
@@ -211,7 +211,7 @@
                                 <MudTd DataLabel="Outward Qty" Style="text-align: right;" Class="text-red-400 font-weight-bold">
                                     @(context.OutwardQty > 0 ? $"-{context.OutwardQty.ToString("N2")}" : "-")
                                 </MudTd>
-                                <MudTd DataLabel="Price" Style="text-align: right;" Class="text-slate-300">$@context.UnitPrice.ToString("N2")</MudTd>
+                                <MudTd DataLabel="Price" Style="text-align: right;" Class="text-slate-300">₹@context.UnitPrice.ToString("N2")</MudTd>
                             </RowTemplate>
                         </MudTable>
                     </MudCardContent>

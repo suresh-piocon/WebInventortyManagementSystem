@@ -66,8 +66,8 @@
             <MudTd DataLabel="Item Code" Class="text-slate-400 font-mono" Style="font-size: 12px;">@context.ItemCode</MudTd>
             <MudTd DataLabel="Item Name" Class="text-slate-100 font-weight-bold">@context.ItemName</MudTd>
             <MudTd DataLabel="Quantity" Style="text-align: right;" Class="text-slate-300">@context.Quantity.ToString("N2")</MudTd>
-            <MudTd DataLabel="Purchase Rate" Style="text-align: right;" Class="text-slate-300">$@context.Rate.ToString("N4")</MudTd>
-            <MudTd DataLabel="Total Amount" Style="text-align: right;" Class="text-slate-100 font-weight-bold">$@context.Amount.ToString("N2")</MudTd>
+            <MudTd DataLabel="Purchase Rate" Style="text-align: right;" Class="text-slate-300">₹@context.Rate.ToString("N4")</MudTd>
+            <MudTd DataLabel="Total Amount" Style="text-align: right;" Class="text-slate-100 font-weight-bold">₹@context.Amount.ToString("N2")</MudTd>
         </RowTemplate>
         <PagerContent>
             <MudTablePager />

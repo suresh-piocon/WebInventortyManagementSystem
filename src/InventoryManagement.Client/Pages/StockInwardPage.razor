@@ -150,7 +150,7 @@
                                                 <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right;" />
                                             </td>
                                             <td style="padding: 6px; text-align: right;" class="text-slate-300 font-weight-bold">
-                                                $@((line.Quantity * line.Rate).ToString("N2"))
+                                                ₹@((line.Quantity * line.Rate).ToString("N2"))
                                             </td>
                                             <td style="padding: 6px; text-align: center;">
                                                 @if (!string.IsNullOrEmpty(line.ImageUrl))
@@ -176,7 +176,7 @@
                         
                         <div class="d-flex justify-end mt-4">
                             <MudText Typo="Typo.subtitle1" Class="font-weight-bold text-slate-100">
-                                Total Invoice Value: <span class="animated-gradient-text" style="font-size: 20px;">$@(_lineItems.Sum(l => l.Quantity * l.Rate).ToString("N2"))</span>
+                                Total Invoice Value: <span class="animated-gradient-text" style="font-size: 20px;">₹@(_lineItems.Sum(l => l.Quantity * l.Rate).ToString("N2"))</span>
                             </MudText>
                         </div>
                     }

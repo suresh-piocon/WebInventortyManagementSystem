@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventory Management System</title>
+    <base href="/" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="InventoryManagement.Client.styles.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app">
+        <!-- Gorgeous Loading Spinner -->
+        <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: #0F172A; color: white; font-family: 'Outfit', sans-serif;">
+            <div style="width: 50px; height: 50px; border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top-color: #5C5CFF; animation: spin 1s ease-in-out infinite;"></div>
+            <h3 style="margin-top: 20px; font-weight: 500; letter-spacing: 1px;">Loading Inventory System...</h3>
+        </div>
+        <style>
+            @keyframes spin { to { transform: rotate(360deg); } }
+        </style>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">🗙</span>
+    </div>
+    
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="_framework/blazor.webassembly.js"></script>
+
+    <!-- Webcam Interop Code -->
+    <script>
+        window.webcamInterop = {
+            startStream: async function (videoElementId) {
+                try {
+                    const video = document.getElementById(videoElementId);
+                    if (!video) return false;
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            facingMode: "environment",
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        } 
+                    });
+                    video.srcObject = stream;
+                    video.play();
+                    window.webcamStream = stream;
+                    return true;
+                } catch (err) {
+                    console.error("Webcam access error:", err);
+                    return false;
+                }
+            },
+            stopStream: function () {
+                if (window.webcamStream) {
+                    window.webcamStream.getTracks().forEach(track => track.stop());
+                    window.webcamStream = null;
+                }
+            },
+            capturePhoto: function (videoElementId, canvasElementId) {
+                const video = document.getElementById(videoElementId);
+                const canvas = document.getElementById(canvasElementId);
+                if (!video || !canvas) return null;
+                
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                return canvas.toDataURL('image/jpeg', 0.85); // 85% JPEG quality
+            },
+            downloadFile: function (fileName, contentType, contentBase64) {
+                const link = document.createElement('a');
+                link.download = fileName;
+                link.href = `data:${contentType};base64,${contentBase64}`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        };
+    </script>
+</body>
+
+</html>

@@ -87,7 +87,7 @@
                 @(context.OutwardQty > 0 ? $"-{context.OutwardQty.ToString("N2")}" : "-")
             </MudTd>
             <MudTd DataLabel="Running Balance" Style="text-align: right;" Class="text-slate-100 font-weight-bold">@context.BalanceQty.ToString("N2")</MudTd>
-            <MudTd DataLabel="Unit Price" Style="text-align: right;" Class="text-slate-300">$@context.UnitPrice.ToString("N2")</MudTd>
+            <MudTd DataLabel="Unit Price" Style="text-align: right;" Class="text-slate-300">₹@context.UnitPrice.ToString("N2")</MudTd>
         </RowTemplate>
         <PagerContent>
             <MudTablePager />

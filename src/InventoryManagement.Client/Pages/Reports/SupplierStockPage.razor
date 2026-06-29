@@ -81,8 +81,8 @@
             <MudTd DataLabel="Inward Qty" Style="text-align: right;" Class="text-slate-300">@context.InwardQty.ToString("N2")</MudTd>
             <MudTd DataLabel="Outward Qty" Style="text-align: right;" Class="text-slate-300">@context.OutwardQty.ToString("N2")</MudTd>
             <MudTd DataLabel="Balance Qty" Style="text-align: right;" Class="text-yellow-500 font-weight-bold">@context.BalanceQty.ToString("N2")</MudTd>
-            <MudTd DataLabel="Unit Cost" Style="text-align: right;" Class="text-slate-300">$@context.UnitCost.ToString("N4")</MudTd>
-            <MudTd DataLabel="Total Value" Style="text-align: right;" Class="text-slate-100 font-weight-bold">$@context.Value.ToString("N2")</MudTd>
+            <MudTd DataLabel="Unit Cost" Style="text-align: right;" Class="text-slate-300">₹@context.UnitCost.ToString("N4")</MudTd>
+            <MudTd DataLabel="Total Value" Style="text-align: right;" Class="text-slate-100 font-weight-bold">₹@context.Value.ToString("N2")</MudTd>
         </RowTemplate>
         <PagerContent>
             <MudTablePager />
