@@ -19,6 +19,12 @@ jobs:
       - name: Publish Blazor WASM Project
         run: dotnet publish src/InventoryManagement.Client/InventoryManagement.Client.csproj -c Release -o release
 
+      - name: Create Cloudflare Pages Project (if not exists)
+        run: npx wrangler pages project create webinventortymanagementsystem --production-branch main || true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
       - name: Publish to Cloudflare Pages
         uses: cloudflare/pages-action@v1
         with:
