@@ -44,16 +44,16 @@
                 {
                     <div class="@(string.IsNullOrEmpty(_capturedImageBase64) ? "d-block w-100" : "d-none")">
                         <div class="d-flex flex-column align-center justify-center p-4 border-2 border-dashed border-slate-500 rounded-lg text-center" style="cursor: pointer; min-height: 150px; background: rgba(30, 41, 59, 0.3);">
-                             <MudFileUpload T="IBrowserFile" OnFilesChanged="UploadFiles" Accept="image/*" Class="w-100">
-                                 <ActivatorContent>
-                                     <MudButton Variant="Variant.Filled"
-                                                Color="Color.Primary"
-                                                StartIcon="@Icons.Material.Filled.PhotoCamera"
-                                                Class="mx-auto">
-                                         Take Mobile Photo / Browse
-                                     </MudButton>
-                                 </ActivatorContent>
-                             </MudFileUpload>
+                              <MudFileUpload T="IBrowserFile" OnFilesChanged="UploadFiles" Accept="image/*" Class="w-100">
+                                  <ActivatorContent>
+                                      <MudButton Variant="Variant.Filled"
+                                                 Color="Color.Primary"
+                                                 StartIcon="@Icons.Material.Filled.PhotoCamera"
+                                                 Class="mx-auto">
+                                          Take Mobile Photo / Browse
+                                      </MudButton>
+                                  </ActivatorContent>
+                              </MudFileUpload>
                             <MudText Typo="Typo.caption" Class="mt-2 text-slate-400">Supports native camera capture on mobile phones</MudText>
                         </div>
                     </div>
