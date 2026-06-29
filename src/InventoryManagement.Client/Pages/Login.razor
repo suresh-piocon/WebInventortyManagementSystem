@@ -107,19 +107,29 @@
             // Fallback for local simulation mode (dev mode bypass)
             if (string.IsNullOrEmpty(supabaseUrl) || supabaseUrl.Contains("your-project") || string.IsNullOrEmpty(anonKey))
             {
-                var headerJson = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
-                var payloadJson = $"{{\"sub\":\"00000000-0000-0000-0000-000000000001\",\"email\":\"{_loginModel.Email}\",\"role\":\"Admin\",\"name\":\"{_loginModel.Email.Split('@')[0]} (Dev Admin)\"}}";
-                
-                var headerBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(headerJson)).Replace("=", "").Replace("+", "-").Replace("/", "_");
-                var payloadBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(payloadJson)).Replace("=", "").Replace("+", "-").Replace("/", "_");
-                var mockToken = $"{headerBase64}.{payloadBase64}.mock-signature";
-                
-                await AuthStateProvider.MarkUserAsAuthenticated(mockToken);
-                Snackbar.Add("Logged in via Client-Side Simulation (Admin).", Severity.Success);
-                
-                _loading = false;
-                Navigation.NavigateTo("");
-                return;
+                var devPayload = new { email = _loginModel.Email, password = _loginModel.Password };
+                var devResponse = await Http.PostAsJsonAsync("api/auth/login-dev-mock", devPayload);
+                if (devResponse.IsSuccessStatusCode)
+                {
+                    var devResult = await devResponse.Content.ReadFromJsonAsync<SupabaseAuthResponse>();
+                    if (devResult != null && !string.IsNullOrEmpty(devResult.AccessToken))
+                    {
+                        await AuthStateProvider.MarkUserAsAuthenticated(devResult.AccessToken);
+                        Snackbar.Add("Logged in via Online Dev Bypass Mode (Admin).", Severity.Success);
+                        
+                        _loading = false;
+                        Navigation.NavigateTo("");
+                        return;
+                    }
+                }
+                else
+                {
+                    var errorStr = await devResponse.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Dev login failed: {errorStr}", Severity.Error);
+                    _loading = false;
+                    StateHasChanged();
+                    return;
+                }
             }
 
             // Real Supabase Auth REST Call
