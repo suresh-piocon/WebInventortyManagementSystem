@@ -26,7 +26,7 @@ namespace InventoryManagement.Client
 
             // Configure HttpClient to talk to ASP.NET Core API
             // Fallback to launchSettings default port, or dynamic domain if self-hosted
-            var apiBaseUrl = "https://localhost:7051/"; 
+            var apiBaseUrl = "https://webinventory-api.onrender.com/"; 
             
             builder.Services.AddHttpClient("InventoryAPI", client =>
             {
