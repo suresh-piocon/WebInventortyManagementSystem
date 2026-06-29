@@ -1,0 +1,29 @@
+name: Deploy Blazor WASM to Cloudflare Pages
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Publish Blazor WASM Project
+        run: dotnet publish src/InventoryManagement.Client/InventoryManagement.Client.csproj -c Release -o release
+
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: webinventortymanagementsystem # Change this to your exact Cloudflare Pages project name if different
+          directory: release/wwwroot
+          gitBranch: main
