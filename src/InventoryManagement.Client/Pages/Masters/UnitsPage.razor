@@ -3,7 +3,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<PageTitle>Unit Master - AG Inventory</PageTitle>
+<PageTitle>Unit Master - Inventory Management</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
     <div class="d-flex justify-between align-center mb-6">
@@ -92,7 +92,7 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="CloseDialog" Variant="Variant.Text" Color="Color.Secondary">Cancel</MudButton>
-        <MudButton OnClick="SaveUnit" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_isFormValid || _saving)">
+        <MudButton OnClick="SaveUnit" Variant="Variant.Filled" Color="Color.Primary" Disabled="@_saving">
             @if (_saving)
             {
                 <MudProgressCircular Size="Size.Small" Indeterminate="true" />

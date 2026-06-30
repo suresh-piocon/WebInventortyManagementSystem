@@ -108,6 +108,36 @@ h1, h2, h3, h4, h5, h6 {
         color: black !important;
     }
 
+    .label-row-50-25 {
+        width: 104mm; /* 50mm * 2 + ~4mm gap / margins */
+        height: 25mm;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        page-break-after: always;
+        overflow: hidden;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        background: white !important;
+        color: black !important;
+    }
+
+    .label-50-25-double {
+        width: 50mm;
+        height: 25mm;
+        padding: 1.5mm;
+        margin: 0;
+        box-sizing: border-box;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        background: white !important;
+        color: black !important;
+    }
+
     .label-75-50 {
         width: 75mm;
         height: 50mm;

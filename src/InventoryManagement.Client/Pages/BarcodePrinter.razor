@@ -4,7 +4,7 @@
 @inject IJSRuntime JSRuntime
 @inject BarcodeGeneratorService BarcodeGen
 
-<PageTitle>Print Barcode Labels - AG Inventory</PageTitle>
+<PageTitle>Print Barcode Labels - Inventory Management</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2 no-print">
     <div class="mb-6">
@@ -41,7 +41,8 @@
                            @bind-Value="_labelSize" 
                            Variant="Variant.Outlined" 
                            Class="mb-4 text-slate-200">
-                    <MudSelectItem Value="@("50x25")">50 x 25 mm (2 x 1 inch)</MudSelectItem>
+                    <MudSelectItem Value="@("50x25")">50 x 25 mm (2 x 1 inch) - 1 per Row</MudSelectItem>
+                    <MudSelectItem Value="@("50x25_double")">50 x 25 mm (2 x 1 inch) - 2 per Row</MudSelectItem>
                     <MudSelectItem Value="@("75x50")">75 x 50 mm (3 x 2 inch)</MudSelectItem>
                 </MudSelect>
 
@@ -150,7 +151,7 @@
                     var qrContent = GetQRJson(codeItem);
                     var qrSvg = BarcodeGen.GenerateQRCodeSvg(qrContent);
 
-                    @if (_labelSize == "50x25")
+                    @if (_labelSize == "50x25" || _labelSize == "50x25_double")
                     {
                         <!-- Screen Preview for 50x25mm -->
                         <div class="pa-2 rounded d-flex flex-column align-center justify-between" style="width: 250px; height: 125px; background: white; color: black; border: 1px dashed #5C5CFF; box-shadow: 0 0 10px rgba(92,92,255,0.15);">
@@ -201,54 +202,101 @@
 
 <!-- Printable Sheet (Only visible during @media print) -->
 <div class="printable-sheet d-none">
-    @foreach (var codeItem in _selectedBarcodes)
+    @{
+        var labels = GetLabelsToPrint();
+    }
+    @if (_labelSize == "50x25_double")
     {
-        var barcodeSvg = BarcodeGen.GenerateBarcodeSvg(codeItem.Barcode);
-        var qrContent = GetQRJson(codeItem);
-        var qrSvg = BarcodeGen.GenerateQRCodeSvg(qrContent);
-
-        @for (int c = 0; c < _copies; c++)
+        @for (int i = 0; i < labels.Count; i += 2)
         {
-            @if (_labelSize == "50x25")
-            {
-                <!-- Physical Label print template for 50x25mm -->
-                <div class="label-50-25">
+            var leftLabel = labels[i];
+            var rightLabel = i + 1 < labels.Count ? labels[i + 1] : null;
+
+            <div class="label-row-50-25">
+                <div class="label-50-25-double">
                     <div style="width: 100%; display: flex; justify-content: space-between; font-size: 8px; font-weight: bold; border-bottom: 0.5px solid #000; padding-bottom: 1px; font-family: sans-serif;">
-                        <span style="max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@_selectedItemName</span>
-                        <span>@codeItem.BatchNo</span>
+                        <span style="max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@leftLabel.ItemName</span>
+                        <span>@leftLabel.BatchNo</span>
                     </div>
                     <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; height: 16mm;">
                         <div style="width: 32mm; height: 12mm; overflow: hidden;">
-                            @((MarkupString)barcodeSvg)
+                            @((MarkupString)leftLabel.BarcodeSvg)
                         </div>
                         <div style="width: 11mm; height: 11mm;">
-                            @((MarkupString)qrSvg)
+                            @((MarkupString)leftLabel.QrSvg)
                         </div>
                     </div>
-                    <div style="font-size: 7px; font-family: monospace; text-align: center; width: 100%;">@codeItem.TrackingNo</div>
+                    <div style="font-size: 7px; font-family: monospace; text-align: center; width: 100%;">@leftLabel.TrackingNo</div>
+                </div>
+
+                @if (rightLabel != null)
+                {
+                    <div class="label-50-25-double">
+                        <div style="width: 100%; display: flex; justify-content: space-between; font-size: 8px; font-weight: bold; border-bottom: 0.5px solid #000; padding-bottom: 1px; font-family: sans-serif;">
+                            <span style="max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@rightLabel.ItemName</span>
+                            <span>@rightLabel.BatchNo</span>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; height: 16mm;">
+                            <div style="width: 32mm; height: 12mm; overflow: hidden;">
+                                @((MarkupString)rightLabel.BarcodeSvg)
+                            </div>
+                            <div style="width: 11mm; height: 11mm;">
+                                @((MarkupString)rightLabel.QrSvg)
+                            </div>
+                        </div>
+                        <div style="font-size: 7px; font-family: monospace; text-align: center; width: 100%;">@rightLabel.TrackingNo</div>
+                    </div>
+                }
+                else
+                {
+                    <!-- Empty label placeholder to keep spacing -->
+                    <div class="label-50-25-double" style="visibility: hidden;"></div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        @foreach (var label in labels)
+        {
+            @if (_labelSize == "50x25")
+            {
+                <div class="label-50-25">
+                    <div style="width: 100%; display: flex; justify-content: space-between; font-size: 8px; font-weight: bold; border-bottom: 0.5px solid #000; padding-bottom: 1px; font-family: sans-serif;">
+                        <span style="max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@label.ItemName</span>
+                        <span>@label.BatchNo</span>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; height: 16mm;">
+                        <div style="width: 32mm; height: 12mm; overflow: hidden;">
+                            @((MarkupString)label.BarcodeSvg)
+                        </div>
+                        <div style="width: 11mm; height: 11mm;">
+                            @((MarkupString)label.QrSvg)
+                        </div>
+                    </div>
+                    <div style="font-size: 7px; font-family: monospace; text-align: center; width: 100%;">@label.TrackingNo</div>
                 </div>
             }
             else
             {
-                <!-- Physical Label print template for 75x50mm -->
                 <div class="label-75-50">
                     <div style="width: 100%; text-align: center; border-bottom: 1px solid #000; padding-bottom: 2px; font-family: sans-serif;">
-                        <div style="font-size: 11px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@_selectedItemName</div>
-                        <div style="font-size: 8px; color: #333;">Batch: <b>@codeItem.BatchNo</b></div>
+                        <div style="font-size: 11px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@label.ItemName</div>
+                        <div style="font-size: 8px; color: #333;">Batch: <b>@label.BatchNo</b></div>
                     </div>
                     
                     <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; height: 32mm;">
                         <div style="width: 50mm; height: auto;">
-                            @((MarkupString)barcodeSvg)
+                            @((MarkupString)label.BarcodeSvg)
                         </div>
                         <div style="width: 18mm; height: 18mm;">
-                            @((MarkupString)qrSvg)
+                            @((MarkupString)label.QrSvg)
                         </div>
                     </div>
                     
                     <div style="width: 100%; display: flex; justify-content: space-between; font-size: 7px; font-family: monospace; border-top: 0.5px solid #ccc; padding-top: 1px;">
-                        <div>Tracking: @codeItem.TrackingNo</div>
-                        <div>AG INVENTORY</div>
+                        <div>Tracking: @label.TrackingNo</div>
+                        <div>Inventory Management</div>
                     </div>
                 </div>
             }
@@ -364,5 +412,40 @@
         
         // Trigger browser print dialog
         await JSRuntime.InvokeVoidAsync("window.print");
+    }
+
+    private class LabelPrintItem
+    {
+        public string ItemName { get; set; } = "";
+        public string Barcode { get; set; } = "";
+        public string BatchNo { get; set; } = "";
+        public string TrackingNo { get; set; } = "";
+        public string BarcodeSvg { get; set; } = "";
+        public string QrSvg { get; set; } = "";
+    }
+
+    private List<LabelPrintItem> GetLabelsToPrint()
+    {
+        var list = new List<LabelPrintItem>();
+        foreach (var codeItem in _selectedBarcodes)
+        {
+            var barcodeSvg = BarcodeGen.GenerateBarcodeSvg(codeItem.Barcode);
+            var qrContent = GetQRJson(codeItem);
+            var qrSvg = BarcodeGen.GenerateQRCodeSvg(qrContent);
+            
+            for (int c = 0; c < _copies; c++)
+            {
+                list.Add(new LabelPrintItem
+                {
+                    ItemName = _selectedItemName,
+                    Barcode = codeItem.Barcode,
+                    BatchNo = codeItem.BatchNo,
+                    TrackingNo = codeItem.TrackingNo,
+                    BarcodeSvg = barcodeSvg,
+                    QrSvg = qrSvg
+                });
+            }
+        }
+        return list;
     }
 }
