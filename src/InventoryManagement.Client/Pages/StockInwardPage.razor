@@ -117,12 +117,11 @@
                             <table class="w-100 mud-table" style="border-collapse: collapse;">
                                 <thead>
                                     <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
-                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 250px;">Item</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 280px;">Item</th>
                                         <th style="color: #94A3B8; padding: 8px; text-align: left; width: 140px;">Batch No</th>
-                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 100px;">Quantity</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 80px;">Qty</th>
                                         <th style="color: #94A3B8; padding: 8px; text-align: right; width: 110px;">Rate</th>
-                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 100px;">Amount</th>
-                                        <th style="color: #94A3B8; padding: 8px; text-align: center; width: 80px;">Photo</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 110px;">Amount</th>
                                         <th style="color: #94A3B8; padding: 8px; text-align: center; width: 50px;"></th>
                                     </tr>
                                 </thead>
@@ -133,7 +132,13 @@
                                         var line = _lineItems[index];
                                         <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle;">
                                             <td style="padding: 6px;">
-                                                <MudSelect T="Guid" @bind-Value="line.ItemId" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white;">
+                                                <MudSelect T="Guid" 
+                                                           @bind-Value="line.ItemId" 
+                                                           @ref="_itemRefs[index]"
+                                                           @onkeydown="@((KeyboardEventArgs e) => HandleItemKeyDown(e, index))"
+                                                           Margin="Margin.Dense" 
+                                                           Variant="Variant.Outlined" 
+                                                           Style="color: white; min-width: 200px;">
                                                     @foreach (var item in _items)
                                                     {
                                                         <MudSelectItem Value="@item.Id">@item.Code - @item.Name (@item.BarcodeType)</MudSelectItem>
@@ -144,26 +149,30 @@
                                                 <MudTextField T="string" @bind-Value="line.BatchNo" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white;" />
                                             </td>
                                             <td style="padding: 6px;">
-                                                <MudNumericField T="decimal" @bind-Value="line.Quantity" Min="0.01M" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right;" />
+                                                <MudNumericField T="decimal" 
+                                                                 @bind-Value="line.Quantity" 
+                                                                 @ref="_qtyRefs[index]"
+                                                                 @onkeydown="@((KeyboardEventArgs e) => HandleQtyKeyDown(e, index))"
+                                                                 Min="0.01M" 
+                                                                 HideSpinButtons="true" 
+                                                                 Margin="Margin.Dense" 
+                                                                 Variant="Variant.Outlined" 
+                                                                 Style="color: white; text-align: right;" />
                                             </td>
                                             <td style="padding: 6px;">
-                                                <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" HideSpinButtons="true" Format="F2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right;" />
+                                                <MudNumericField T="decimal" 
+                                                                 @bind-Value="line.Rate" 
+                                                                 @ref="_rateRefs[index]"
+                                                                 @onkeydown="@((KeyboardEventArgs e) => HandleRateKeyDown(e, index))"
+                                                                 Min="0" 
+                                                                 HideSpinButtons="true" 
+                                                                 Format="F2" 
+                                                                 Margin="Margin.Dense" 
+                                                                 Variant="Variant.Outlined" 
+                                                                 Style="color: white; text-align: right;" />
                                             </td>
                                             <td style="padding: 6px; text-align: right;" class="text-slate-300 font-weight-bold">
                                                 ₹@((line.Quantity * line.Rate).ToString("N2"))
-                                            </td>
-                                            <td style="padding: 6px; text-align: center;">
-                                                @if (!string.IsNullOrEmpty(line.ImageUrl))
-                                                {
-                                                    <div style="position: relative; display: inline-block;">
-                                                        <img src="@line.ImageUrl" style="width: 32px; height: 32px; border-radius: 4px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewImage(line.ImageUrl))" />
-                                                        <MudIconButton Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Small" Style="position: absolute; top: -10px; right: -10px; padding: 0;" OnClick="@(() => line.ImageUrl = null)" />
-                                                    </div>
-                                                }
-                                                else
-                                                {
-                                                    <MudIconButton Icon="@Icons.Material.Filled.AddAPhoto" Color="Color.Secondary" Size="Size.Medium" OnClick="@(() => OpenCameraDialog(index))" />
-                                                }
                                             </td>
                                             <td style="padding: 6px; text-align: center;">
                                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveLineItem(index))" />
@@ -186,19 +195,6 @@
     </EditForm>
 </MudContainer>
 
-<!-- Webcam snapping dialog -->
-<MudDialog @bind-Visible="_cameraDialogOpen" Options="_cameraDialogOptions">
-    <TitleContent>
-        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">Capture Item Image</MudText>
-    </TitleContent>
-    <DialogContent>
-        <CameraCapture OnPhotoCaptured="OnPhotoUploaded" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="CloseCameraDialog" Variant="Variant.Text" Color="Color.Secondary">Close</MudButton>
-    </DialogActions>
-</MudDialog>
-
 @code {
     private List<Supplier> _suppliers = new();
     private List<Item> _items = new();
@@ -212,16 +208,73 @@
     private int _nextBatchSeq = 1;
 
     private bool _saving = false;
-    
-    // Camera Dialog state
-    private bool _cameraDialogOpen = false;
-    private int _activeLineIndex = 0;
-    private readonly DialogOptions _cameraDialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+    // References for keyboard navigation
+    private Dictionary<int, MudSelect<Guid>> _itemRefs = new();
+    private Dictionary<int, MudNumericField<decimal>> _qtyRefs = new();
+    private Dictionary<int, MudNumericField<decimal>> _rateRefs = new();
 
     protected override async Task OnInitializedAsync()
     {
         await LoadLookups();
         await ResetFormAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await FocusItemSelect(0);
+        }
+    }
+
+    private async Task FocusItemSelect(int index)
+    {
+        await Task.Delay(100);
+        if (_itemRefs.TryGetValue(index, out var selectField) && selectField != null)
+        {
+            await selectField.FocusAsync();
+        }
+    }
+
+    private async Task HandleItemKeyDown(KeyboardEventArgs e, int index)
+    {
+        if (e.Key == "Enter")
+        {
+            if (_qtyRefs.TryGetValue(index, out var qtyField) && qtyField != null)
+            {
+                await qtyField.FocusAsync();
+            }
+        }
+    }
+
+    private async Task HandleQtyKeyDown(KeyboardEventArgs e, int index)
+    {
+        if (e.Key == "Enter")
+        {
+            if (_rateRefs.TryGetValue(index, out var rateField) && rateField != null)
+            {
+                await rateField.FocusAsync();
+            }
+        }
+    }
+
+    private async Task HandleRateKeyDown(KeyboardEventArgs e, int index)
+    {
+        if (e.Key == "Enter")
+        {
+            // If it is the last row, automatically add a new line and focus its Item select
+            if (index == _lineItems.Count - 1)
+            {
+                AddLineItem();
+                StateHasChanged();
+                await FocusItemSelect(index + 1);
+            }
+            else
+            {
+                await FocusItemSelect(index + 1);
+            }
+        }
     }
 
     private async Task LoadLookups()
@@ -281,41 +334,17 @@
         if (index >= 0 && index < _lineItems.Count)
         {
             _lineItems.RemoveAt(index);
+            // Clear reference dictionaries
+            _itemRefs.Remove(index);
+            _qtyRefs.Remove(index);
+            _rateRefs.Remove(index);
+
             // Re-sequence batch numbers
             for (int i = 0; i < _lineItems.Count; i++)
             {
                 _lineItems[i].BatchNo = $"{_batchPrefix}{(_nextBatchSeq + i).ToString("D5")}";
             }
         }
-    }
-
-    private void OpenCameraDialog(int index)
-    {
-        _activeLineIndex = index;
-        _cameraDialogOpen = true;
-    }
-
-    private void CloseCameraDialog()
-    {
-        _cameraDialogOpen = false;
-    }
-
-    private void OnPhotoUploaded(string publicUrl)
-    {
-        if (_activeLineIndex >= 0 && _activeLineIndex < _lineItems.Count)
-        {
-            _lineItems[_activeLineIndex].ImageUrl = publicUrl;
-            _cameraDialogOpen = false;
-            StateHasChanged();
-        }
-    }
-
-    private async Task PreviewImage(string url)
-    {
-        var parameters = new DialogParameters { ["imageUrl"] = url };
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
-        
-        await DialogService.ShowAsync<ImagePreviewDialog>("Photo View", parameters, options);
     }
 
     private async Task ResetFormAsync()
@@ -328,8 +357,13 @@
         _inwardDate = DateTime.Today;
         _invoiceDate = null;
         _lineItems.Clear();
+        _itemRefs.Clear();
+        _qtyRefs.Clear();
+        _rateRefs.Clear();
+
         await RefreshBatchSequence();
         AddLineItem();
+        await FocusItemSelect(0);
     }
 
     private async Task ResetForm()
@@ -357,7 +391,7 @@
                 BatchNo = l.BatchNo,
                 Quantity = l.Quantity,
                 Rate = l.Rate,
-                ImageUrl = l.ImageUrl
+                ImageUrl = null
             }).ToList();
 
             var response = await Http.PostAsJsonAsync("api/stockinward", _inwardHeader);

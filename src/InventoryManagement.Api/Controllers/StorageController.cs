@@ -7,6 +7,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using System.Linq;
+using Microsoft.EntityFrameworkCore;
+using InventoryManagement.Api.Data;
+using InventoryManagement.Shared;
 
 namespace InventoryManagement.Api.Controllers
 {
@@ -16,11 +20,13 @@ namespace InventoryManagement.Api.Controllers
     {
         private readonly IWebHostEnvironment _env;
         private readonly IConfiguration _config;
+        private readonly InventoryDbContext _context;
 
-        public StorageController(IWebHostEnvironment env, IConfiguration config)
+        public StorageController(IWebHostEnvironment env, IConfiguration config, InventoryDbContext context)
         {
             _env = env;
             _config = config;
+            _context = context;
         }
 
         [HttpPost("upload")]
@@ -95,5 +101,59 @@ namespace InventoryManagement.Api.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, $"Error uploading to Supabase: {ex.Message}");
             }
         }
+
+        [HttpGet("lookup/{code}")]
+        public async Task<IActionResult> LookupItem(string code)
+        {
+            var barcode = await _context.BarcodeMasters
+                .Include(b => b.Item)
+                .FirstOrDefaultAsync(b => b.Barcode == code || b.BatchNo == code);
+
+            if (barcode == null)
+            {
+                return NotFound("Barcode or Batch number not found in system.");
+            }
+
+            return Ok(new
+            {
+                itemName = barcode.Item?.Name ?? "Unknown Item",
+                itemCode = barcode.Item?.Code ?? "Unknown Code",
+                existingImageUrl = barcode.ImageUrl
+            });
+        }
+
+        [HttpPost("update-photo")]
+        public async Task<IActionResult> UpdatePhoto([FromBody] UpdatePhotoRequest request)
+        {
+            if (string.IsNullOrEmpty(request.Code))
+            {
+                return BadRequest("Code is required.");
+            }
+
+            var barcodes = await _context.BarcodeMasters
+                .Where(b => b.Barcode == request.Code || b.BatchNo == request.Code)
+                .ToListAsync();
+
+            if (!barcodes.Any())
+            {
+                return NotFound("No barcode or batch number found matching the code.");
+            }
+
+            foreach (var b in barcodes)
+            {
+                b.ImageUrl = request.ImageUrl;
+            }
+
+            _context.BarcodeMasters.UpdateRange(barcodes);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = $"Photo updated successfully for {barcodes.Count} item(s)." });
+        }
+    }
+
+    public class UpdatePhotoRequest
+    {
+        public string Code { get; set; } = string.Empty;
+        public string? ImageUrl { get; set; }
     }
 }

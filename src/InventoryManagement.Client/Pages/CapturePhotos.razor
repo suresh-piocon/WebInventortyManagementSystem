@@ -1,0 +1,234 @@
+@page "/capture-photos"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@attribute [Authorize]
+
+<PageTitle>Item Photo Capture - AG Inventory</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
+    <div class="mb-6">
+        <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+            Item Photo Capture
+        </MudText>
+        <MudText Typo="Typo.body2" Class="text-slate-400">
+            Scan or enter a Barcode Number or Batch Number to snap and associate item photos
+        </MudText>
+    </div>
+
+    <MudGrid>
+        <!-- Search Panel -->
+        <MudItem xs="12">
+            <MudPaper Class="glass-panel pa-6">
+                <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                    <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Class="mr-2" /> Lookup Barcode / Batch
+                </MudText>
+                <div class="d-flex align-center gap-3">
+                    <MudTextField T="string" 
+                                  @bind-Value="_code" 
+                                  Label="Barcode or Batch Number" 
+                                  Variant="Variant.Outlined" 
+                                  Class="text-slate-200 flex-grow-1"
+                                  OnKeyDown="HandleSearchKeyDown"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  @ref="_codeField" />
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary" 
+                               Size="Size.Large"
+                               OnClick="SearchItem"
+                               Disabled="_searching"
+                               Style="font-family: 'Outfit'; font-weight: 600; height: 56px;">
+                        @if (_searching)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        }
+                        else
+                        {
+                            <MudText>Search</MudText>
+                        }
+                    </MudButton>
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <!-- Item Info & Photo Capture -->
+        @if (_itemFound)
+        {
+            <MudItem xs="12" md="5">
+                <MudPaper Class="glass-panel pa-6 d-flex flex-column align-center text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Layers" Color="Color.Primary" Size="Size.Large" Class="mb-3" />
+                    <MudText Typo="Typo.h6" Class="text-slate-100 font-weight-bold" Style="font-family: 'Outfit';">
+                        @_itemName
+                    </MudText>
+                    <MudText Typo="Typo.body2" Class="text-slate-400 mt-1">
+                        Code: <span class="text-slate-200">@_itemCode</span>
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                        Associated with: @_code
+                    </MudText>
+
+                    <div class="mt-6 w-100">
+                        <MudText Typo="Typo.subtitle2" Class="text-slate-400 mb-2">Existing Image</MudText>
+                        @if (!string.IsNullOrEmpty(_existingImageUrl))
+                        {
+                            <div style="position: relative; display: inline-block;" class="w-100">
+                                <img src="@_existingImageUrl" style="max-width: 100%; max-height: 250px; border-radius: 8px; border: 2px solid #5C5CFF; object-fit: contain;" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                               Color="Color.Error" 
+                                               Class="mud-elevation-4"
+                                               Style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5);" 
+                                               OnClick="DeletePhoto" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div style="height: 180px; border: 2px dashed rgba(255,255,255,0.15); border-radius: 8px;" class="d-flex align-center justify-center text-slate-500">
+                                <div class="d-flex flex-column align-center">
+                                    <MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Size="Size.Large" Class="mb-1" />
+                                    <MudText Typo="Typo.body2">No Image Associated</MudText>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="7">
+                <MudPaper Class="glass-panel pa-6">
+                    <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                        <MudIcon Icon="@Icons.Material.Filled.CameraAlt" Class="mr-2" /> Capture / Upload Image
+                    </MudText>
+                    <CameraCapture OnPhotoCaptured="OnPhotoUploaded" />
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private string _code = string.Empty;
+    private bool _searching = false;
+    private bool _itemFound = false;
+    private MudTextField<string>? _codeField;
+
+    // Item details
+    private string _itemName = string.Empty;
+    private string _itemCode = string.Empty;
+    private string? _existingImageUrl;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _codeField != null)
+        {
+            await _codeField.FocusAsync();
+        }
+    }
+
+    private async Task HandleSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchItem();
+        }
+    }
+
+    private async Task SearchItem()
+    {
+        if (string.IsNullOrWhiteSpace(_code))
+        {
+            Snackbar.Add("Please enter a Barcode or Batch number.", Severity.Warning);
+            return;
+        }
+
+        _searching = true;
+        _itemFound = false;
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.GetAsync($"api/storage/lookup/{Uri.EscapeDataString(_code)}");
+            if (response.IsSuccessStatusCode)
+            {
+                var lookup = await response.Content.ReadFromJsonAsync<LookupResponseDto>();
+                if (lookup != null)
+                {
+                    _itemName = lookup.ItemName;
+                    _itemCode = lookup.ItemCode;
+                    _existingImageUrl = lookup.ExistingImageUrl;
+                    _itemFound = true;
+                }
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Lookup failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error looking up item: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _searching = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnPhotoUploaded(string publicUrl)
+    {
+        try
+        {
+            var updatePayload = new { Code = _code, ImageUrl = publicUrl };
+            var response = await Http.PostAsJsonAsync("api/storage/update-photo", updatePayload);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Photo saved and associated successfully!", Severity.Success);
+                _existingImageUrl = publicUrl;
+                StateHasChanged();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to associate photo: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving associated photo: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeletePhoto()
+    {
+        try
+        {
+            var updatePayload = new { Code = _code, ImageUrl = (string?)null };
+            var response = await Http.PostAsJsonAsync("api/storage/update-photo", updatePayload);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Photo association deleted.", Severity.Success);
+                _existingImageUrl = null;
+                StateHasChanged();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to delete photo association: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting photo: {ex.Message}", Severity.Error);
+        }
+    }
+
+    public class LookupResponseDto
+    {
+        public string ItemName { get; set; } = string.Empty;
+        public string ItemCode { get; set; } = string.Empty;
+        public string? ExistingImageUrl { get; set; }
+    }
+}
