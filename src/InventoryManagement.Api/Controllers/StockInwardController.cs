@@ -243,7 +243,8 @@ namespace InventoryManagement.Api.Controllers
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                return StatusCode(500, $"An error occurred while saving stock inward: {ex.Message}");
+                var innerMsg = ex.InnerException != null ? $" | Inner: {ex.InnerException.Message}" : "";
+                return StatusCode(500, $"An error occurred while saving stock inward: {ex.Message}{innerMsg}");
             }
         }
 
