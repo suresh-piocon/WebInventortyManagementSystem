@@ -211,6 +211,7 @@
     {
         _editItem = new Item
         {
+            Id = Guid.Empty,
             BarcodeType = "Batch",
             CategoryId = _categories.FirstOrDefault()?.Id ?? Guid.Empty,
             UnitId = _units.FirstOrDefault()?.Id ?? Guid.Empty
