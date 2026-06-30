@@ -140,60 +140,110 @@
     <!-- Visual Interactive Screen Preview (Non-printed layout) -->
     @if (_selectedBarcodes.Any())
     {
+        var previewLabels = GetLabelsToPrint();
         <MudPaper Class="glass-panel pa-6 mt-6">
             <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
-                Label Screen Preview (Grid Visualization)
+                Label Screen Preview (Print Layout Visualization)
             </MudText>
-            <div class="d-flex flex-wrap gap-4 justify-center">
-                @foreach (var codeItem in _selectedBarcodes)
+            
+            <div class="d-flex flex-column align-center w-100" style="max-height: 500px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 20px; border-radius: 8px;">
+                @if (_labelSize == "50x25_double")
                 {
-                    var barcodeSvg = BarcodeGen.GenerateBarcodeSvg(codeItem.Barcode);
-                    var qrContent = GetQRJson(codeItem);
-                    var qrSvg = BarcodeGen.GenerateQRCodeSvg(qrContent);
+                    @for (int i = 0; i < previewLabels.Count; i += 2)
+                    {
+                        var leftLabel = previewLabels[i];
+                        var rightLabel = i + 1 < previewLabels.Count ? previewLabels[i + 1] : null;
 
-                    @if (_labelSize == "50x25" || _labelSize == "50x25_double")
-                    {
-                        <!-- Screen Preview for 50x25mm -->
-                        <div class="pa-2 rounded d-flex flex-column align-center justify-between" style="width: 250px; height: 125px; background: white; color: black; border: 1px dashed #5C5CFF; box-shadow: 0 0 10px rgba(92,92,255,0.15);">
-                            <div class="w-100 d-flex justify-between" style="font-size: 10px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 2px;">
-                                <div style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@_selectedItemName</div>
-                                <div>@codeItem.BatchNo</div>
-                            </div>
-                            <div class="d-flex align-center justify-space-between w-100 px-1 py-1">
-                                <div style="width: 155px; height: auto;">
-                                    @((MarkupString)barcodeSvg)
+                        <div class="d-flex justify-center gap-4 mb-4" style="width: 100%;">
+                            <!-- Left Label -->
+                            <div class="pa-2 rounded d-flex flex-column align-center justify-between" style="width: 250px; height: 125px; background: white; color: black; border: 1px dashed #5C5CFF; box-shadow: 0 0 10px rgba(92,92,255,0.15);">
+                                <div class="w-100 d-flex justify-between" style="font-size: 10px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 2px;">
+                                    <div style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@leftLabel.ItemName</div>
+                                    <div>@leftLabel.BatchNo</div>
                                 </div>
-                                <div style="width: 45px; height: 45px;">
-                                    @((MarkupString)qrSvg)
+                                <div class="d-flex align-center justify-space-between w-100 px-1 py-1">
+                                    <div style="width: 155px; height: auto;">
+                                        @((MarkupString)leftLabel.BarcodeSvg)
+                                    </div>
+                                    <div style="width: 45px; height: 45px;">
+                                        @((MarkupString)leftLabel.QrSvg)
+                                    </div>
                                 </div>
+                                <div style="font-size: 8px; font-family: monospace; color: #555;">@leftLabel.TrackingNo</div>
                             </div>
-                            <div style="font-size: 8px; font-family: monospace; color: #555;">@codeItem.TrackingNo</div>
+
+                            <!-- Right Label -->
+                            @if (rightLabel != null)
+                            {
+                                <div class="pa-2 rounded d-flex flex-column align-center justify-between" style="width: 250px; height: 125px; background: white; color: black; border: 1px dashed #5C5CFF; box-shadow: 0 0 10px rgba(92,92,255,0.15);">
+                                    <div class="w-100 d-flex justify-between" style="font-size: 10px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 2px;">
+                                        <div style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@rightLabel.ItemName</div>
+                                        <div>@rightLabel.BatchNo</div>
+                                    </div>
+                                    <div class="d-flex align-center justify-space-between w-100 px-1 py-1">
+                                        <div style="width: 155px; height: auto;">
+                                            @((MarkupString)rightLabel.BarcodeSvg)
+                                        </div>
+                                        <div style="width: 45px; height: 45px;">
+                                            @((MarkupString)rightLabel.QrSvg)
+                                        </div>
+                                    </div>
+                                    <div style="font-size: 8px; font-family: monospace; color: #555;">@rightLabel.TrackingNo</div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div style="width: 250px; height: 125px; border: 1px dashed rgba(255,255,255,0.1); visibility: hidden;"></div>
+                            }
                         </div>
                     }
-                    else
-                    {
-                        <!-- Screen Preview for 75x50mm -->
-                        <div class="pa-4 rounded d-flex flex-column align-center justify-between" style="width: 300px; height: 200px; background: white; color: black; border: 1px dashed #5C5CFF; box-shadow: 0 0 10px rgba(92,92,255,0.15);">
-                            <div class="w-100 text-center" style="border-bottom: 2px solid black; padding-bottom: 4px; margin-bottom: 4px;">
-                                <div class="font-weight-bold" style="font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@_selectedItemName</div>
-                                <div style="font-size: 11px; color: #444;">Batch No: <b>@codeItem.BatchNo</b></div>
-                            </div>
-                            
-                            <div class="d-flex align-center justify-between w-100 py-2">
-                                <div style="width: 180px; height: auto;">
-                                    @((MarkupString)barcodeSvg)
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap gap-4 justify-center">
+                        @foreach (var label in previewLabels)
+                        {
+                            @if (_labelSize == "50x25")
+                            {
+                                <div class="pa-2 rounded d-flex flex-column align-center justify-between" style="width: 250px; height: 125px; background: white; color: black; border: 1px dashed #5C5CFF; box-shadow: 0 0 10px rgba(92,92,255,0.15);">
+                                    <div class="w-100 d-flex justify-between" style="font-size: 10px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 2px;">
+                                        <div style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@label.ItemName</div>
+                                        <div>@label.BatchNo</div>
+                                    </div>
+                                    <div class="d-flex align-center justify-space-between w-100 px-1 py-1">
+                                        <div style="width: 155px; height: auto;">
+                                            @((MarkupString)label.BarcodeSvg)
+                                        </div>
+                                        <div style="width: 45px; height: 45px;">
+                                            @((MarkupString)label.QrSvg)
+                                        </div>
+                                    </div>
+                                    <div style="font-size: 8px; font-family: monospace; color: #555;">@label.TrackingNo</div>
                                 </div>
-                                <div style="width: 70px; height: 70px;">
-                                    @((MarkupString)qrSvg)
+                            }
+                            else
+                            {
+                                <div class="pa-4 rounded d-flex flex-column align-center justify-between" style="width: 300px; height: 200px; background: white; color: black; border: 1px dashed #5C5CFF; box-shadow: 0 0 10px rgba(92,92,255,0.15);">
+                                    <div class="w-100 text-center" style="border-bottom: 2px solid black; padding-bottom: 4px; margin-bottom: 4px;">
+                                        <div class="font-weight-bold" style="font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@label.ItemName</div>
+                                        <div style="font-size: 11px; color: #444;">Batch No: <b>@label.BatchNo</b></div>
+                                    </div>
+                                    <div class="d-flex align-center justify-between w-100 py-2">
+                                        <div style="width: 180px; height: auto;">
+                                            @((MarkupString)label.BarcodeSvg)
+                                        </div>
+                                        <div style="width: 70px; height: 70px;">
+                                            @((MarkupString)label.QrSvg)
+                                        </div>
+                                    </div>
+                                    <div class="w-100 d-flex justify-between" style="font-size: 9px; font-family: monospace; color: #333; border-top: 1px solid #eee; padding-top: 2px;">
+                                        <div>Track: @label.TrackingNo</div>
+                                        <div>Size: 75x50mm</div>
+                                    </div>
                                 </div>
-                            </div>
-                            
-                            <div class="w-100 d-flex justify-between" style="font-size: 9px; font-family: monospace; color: #333; border-top: 1px solid #eee; padding-top: 2px;">
-                                <div>Track: @codeItem.TrackingNo</div>
-                                <div>Size: 75x50mm</div>
-                            </div>
-                        </div>
-                    }
+                            }
+                        }
+                    </div>
                 }
             </div>
         </MudPaper>

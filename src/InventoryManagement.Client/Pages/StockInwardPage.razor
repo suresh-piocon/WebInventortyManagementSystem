@@ -75,7 +75,8 @@
                                Color="Color.Success"
                                StartIcon="@Icons.Material.Filled.Save"
                                Disabled="@(!_lineItems.Any() || _saving)"
-                               Style="font-family: 'Outfit'; font-weight: 600;">
+                               Style="font-family: 'Outfit'; font-weight: 600;"
+                               @ref="_submitButton">
                         @if (_saving)
                         {
                             <MudProgressCircular Size="Size.Small" Indeterminate="true" />
@@ -98,7 +99,7 @@
                         <MudButton Variant="Variant.Filled" 
                                    Color="Color.Primary" 
                                    StartIcon="@Icons.Material.Filled.Add"
-                                   OnClick="AddLineItem"
+                                   OnClick="AddLineItemAsync"
                                    Size="Size.Small">
                             Add Line Row
                         </MudButton>
@@ -209,6 +210,8 @@
 
     private bool _saving = false;
 
+    private MudButton? _submitButton;
+
     // References for keyboard navigation
     private Dictionary<int, MudSelect<Guid>> _itemRefs = new();
     private Dictionary<int, MudNumericField<decimal>> _qtyRefs = new();
@@ -263,16 +266,9 @@
     {
         if (e.Key == "Enter")
         {
-            // If it is the last row, automatically add a new line and focus its Item select
-            if (index == _lineItems.Count - 1)
+            if (_submitButton != null)
             {
-                AddLineItem();
-                StateHasChanged();
-                await FocusItemSelect(index + 1);
-            }
-            else
-            {
-                await FocusItemSelect(index + 1);
+                await _submitButton.FocusAsync();
             }
         }
     }
@@ -327,6 +323,20 @@
             Quantity = 1,
             Rate = 0.00M
         });
+    }
+
+    private async Task AddLineItemAsync()
+    {
+        var newIndex = _lineItems.Count;
+        _lineItems.Add(new InwardLineItem
+        {
+            ItemId = _items.FirstOrDefault()?.Id ?? Guid.Empty,
+            BatchNo = $"{_batchPrefix}{(_nextBatchSeq + newIndex).ToString("D5")}",
+            Quantity = 1,
+            Rate = 0.00M
+        });
+        StateHasChanged();
+        await FocusItemSelect(newIndex);
     }
 
     private void RemoveLineItem(int index)

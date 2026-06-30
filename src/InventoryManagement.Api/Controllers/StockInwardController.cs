@@ -252,80 +252,80 @@ namespace InventoryManagement.Api.Controllers
         {
             var year = DateTime.UtcNow.Year;
             var prefix = $"INW-{year}-";
-            var lastRecord = await _context.StockInwards
+            var records = await _context.StockInwards
                 .Where(si => si.InwardNo.StartsWith(prefix))
-                .OrderByDescending(si => si.InwardNo)
-                .FirstOrDefaultAsync();
+                .Select(si => si.InwardNo)
+                .ToListAsync();
 
-            int nextNum = 1;
-            if (lastRecord != null)
+            int maxNum = 0;
+            foreach (var r in records)
             {
-                var parts = lastRecord.InwardNo.Split('-');
-                if (parts.Length == 3 && int.TryParse(parts[2], out var lastNum))
+                var parts = r.Split('-');
+                if (parts.Length == 3 && int.TryParse(parts[2], out var num))
                 {
-                    nextNum = lastNum + 1;
+                    if (num > maxNum) maxNum = num;
                 }
             }
-            return $"{prefix}{nextNum:D6}";
+            return $"{prefix}{(maxNum + 1):D6}";
         }
 
         private async Task<string> GenerateTrackingNumberAsync()
         {
             var year = DateTime.UtcNow.Year;
             var prefix = $"TRK-{year}-";
-            var lastRecord = await _context.StockInwardDetails
+            var records = await _context.StockInwardDetails
                 .Where(sid => sid.TrackingNo.StartsWith(prefix))
-                .OrderByDescending(sid => sid.TrackingNo)
-                .FirstOrDefaultAsync();
+                .Select(sid => sid.TrackingNo)
+                .ToListAsync();
 
-            int nextNum = 1;
-            if (lastRecord != null)
+            int maxNum = 0;
+            foreach (var r in records)
             {
-                var parts = lastRecord.TrackingNo.Split('-');
-                if (parts.Length == 3 && int.TryParse(parts[2], out var lastNum))
+                var parts = r.Split('-');
+                if (parts.Length == 3 && int.TryParse(parts[2], out var num))
                 {
-                    nextNum = lastNum + 1;
+                    if (num > maxNum) maxNum = num;
                 }
             }
-            return $"{prefix}{nextNum:D6}";
+            return $"{prefix}{(maxNum + 1):D6}";
         }
 
         private async Task<string> GenerateUniqueBarcodeAsync()
         {
-            var lastBarcode = await _context.BarcodeMasters
+            var barcodes = await _context.BarcodeMasters
                 .Where(b => b.Barcode.StartsWith("ITEM"))
-                .OrderByDescending(b => b.Barcode)
-                .FirstOrDefaultAsync();
+                .Select(b => b.Barcode)
+                .ToListAsync();
 
-            int nextNum = 1;
-            if (lastBarcode != null)
+            int maxNum = 0;
+            foreach (var b in barcodes)
             {
-                var numStr = lastBarcode.Barcode.Replace("ITEM", "");
-                if (int.TryParse(numStr, out var lastNum))
+                var numStr = b.Replace("ITEM", "");
+                if (int.TryParse(numStr, out var num))
                 {
-                    nextNum = lastNum + 1;
+                    if (num > maxNum) maxNum = num;
                 }
             }
-            return $"ITEM{nextNum:D6}";
+            return $"ITEM{(maxNum + 1):D6}";
         }
 
         private async Task<string> GenerateBatchBarcodeAsync()
         {
-            var lastBarcode = await _context.BarcodeMasters
+            var barcodes = await _context.BarcodeMasters
                 .Where(b => b.Barcode.StartsWith("BATCH"))
-                .OrderByDescending(b => b.Barcode)
-                .FirstOrDefaultAsync();
+                .Select(b => b.Barcode)
+                .ToListAsync();
 
-            int nextNum = 1;
-            if (lastBarcode != null)
+            int maxNum = 0;
+            foreach (var b in barcodes)
             {
-                var numStr = lastBarcode.Barcode.Replace("BATCH", "");
-                if (int.TryParse(numStr, out var lastNum))
+                var numStr = b.Replace("BATCH", "");
+                if (int.TryParse(numStr, out var num))
                 {
-                    nextNum = lastNum + 1;
+                    if (num > maxNum) maxNum = num;
                 }
             }
-            return $"BATCH{nextNum:D6}";
+            return $"BATCH{(maxNum + 1):D6}";
         }
     }
 }
