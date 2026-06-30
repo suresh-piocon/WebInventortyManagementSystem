@@ -98,6 +98,7 @@ app.UseCors("BlazorCors");
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapGet("/", () => Results.Text("Inventory Management System API is running successfully!"));
 app.MapControllers();
 
 // Ensure Database is Created and Seeded

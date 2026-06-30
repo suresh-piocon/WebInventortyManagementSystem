@@ -35,13 +35,10 @@ namespace InventoryManagement.Client
             .AddHttpMessageHandler<AuthenticationHeaderHandler>();
 
             // Register HttpClient instance for direct injection
-            builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("InventoryAPI"));
-
-            // Register Authentication Services
+            builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("InventoryAPI"));            // Register Authentication Services
             builder.Services.AddAuthorizationCore();
-            builder.Services.AddScoped<AuthenticationStateProvider, ApiAuthenticationStateProvider>();
             builder.Services.AddScoped<ApiAuthenticationStateProvider>();
-
+            builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<ApiAuthenticationStateProvider>());
             // Register Barcode SVG Generator Service
             builder.Services.AddScoped<InventoryManagement.Client.Services.BarcodeGeneratorService>();
 
