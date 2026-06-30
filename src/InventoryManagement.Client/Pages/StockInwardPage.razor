@@ -56,6 +56,13 @@
                                    @bind-Date="_invoiceDate" 
                                    Variant="Variant.Outlined" 
                                    Class="mb-4 text-slate-200" />
+
+                    <MudTextField T="string" 
+                                  Label="Batch Prefix" 
+                                  Value="@_batchPrefix"
+                                  ValueChanged="OnBatchPrefixChanged"
+                                  Variant="Variant.Outlined" 
+                                  Class="mb-4 text-slate-200" />
                 </MudPaper>
 
                 <!-- Actions -->
@@ -111,10 +118,9 @@
                                 <thead>
                                     <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
                                         <th style="color: #94A3B8; padding: 8px; text-align: left; width: 250px;">Item</th>
-                                        <th style="color: #94A3B8; padding: 8px; text-align: left;">Color/Size</th>
-                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 120px;">Batch No</th>
-                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 90px;">Quantity</th>
-                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 100px;">Rate</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 140px;">Batch No</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 100px;">Quantity</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 110px;">Rate</th>
                                         <th style="color: #94A3B8; padding: 8px; text-align: right; width: 100px;">Amount</th>
                                         <th style="color: #94A3B8; padding: 8px; text-align: center; width: 80px;">Photo</th>
                                         <th style="color: #94A3B8; padding: 8px; text-align: center; width: 50px;"></th>
@@ -135,19 +141,13 @@
                                                 </MudSelect>
                                             </td>
                                             <td style="padding: 6px;">
-                                                <div class="d-flex gap-1">
-                                                    <MudTextField T="string" Placeholder="Color" @bind-Value="line.Color" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; font-size: 12px;" />
-                                                    <MudTextField T="string" Placeholder="Size" @bind-Value="line.Size" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; font-size: 12px;" />
-                                                </div>
-                                            </td>
-                                            <td style="padding: 6px;">
                                                 <MudTextField T="string" @bind-Value="line.BatchNo" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white;" />
                                             </td>
                                             <td style="padding: 6px;">
-                                                <MudNumericField T="decimal" @bind-Value="line.Quantity" Min="0.01M" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right;" />
+                                                <MudNumericField T="decimal" @bind-Value="line.Quantity" Min="0.01M" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right;" />
                                             </td>
                                             <td style="padding: 6px;">
-                                                <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right;" />
+                                                <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" HideSpinButtons="true" Format="F2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right;" />
                                             </td>
                                             <td style="padding: 6px; text-align: right;" class="text-slate-300 font-weight-bold">
                                                 ₹@((line.Quantity * line.Rate).ToString("N2"))
@@ -208,6 +208,9 @@
     private DateTime? _invoiceDate;
     private List<InwardLineItem> _lineItems = new();
 
+    private string _batchPrefix = "KS";
+    private int _nextBatchSeq = 1;
+
     private bool _saving = false;
     
     // Camera Dialog state
@@ -218,7 +221,7 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadLookups();
-        ResetForm();
+        await ResetFormAsync();
     }
 
     private async Task LoadLookups()
@@ -234,12 +237,42 @@
         }
     }
 
+    private async Task RefreshBatchSequence()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<BatchSeqResponse>($"api/stockinward/next-batch-seq?prefix={Uri.EscapeDataString(_batchPrefix)}");
+            if (response != null)
+            {
+                _nextBatchSeq = response.NextSeq;
+            }
+        }
+        catch
+        {
+            _nextBatchSeq = 1;
+        }
+    }
+
+    private async Task OnBatchPrefixChanged(string val)
+    {
+        _batchPrefix = val;
+        await RefreshBatchSequence();
+        for (int i = 0; i < _lineItems.Count; i++)
+        {
+            _lineItems[i].BatchNo = $"{_batchPrefix}{(_nextBatchSeq + i).ToString("D5")}";
+        }
+        StateHasChanged();
+    }
+
     private void AddLineItem()
     {
+        var newIndex = _lineItems.Count;
         _lineItems.Add(new InwardLineItem
         {
             ItemId = _items.FirstOrDefault()?.Id ?? Guid.Empty,
-            BatchNo = $"BAT{DateTime.UtcNow:yyMMddHHmmss}"
+            BatchNo = $"{_batchPrefix}{(_nextBatchSeq + newIndex).ToString("D5")}",
+            Quantity = 1,
+            Rate = 0.00M
         });
     }
 
@@ -248,6 +281,11 @@
         if (index >= 0 && index < _lineItems.Count)
         {
             _lineItems.RemoveAt(index);
+            // Re-sequence batch numbers
+            for (int i = 0; i < _lineItems.Count; i++)
+            {
+                _lineItems[i].BatchNo = $"{_batchPrefix}{(_nextBatchSeq + i).ToString("D5")}";
+            }
         }
     }
 
@@ -277,11 +315,10 @@
         var parameters = new DialogParameters { ["imageUrl"] = url };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
         
-        // Inline simple view dialog
         await DialogService.ShowAsync<ImagePreviewDialog>("Photo View", parameters, options);
     }
 
-    private void ResetForm()
+    private async Task ResetFormAsync()
     {
         _inwardHeader = new StockInwardPostDto
         {
@@ -291,7 +328,13 @@
         _inwardDate = DateTime.Today;
         _invoiceDate = null;
         _lineItems.Clear();
+        await RefreshBatchSequence();
         AddLineItem();
+    }
+
+    private async Task ResetForm()
+    {
+        await ResetFormAsync();
     }
 
     private async Task SaveInward()
@@ -308,9 +351,9 @@
             _inwardHeader.Details = _lineItems.Select(l => new StockInwardDetailDto
             {
                 ItemId = l.ItemId,
-                Color = l.Color,
-                Design = l.Design,
-                Size = l.Size,
+                Color = null,
+                Design = null,
+                Size = null,
                 BatchNo = l.BatchNo,
                 Quantity = l.Quantity,
                 Rate = l.Rate,
@@ -321,7 +364,7 @@
             if (response.IsSuccessStatusCode)
             {
                 Snackbar.Add("Stock Inward recorded successfully! Barcodes and QR Codes registered.", Severity.Success);
-                ResetForm();
+                await ResetFormAsync();
             }
             else
             {
@@ -349,5 +392,10 @@
         public decimal Quantity { get; set; } = 1;
         public decimal Rate { get; set; } = 0;
         public string? ImageUrl { get; set; }
+    }
+
+    public class BatchSeqResponse
+    {
+        public int NextSeq { get; set; }
     }
 }

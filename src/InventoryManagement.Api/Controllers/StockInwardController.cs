@@ -51,6 +51,35 @@ namespace InventoryManagement.Api.Controllers
             return Ok(inward);
         }
 
+        [HttpGet("next-batch-seq")]
+        public async Task<IActionResult> GetNextBatchSequence([FromQuery] string prefix)
+        {
+            if (string.IsNullOrEmpty(prefix))
+            {
+                return BadRequest("Prefix is required.");
+            }
+
+            var batchNumbers = await _context.StockInwardDetails
+                .Where(d => d.BatchNo.StartsWith(prefix))
+                .Select(d => d.BatchNo)
+                .ToListAsync();
+
+            int maxSeq = 0;
+            foreach (var batch in batchNumbers)
+            {
+                var suffix = batch.Substring(prefix.Length);
+                if (int.TryParse(suffix, out var seq))
+                {
+                    if (seq > maxSeq)
+                    {
+                        maxSeq = seq;
+                    }
+                }
+            }
+
+            return Ok(new { nextSeq = maxSeq + 1 });
+        }
+
         [HttpPost]
         public async Task<IActionResult> CreateInward([FromBody] StockInwardPostDto dto)
         {
