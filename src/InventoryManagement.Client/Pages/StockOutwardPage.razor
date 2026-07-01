@@ -63,6 +63,7 @@
                                       AdornmentIcon="@Icons.Material.Filled.QrCode" 
                                       OnKeyDown="HandleScanKeyPress" 
                                       Disabled="_resolving"
+                                      Immediate="true"
                                       HelperText="e.g. ITEM000001, BATCH000001"
                                       Class="text-slate-100 flex-grow-1" />
                     </div>
@@ -111,7 +112,7 @@
                     else
                     {
                         <div style="overflow-x: auto;">
-                            <table class="w-100 mud-table" style="border-collapse: collapse;">
+                            <table class="mud-table" style="width: 100%; min-width: 800px; border-collapse: collapse;">
                                 <thead>
                                     <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
                                         <th style="color: #94A3B8; padding: 10px; text-align: left; width: 60px;">Photo</th>
@@ -155,7 +156,7 @@
                                                 <MudNumericField T="decimal" @bind-Value="line.Quantity" Min="0.01M" Max="@line.AvailableQuantity" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 75px;" />
                                             </td>
                                             <td style="padding: 10px;">
-                                                <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 140px;" />
+                                                <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" HideSpinButtons="true" Format="F2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 140px;" />
                                             </td>
                                             <td style="padding: 10px; text-align: right;" class="text-slate-100 font-weight-bold">
                                                 ₹@((line.Quantity * line.Rate).ToString("N2"))
