@@ -84,6 +84,28 @@
                 document.body.removeChild(link);
             }
         };
+
+        window.keyboardShortcutInterop = {
+            registerCtrlS: function (dotNetHelper) {
+                if (window.ctrlSHandler) {
+                    window.removeEventListener('keydown', window.ctrlSHandler);
+                }
+                const handler = function (e) {
+                    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+                        e.preventDefault();
+                        dotNetHelper.invokeMethodAsync('OnCtrlS');
+                    }
+                };
+                window.ctrlSHandler = handler;
+                window.addEventListener('keydown', handler);
+            },
+            unregisterCtrlS: function () {
+                if (window.ctrlSHandler) {
+                    window.removeEventListener('keydown', window.ctrlSHandler);
+                    window.ctrlSHandler = null;
+                }
+            }
+        };
     </script>
 </body>
 

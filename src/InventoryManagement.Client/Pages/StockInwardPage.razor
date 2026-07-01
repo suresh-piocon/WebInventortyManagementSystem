@@ -3,6 +3,8 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@implements IDisposable
 
 <PageTitle>Stock Inward Entry - AG Inventory</PageTitle>
 
@@ -215,6 +217,7 @@
     private bool _saving = false;
 
     private MudButton? _submitButton;
+    private DotNetObjectReference<StockInwardPage>? _objRef;
 
     // References for keyboard navigation
     private Dictionary<int, MudSelect<Guid>> _itemRefs = new();
@@ -232,6 +235,8 @@
         if (firstRender)
         {
             await FocusItemSelect(0);
+            _objRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("keyboardShortcutInterop.registerCtrlS", _objRef);
         }
     }
 
@@ -270,11 +275,30 @@
     {
         if (e.Key == "Enter")
         {
-            if (_submitButton != null)
+            if (index < _lineItems.Count - 1)
             {
-                await _submitButton.FocusAsync();
+                await FocusItemSelect(index + 1);
+            }
+            else
+            {
+                await AddLineItemAsync();
             }
         }
+    }
+
+    [JSInvokable]
+    public async Task OnCtrlS()
+    {
+        if (!_saving && _lineItems.Any())
+        {
+            await SaveInward();
+        }
+    }
+
+    public void Dispose()
+    {
+        _objRef?.Dispose();
+        _ = JSRuntime.InvokeVoidAsync("keyboardShortcutInterop.unregisterCtrlS");
     }
 
     private async Task LoadLookups()
