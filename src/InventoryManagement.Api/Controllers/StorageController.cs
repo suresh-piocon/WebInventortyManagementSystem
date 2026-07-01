@@ -44,12 +44,25 @@ namespace InventoryManagement.Api.Controllers
             var serviceRoleKey = _config["Supabase:ServiceRoleKey"];
             var anonKey = _config["Supabase:AnonKey"];
 
-            // Helper function to check if a value is a placeholder
+            // Helper function to check if a value is a placeholder or invalid key
             bool IsPlaceholder(string? value)
             {
                 if (string.IsNullOrWhiteSpace(value)) return true;
                 var v = value.ToLowerInvariant();
-                return v.Contains("your-anon-key") || v.Contains("your-service-role-key") || v.Contains("your-jwt-secret") || v.Contains("your-project");
+                if (v.Contains("your-anon-key") || v.Contains("your-service-role-key") || v.Contains("your-jwt-secret") || v.Contains("your-project"))
+                {
+                    return true;
+                }
+                
+                // Supabase service keys and anon keys are JWTs (3 parts separated by dots).
+                // If it doesn't have 3 parts, it's not a valid Supabase key and upload would fail with 403.
+                var parts = value.Split('.');
+                if (parts.Length != 3)
+                {
+                    return true;
+                }
+
+                return false;
             }
 
             if (IsPlaceholder(serviceRoleKey)) serviceRoleKey = null;
