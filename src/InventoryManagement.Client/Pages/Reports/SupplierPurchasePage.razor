@@ -2,6 +2,7 @@
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject IJSRuntime JSRuntime
+@inject IDialogService DialogService
 
 <PageTitle>Supplier Purchase History - AG Inventory</PageTitle>
 
@@ -58,6 +59,7 @@
             <MudTh Style="color: #94A3B8; text-align: right;">Quantity</MudTh>
             <MudTh Style="color: #94A3B8; text-align: right;">Purchase Rate</MudTh>
             <MudTh Style="color: #94A3B8; text-align: right;">Total Amount</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: center;">Actions</MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Purchase Date" Class="text-slate-300">@context.InwardDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</MudTd>
@@ -68,6 +70,22 @@
             <MudTd DataLabel="Quantity" Style="text-align: right;" Class="text-slate-300">@context.Quantity.ToString("N2")</MudTd>
             <MudTd DataLabel="Purchase Rate" Style="text-align: right;" Class="text-slate-300">₹@context.Rate.ToString("N4")</MudTd>
             <MudTd DataLabel="Total Amount" Style="text-align: right;" Class="text-slate-100 font-weight-bold">₹@context.Amount.ToString("N2")</MudTd>
+            <MudTd DataLabel="Actions" Style="text-align: center;">
+                <div class="d-flex align-center justify-center gap-1">
+                    <MudTooltip Text="Delete this item row">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                       Color="Color.Error" 
+                                       Size="Size.Small" 
+                                       OnClick="@(() => ConfirmDeleteRow(context))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Delete entire invoice">
+                        <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" 
+                                       Color="Color.Warning" 
+                                       Size="Size.Small" 
+                                       OnClick="@(() => ConfirmDeleteInvoice(context))" />
+                    </MudTooltip>
+                </div>
+            </MudTd>
         </RowTemplate>
         <PagerContent>
             <MudTablePager />
@@ -146,6 +164,66 @@
         catch (Exception ex)
         {
             Snackbar.Add($"Error exporting: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ConfirmDeleteRow(SupplierPurchaseReportDto item)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Delete Inward Item Row", 
+            $"Are you sure you want to delete the item '{item.ItemName}' from invoice '{item.InvoiceNo}'? This will also delete all corresponding barcode and ledger tracking data.", 
+            yesText: "Delete Row", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/stockinward/detail/{item.Id}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Inward row and barcode data deleted successfully!", Severity.Success);
+                    await LoadReport();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Delete failed: {error}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting record: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ConfirmDeleteInvoice(SupplierPurchaseReportDto item)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Delete Entire Invoice", 
+            $"Are you sure you want to delete the entire invoice '{item.InvoiceNo}' of supplier '{item.SupplierName}'? This will delete ALL items in this invoice, including their corresponding barcodes and ledger history.", 
+            yesText: "Delete Invoice", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/stockinward/invoice/{item.StockInwardId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Entire invoice and all barcode data deleted successfully!", Severity.Success);
+                    await LoadReport();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Delete failed: {error}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting invoice: {ex.Message}", Severity.Error);
+            }
         }
     }
 }

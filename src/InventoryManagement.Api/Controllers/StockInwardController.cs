@@ -416,5 +416,128 @@ namespace InventoryManagement.Api.Controllers
             int nextNum = maxSeq + 1;
             return $"BATCH{nextNum:D6}";
         }
+
+        [HttpDelete("detail/{detailId}")]
+        public async Task<IActionResult> DeleteInwardDetail(Guid detailId)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var detail = await _context.StockInwardDetails
+                    .Include(d => d.StockInward)
+                    .FirstOrDefaultAsync(d => d.Id == detailId);
+
+                if (detail == null)
+                {
+                    return NotFound("Stock inward detail record not found.");
+                }
+
+                var trackingNo = detail.TrackingNo;
+                var stockInwardId = detail.StockInwardId;
+
+                // 1. Delete associated BarcodeMaster records
+                if (!string.IsNullOrEmpty(trackingNo))
+                {
+                    var barcodes = await _context.BarcodeMasters
+                        .Where(b => b.TrackingNo == trackingNo)
+                        .ToListAsync();
+                    _context.BarcodeMasters.RemoveRange(barcodes);
+
+                    // 2. Delete associated QRCodeMaster records
+                    var qrCodes = await _context.QRCodeMasters
+                        .Where(q => q.TrackingNo == trackingNo)
+                        .ToListAsync();
+                    _context.QRCodeMasters.RemoveRange(qrCodes);
+
+                    // 3. Delete associated StockLedger records
+                    var ledgers = await _context.StockLedgers
+                        .Where(l => l.TrackingNo == trackingNo)
+                        .ToListAsync();
+                    _context.StockLedgers.RemoveRange(ledgers);
+                }
+
+                // 4. Delete the StockInwardDetail itself
+                _context.StockInwardDetails.Remove(detail);
+                await _context.SaveChangesAsync();
+
+                // 5. If the parent StockInward has no other details left, delete the parent record too
+                var otherDetailsCount = await _context.StockInwardDetails
+                    .CountAsync(d => d.StockInwardId == stockInwardId);
+
+                if (otherDetailsCount == 0)
+                {
+                    var parent = await _context.StockInwards.FindAsync(stockInwardId);
+                    if (parent != null)
+                    {
+                        _context.StockInwards.Remove(parent);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
+                await transaction.CommitAsync();
+                return Ok(new { message = "Stock inward detail and corresponding barcode tracking data deleted successfully." });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, $"An error occurred while deleting stock inward detail: {ex.Message}");
+            }
+        }
+
+        [HttpDelete("invoice/{inwardId}")]
+        public async Task<IActionResult> DeleteInwardInvoice(Guid inwardId)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var inward = await _context.StockInwards
+                    .Include(si => si.Details)
+                    .FirstOrDefaultAsync(si => si.Id == inwardId);
+
+                if (inward == null)
+                {
+                    return NotFound("Stock inward record not found.");
+                }
+
+                // 1. Get all tracking numbers for the details
+                var trackingNos = inward.Details
+                    .Select(d => d.TrackingNo)
+                    .Where(t => !string.IsNullOrEmpty(t))
+                    .ToList();
+
+                if (trackingNos.Any())
+                {
+                    // 2. Delete associated BarcodeMaster records
+                    var barcodes = await _context.BarcodeMasters
+                        .Where(b => trackingNos.Contains(b.TrackingNo))
+                        .ToListAsync();
+                    _context.BarcodeMasters.RemoveRange(barcodes);
+
+                    // 3. Delete associated QRCodeMaster records
+                    var qrCodes = await _context.QRCodeMasters
+                        .Where(q => trackingNos.Contains(q.TrackingNo))
+                        .ToListAsync();
+                    _context.QRCodeMasters.RemoveRange(qrCodes);
+
+                    // 4. Delete associated StockLedger records
+                    var ledgers = await _context.StockLedgers
+                        .Where(l => trackingNos.Contains(l.TrackingNo))
+                        .ToListAsync();
+                    _context.StockLedgers.RemoveRange(ledgers);
+                }
+
+                // 5. Delete the StockInward (which cascade deletes the details)
+                _context.StockInwards.Remove(inward);
+                
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return Ok(new { message = "Stock inward invoice, all detail lines, and corresponding barcode tracking data deleted successfully." });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, $"An error occurred while deleting stock inward invoice: {ex.Message}");
+            }
+        }
     }
 }

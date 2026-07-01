@@ -577,6 +577,8 @@ namespace InventoryManagement.Shared
 
     public class SupplierPurchaseReportDto
     {
+        public Guid Id { get; set; } // StockInwardDetail Id
+        public Guid StockInwardId { get; set; } // StockInward Id
         public DateTimeOffset InwardDate { get; set; }
         public string SupplierName { get; set; } = string.Empty;
         public string InvoiceNo { get; set; } = string.Empty;

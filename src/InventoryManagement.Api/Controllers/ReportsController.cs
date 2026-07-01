@@ -225,6 +225,8 @@ namespace InventoryManagement.Api.Controllers
                 .OrderByDescending(d => d.StockInward!.InwardDate)
                 .Select(d => new SupplierPurchaseReportDto
                 {
+                    Id = d.Id,
+                    StockInwardId = d.StockInwardId,
                     InwardDate = d.StockInward!.InwardDate,
                     SupplierName = d.StockInward.Supplier!.Name,
                     InvoiceNo = d.StockInward.InvoiceNo ?? "N/A",

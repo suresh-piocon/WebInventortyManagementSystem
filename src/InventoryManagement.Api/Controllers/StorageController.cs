@@ -45,7 +45,7 @@ namespace InventoryManagement.Api.Controllers
 
             // If Supabase is not configured, fall back to local file storage
             if (string.IsNullOrEmpty(supabaseUrl) || supabaseUrl.Contains("your-project") || 
-                string.IsNullOrEmpty(serviceKey) || serviceKey.Contains("your-anon-key-here") || serviceKey.Contains("your-service-role-key-here"))
+                string.IsNullOrEmpty(serviceKey) || serviceKey.Contains("your-anon-key") || serviceKey.Contains("your-service-role-key"))
             {
                 var uploadsFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "uploads");
                 if (!Directory.Exists(uploadsFolder))
