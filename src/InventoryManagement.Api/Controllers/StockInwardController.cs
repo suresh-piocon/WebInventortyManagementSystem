@@ -268,38 +268,35 @@ namespace InventoryManagement.Api.Controllers
             var year = DateTime.UtcNow.Year;
             var prefix = $"INW-{year}-";
 
-            var maxDbInward = await _context.StockInwards
+            var dbInwards = await _context.StockInwards
                 .Where(si => si.InwardNo.ToUpper().StartsWith(prefix))
-                .OrderByDescending(si => si.InwardNo)
                 .Select(si => si.InwardNo)
-                .FirstOrDefaultAsync();
+                .ToListAsync();
 
-            var maxLocalInward = _context.StockInwards.Local
-                .Where(si => si.InwardNo.ToUpper().StartsWith(prefix))
-                .OrderByDescending(si => si.InwardNo)
+            var localInwards = _context.StockInwards.Local
+                .Where(si => si.InwardNo != null && si.InwardNo.ToUpper().StartsWith(prefix))
                 .Select(si => si.InwardNo)
-                .FirstOrDefault();
+                .ToList();
 
-            string? maxInward = null;
-            if (maxDbInward != null && maxLocalInward != null)
-            {
-                maxInward = string.Compare(maxDbInward, maxLocalInward, StringComparison.OrdinalIgnoreCase) > 0 ? maxDbInward : maxLocalInward;
-            }
-            else
-            {
-                maxInward = maxDbInward ?? maxLocalInward;
-            }
+            var allInwards = dbInwards
+                .Concat(localInwards)
+                .Where(i => !string.IsNullOrEmpty(i))
+                .Distinct();
 
-            int nextNum = 1;
-            if (maxInward != null)
+            int maxSeq = 0;
+            foreach (var inw in allInwards)
             {
-                var parts = maxInward.Split('-');
-                if (parts.Length == 3 && int.TryParse(parts[2], out var num))
+                var parts = inw.Split('-');
+                if (parts.Length >= 3 && int.TryParse(parts[2], out var num))
                 {
-                    nextNum = num + 1;
+                    if (num > maxSeq)
+                    {
+                        maxSeq = num;
+                    }
                 }
             }
 
+            int nextNum = maxSeq + 1;
             return $"{prefix}{nextNum:D6}";
         }
 
@@ -310,25 +307,21 @@ namespace InventoryManagement.Api.Controllers
 
             var dbTrackings = await _context.StockInwardDetails
                 .Where(sid => sid.TrackingNo.ToUpper().StartsWith(prefix))
-                .OrderByDescending(sid => sid.TrackingNo)
                 .Select(sid => sid.TrackingNo)
-                .Take(100)
                 .ToListAsync();
 
             var dbQrTrackings = await _context.QRCodeMasters
                 .Where(qm => qm.TrackingNo.ToUpper().StartsWith(prefix))
-                .OrderByDescending(qm => qm.TrackingNo)
                 .Select(qm => qm.TrackingNo)
-                .Take(100)
                 .ToListAsync();
 
             var localTrackings = _context.StockInwardDetails.Local
-                .Where(sid => sid.TrackingNo.ToUpper().StartsWith(prefix))
+                .Where(sid => sid.TrackingNo != null && sid.TrackingNo.ToUpper().StartsWith(prefix))
                 .Select(sid => sid.TrackingNo)
                 .ToList();
 
             var localQrTrackings = _context.QRCodeMasters.Local
-                .Where(qm => qm.TrackingNo.ToUpper().StartsWith(prefix))
+                .Where(qm => qm.TrackingNo != null && qm.TrackingNo.ToUpper().StartsWith(prefix))
                 .Select(qm => qm.TrackingNo)
                 .ToList();
 
@@ -360,13 +353,11 @@ namespace InventoryManagement.Api.Controllers
         {
             var dbBarcodes = await _context.BarcodeMasters
                 .Where(b => b.Barcode.ToUpper().StartsWith("ITEM"))
-                .OrderByDescending(b => b.Barcode)
                 .Select(b => b.Barcode)
-                .Take(100)
                 .ToListAsync();
 
             var localBarcodes = _context.BarcodeMasters.Local
-                .Where(b => b.Barcode.ToUpper().StartsWith("ITEM"))
+                .Where(b => b.Barcode != null && b.Barcode.ToUpper().StartsWith("ITEM"))
                 .Select(b => b.Barcode)
                 .ToList();
 
@@ -396,13 +387,11 @@ namespace InventoryManagement.Api.Controllers
         {
             var dbBarcodes = await _context.BarcodeMasters
                 .Where(b => b.Barcode.ToUpper().StartsWith("BATCH"))
-                .OrderByDescending(b => b.Barcode)
                 .Select(b => b.Barcode)
-                .Take(100)
                 .ToListAsync();
 
             var localBarcodes = _context.BarcodeMasters.Local
-                .Where(b => b.Barcode.ToUpper().StartsWith("BATCH"))
+                .Where(b => b.Barcode != null && b.Barcode.ToUpper().StartsWith("BATCH"))
                 .Select(b => b.Barcode)
                 .ToList();
 

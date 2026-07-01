@@ -109,6 +109,37 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<InventoryDbContext>();
         context.Database.EnsureCreated();
+        
+        // Adjust database indexes to remove uniqueness on TrackingNo
+        try
+        {
+            var isSqlite = context.Database.ProviderName?.Contains("Sqlite") == true;
+            if (isSqlite)
+            {
+                context.Database.ExecuteSqlRaw("DROP INDEX IF EXISTS \"IX_StockInwardDetails_TrackingNo\";");
+                context.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS \"IX_StockInwardDetails_TrackingNo\" ON \"StockInwardDetails\"(\"TrackingNo\");");
+                
+                context.Database.ExecuteSqlRaw("DROP INDEX IF EXISTS \"IX_QRCodeMaster_TrackingNo\";");
+                context.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS \"IX_QRCodeMaster_TrackingNo\" ON \"QRCodeMaster\"(\"TrackingNo\");");
+            }
+            else
+            {
+                // PostgreSQL
+                context.Database.ExecuteSqlRaw("ALTER TABLE \"StockInwardDetails\" DROP CONSTRAINT IF EXISTS \"IX_StockInwardDetails_TrackingNo\";");
+                context.Database.ExecuteSqlRaw("DROP INDEX IF EXISTS \"IX_StockInwardDetails_TrackingNo\";");
+                context.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS \"IX_StockInwardDetails_TrackingNo\" ON \"StockInwardDetails\"(\"TrackingNo\");");
+                
+                context.Database.ExecuteSqlRaw("ALTER TABLE \"QRCodeMaster\" DROP CONSTRAINT IF EXISTS \"IX_QRCodeMaster_TrackingNo\";");
+                context.Database.ExecuteSqlRaw("DROP INDEX IF EXISTS \"IX_QRCodeMaster_TrackingNo\";");
+                context.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS \"IX_QRCodeMaster_TrackingNo\" ON \"QRCodeMaster\"(\"TrackingNo\");");
+            }
+            Console.WriteLine("Database unique index constraints on TrackingNo adjusted successfully.");
+        }
+        catch (Exception indexEx)
+        {
+            Console.WriteLine($"Warning: Failed to adjust database unique index constraints: {indexEx.Message}");
+        }
+
         DbInitializer.Initialize(context);
     }
     catch (Exception ex)

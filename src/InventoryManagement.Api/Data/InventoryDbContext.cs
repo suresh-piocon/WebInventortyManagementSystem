@@ -49,11 +49,11 @@ namespace InventoryManagement.Api.Data
             modelBuilder.Entity<Supplier>().HasIndex(s => s.Code).IsUnique();
             modelBuilder.Entity<Item>().HasIndex(i => i.Code).IsUnique();
             modelBuilder.Entity<StockInward>().HasIndex(si => si.InwardNo).IsUnique();
-            modelBuilder.Entity<StockInwardDetail>().HasIndex(sid => sid.TrackingNo).IsUnique();
+            modelBuilder.Entity<StockInwardDetail>().HasIndex(sid => sid.TrackingNo);
             modelBuilder.Entity<StockOutward>().HasIndex(so => so.OutwardNo).IsUnique();
             modelBuilder.Entity<BarcodeMaster>().HasIndex(bm => bm.Barcode).IsUnique();
             modelBuilder.Entity<QRCodeMaster>().HasIndex(qm => qm.QRCode).IsUnique();
-            modelBuilder.Entity<QRCodeMaster>().HasIndex(qm => qm.TrackingNo).IsUnique();
+            modelBuilder.Entity<QRCodeMaster>().HasIndex(qm => qm.TrackingNo);
 
             // Set up cascading deletes
             modelBuilder.Entity<StockInwardDetail>()
