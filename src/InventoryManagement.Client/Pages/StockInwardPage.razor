@@ -118,10 +118,10 @@
                             <table class="w-100 mud-table" style="border-collapse: collapse;">
                                 <thead>
                                     <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
-                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 210px;">Item</th>
-                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 160px;">Batch No</th>
-                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 70px;">Qty</th>
-                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 110px;">Rate</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 190px;">Item</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 150px;">Batch No</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 110px;">Qty</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 140px;">Rate</th>
                                         <th style="color: #94A3B8; padding: 8px; text-align: right; width: 120px;">Amount</th>
                                         <th style="color: #94A3B8; padding: 8px; text-align: center; width: 50px;"></th>
                                     </tr>
@@ -139,7 +139,7 @@
                                                            @onkeydown="@((KeyboardEventArgs e) => HandleItemKeyDown(e, index))"
                                                            Margin="Margin.Dense" 
                                                            Variant="Variant.Outlined" 
-                                                           Style="color: white; min-width: 180px;">
+                                                           Style="color: white; min-width: 170px;">
                                                     @foreach (var item in _items)
                                                     {
                                                         <MudSelectItem Value="@item.Id">@item.Name (@item.BarcodeType)</MudSelectItem>
