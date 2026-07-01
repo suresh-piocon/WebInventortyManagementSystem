@@ -538,5 +538,105 @@ namespace InventoryManagement.Api.Controllers
                 return StatusCode(500, $"An error occurred while deleting stock inward invoice: {ex.Message}");
             }
         }
+
+        [HttpDelete("barcode/{barcodeId}")]
+        public async Task<IActionResult> DeleteBarcode(Guid barcodeId)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var barcode = await _context.BarcodeMasters.FindAsync(barcodeId);
+                if (barcode == null)
+                {
+                    return NotFound("Barcode record not found.");
+                }
+
+                var trackingNo = barcode.TrackingNo;
+                
+                // Find corresponding StockInwardDetail
+                var detail = await _context.StockInwardDetails
+                    .Include(d => d.StockInward)
+                    .FirstOrDefaultAsync(d => d.TrackingNo == trackingNo);
+
+                if (detail != null)
+                {
+                    var stockInwardId = detail.StockInwardId;
+
+                    // If it is a Unique barcode and there are multiple barcodes for this tracking number, we just decrement quantity
+                    var barcodeCount = await _context.BarcodeMasters.CountAsync(b => b.TrackingNo == trackingNo);
+
+                    if (barcodeCount > 1)
+                    {
+                        // Decrement detail quantity by 1
+                        detail.Quantity -= 1;
+                        detail.Amount = detail.Quantity * detail.Rate;
+                        _context.StockInwardDetails.Update(detail);
+
+                        // Decrement QRCodeMaster quantity by 1
+                        var qrCode = await _context.QRCodeMasters.FirstOrDefaultAsync(q => q.TrackingNo == trackingNo);
+                        if (qrCode != null)
+                        {
+                            qrCode.Quantity -= 1;
+                            if (qrCode.Quantity <= 0) _context.QRCodeMasters.Remove(qrCode);
+                            else _context.QRCodeMasters.Update(qrCode);
+                        }
+
+                        // Decrement StockLedger quantity by 1
+                        var ledger = await _context.StockLedgers.FirstOrDefaultAsync(l => l.TrackingNo == trackingNo);
+                        if (ledger != null)
+                        {
+                            ledger.InwardQty -= 1;
+                            ledger.BalanceQty -= 1;
+                            if (ledger.InwardQty <= 0) _context.StockLedgers.Remove(ledger);
+                            else _context.StockLedgers.Update(ledger);
+                        }
+
+                        // Remove this barcode
+                        _context.BarcodeMasters.Remove(barcode);
+                    }
+                    else
+                    {
+                        // Delete everything for this tracking number
+                        _context.BarcodeMasters.Remove(barcode);
+
+                        var qrCodes = await _context.QRCodeMasters.Where(q => q.TrackingNo == trackingNo).ToListAsync();
+                        _context.QRCodeMasters.RemoveRange(qrCodes);
+
+                        var ledgers = await _context.StockLedgers.Where(l => l.TrackingNo == trackingNo).ToListAsync();
+                        _context.StockLedgers.RemoveRange(ledgers);
+
+                        _context.StockInwardDetails.Remove(detail);
+                    }
+
+                    await _context.SaveChangesAsync();
+
+                    // Check if parent has any other details left
+                    var otherDetailsCount = await _context.StockInwardDetails.CountAsync(d => d.StockInwardId == stockInwardId);
+                    if (otherDetailsCount == 0)
+                    {
+                        var parent = await _context.StockInwards.FindAsync(stockInwardId);
+                        if (parent != null)
+                        {
+                            _context.StockInwards.Remove(parent);
+                            await _context.SaveChangesAsync();
+                        }
+                    }
+                }
+                else
+                {
+                    // If no detail is found (orphan barcode), just delete the barcode
+                    _context.BarcodeMasters.Remove(barcode);
+                    await _context.SaveChangesAsync();
+                }
+
+                await transaction.CommitAsync();
+                return Ok(new { message = "Barcode and associated inward data updated/deleted successfully." });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, $"An error occurred while deleting barcode: {ex.Message}");
+            }
+        }
     }
 }

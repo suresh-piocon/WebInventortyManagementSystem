@@ -3,6 +3,7 @@
 @inject ISnackbar Snackbar
 @inject IJSRuntime JSRuntime
 @inject BarcodeGeneratorService BarcodeGen
+@inject IDialogService DialogService
 
 <PageTitle>Print Barcode Labels - Inventory Management</PageTitle>
 
@@ -82,17 +83,25 @@
                             <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2 text-primary" /> 1. Select Inward Invoice
                         </MudText>
                         <MudSpacer />
-                        <MudTextField @bind-Value="_inwardSearchQuery" Placeholder="Search Supplier, Invoice No..." 
+                        <MudTextField @bind-Value="InwardSearchQuery" Placeholder="Search Supplier, Invoice No..." 
                                       Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
                                       IconSize="Size.Medium" Class="mt-0 text-slate-200" Style="color: white; max-width: 320px;" />
                     </ToolBarContent>
                     <HeaderContent>
+                        <MudTh Style="color: #94A3B8; width: 60px;">Select</MudTh>
                         <MudTh Style="color: #94A3B8;">Supplier Name</MudTh>
                         <MudTh Style="color: #94A3B8;">Invoice No</MudTh>
                         <MudTh Style="color: #94A3B8;">Invoice Date</MudTh>
                         <MudTh Style="color: #94A3B8; text-align: right;">Total Qty</MudTh>
                     </HeaderContent>
                     <RowTemplate>
+                        <MudTd>
+                            <MudCheckBox T="bool" 
+                                         Value="@(_selectedInward?.Id == context.Id)" 
+                                         ValueChanged="@((bool val) => OnInwardCheckboxChanged(val, context))" 
+                                         Color="Color.Primary" 
+                                         Size="Size.Small" />
+                        </MudTd>
                         <MudTd DataLabel="Supplier Name" Class="text-slate-100 font-weight-bold">@context.Supplier?.Name</MudTd>
                         <MudTd DataLabel="Invoice No" Class="text-slate-200">@context.InvoiceNo</MudTd>
                         <MudTd DataLabel="Invoice Date" Class="text-slate-300">@(context.InvoiceDate?.LocalDateTime.ToString("yyyy-MM-dd") ?? "N/A")</MudTd>
@@ -103,76 +112,83 @@
                     </PagerContent>
                 </MudTable>
             </MudPaper>
-
-            <!-- Barcodes Table -->
-            <MudPaper Class="glass-panel pa-6">
-                <div class="d-flex justify-between align-center mb-4">
-                    <MudText Typo="Typo.h6" Class="text-slate-200" Style="font-family: 'Outfit';">
-                        <MudIcon Icon="@Icons.Material.Filled.FormatListBulleted" Class="mr-2 text-secondary" /> 
-                        2. Select Barcodes to Print
-                    </MudText>
-                    @if (_barcodes.Any())
-                    {
-                        <div class="d-flex gap-2">
-                            <MudButton Variant="Variant.Text" Color="Color.Secondary" Size="Size.Small" OnClick="SelectAll">Select All</MudButton>
-                            <MudButton Variant="Variant.Text" Color="Color.Secondary" Size="Size.Small" OnClick="ClearSelection">Deselect All</MudButton>
-                        </div>
-                    }
-                </div>
-
-                @if (_loading)
-                {
-                    <div class="d-flex justify-center py-8">
-                        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-                    </div>
-                }
-                else if (!_barcodes.Any())
-                {
-                    <div class="d-flex flex-column align-center justify-center py-8 text-center text-slate-500">
-                        <MudIcon Icon="@Icons.Material.Filled.QrCode" Size="Size.Large" Class="mb-2" />
-                        @if (_selectedInward == null)
-                        {
-                            <MudText>Select an inward invoice from the list above to display its corresponding barcodes.</MudText>
-                        }
-                        else
-                        {
-                            <MudText>No barcodes registered for this stock inward invoice.</MudText>
-                        }
-                    </div>
-                }
-                else
-                {
-                    <div style="max-height: 450px; overflow-y: auto;">
-                        <MudTable Items="@_barcodes" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0" MultiSelection="true" @bind-SelectedItems="_selectedBarcodes" Style="background: transparent;">
-                            <HeaderContent>
-                                <MudTh Style="color: #94A3B8;">Item Name</MudTh>
-                                <MudTh Style="color: #94A3B8;">Barcode Number</MudTh>
-                                <MudTh Style="color: #94A3B8;">Batch No</MudTh>
-                                <MudTh Style="color: #94A3B8;">Tracking No</MudTh>
-                                <MudTh Style="color: #94A3B8;">Type</MudTh>
-                                <MudTh Style="color: #94A3B8;">Status</MudTh>
-                            </HeaderContent>
-                            <RowTemplate>
-                                <MudTd DataLabel="Item Name" Class="text-slate-100 font-weight-bold">@context.Item?.Name</MudTd>
-                                <MudTd DataLabel="Barcode Number" Class="text-slate-100 font-mono font-weight-bold">@context.Barcode</MudTd>
-                                <MudTd DataLabel="Batch No" Class="text-slate-200">@context.BatchNo</MudTd>
-                                <MudTd DataLabel="Tracking No" Class="text-slate-300 font-mono" Style="font-size: 12px;">@context.TrackingNo</MudTd>
-                                <MudTd DataLabel="Type" Class="text-slate-300">@context.Type</MudTd>
-                                <MudTd DataLabel="Status">
-                                    @if (context.IsUsed)
-                                    {
-                                        <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Text">Used / Outward</MudChip>
-                                    }
-                                    else
-                                    {
-                                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">Available</MudChip>
-                                    }
-                                </MudTd>
-                            </RowTemplate>
-                        </MudTable>
-                    </div>
-                }
-            </MudPaper>
+ 
+             <!-- Barcodes Table -->
+             <MudPaper Class="glass-panel pa-6">
+                 <div class="d-flex justify-between align-center mb-4">
+                     <MudText Typo="Typo.h6" Class="text-slate-200" Style="font-family: 'Outfit';">
+                         <MudIcon Icon="@Icons.Material.Filled.FormatListBulleted" Class="mr-2 text-secondary" /> 
+                         2. Select Barcodes to Print
+                     </MudText>
+                     @if (_barcodes.Any())
+                     {
+                         <div class="d-flex gap-2">
+                             <MudButton Variant="Variant.Text" Color="Color.Secondary" Size="Size.Small" OnClick="SelectAll">Select All</MudButton>
+                             <MudButton Variant="Variant.Text" Color="Color.Secondary" Size="Size.Small" OnClick="ClearSelection">Deselect All</MudButton>
+                         </div>
+                     }
+                 </div>
+ 
+                 @if (_loading)
+                 {
+                     <div class="d-flex justify-center py-8">
+                         <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                     </div>
+                 }
+                 else if (!_barcodes.Any())
+                 {
+                     <div class="d-flex flex-column align-center justify-center py-8 text-center text-slate-500">
+                         <MudIcon Icon="@Icons.Material.Filled.QrCode" Size="Size.Large" Class="mb-2" />
+                         @if (_selectedInward == null)
+                         {
+                             <MudText>Select an inward invoice from the list above to display its corresponding barcodes.</MudText>
+                         }
+                         else
+                         {
+                             <MudText>No barcodes registered for this stock inward invoice.</MudText>
+                         }
+                     </div>
+                 }
+                 else
+                 {
+                     <div style="max-height: 450px; overflow-y: auto;">
+                         <MudTable Items="@_barcodes" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0" MultiSelection="true" @bind-SelectedItems="_selectedBarcodes" Style="background: transparent;">
+                             <HeaderContent>
+                                 <MudTh Style="color: #94A3B8;">Item Name</MudTh>
+                                 <MudTh Style="color: #94A3B8;">Barcode Number</MudTh>
+                                 <MudTh Style="color: #94A3B8;">Batch No</MudTh>
+                                 <MudTh Style="color: #94A3B8;">Tracking No</MudTh>
+                                 <MudTh Style="color: #94A3B8;">Type</MudTh>
+                                 <MudTh Style="color: #94A3B8;">Status</MudTh>
+                                 <MudTh Style="color: #94A3B8; text-align: center; width: 60px;">Actions</MudTh>
+                             </HeaderContent>
+                             <RowTemplate>
+                                 <MudTd DataLabel="Item Name" Class="text-slate-100 font-weight-bold">@context.Item?.Name</MudTd>
+                                 <MudTd DataLabel="Barcode Number" Class="text-slate-100 font-mono font-weight-bold">@context.Barcode</MudTd>
+                                 <MudTd DataLabel="Batch No" Class="text-slate-200">@context.BatchNo</MudTd>
+                                 <MudTd DataLabel="Tracking No" Class="text-slate-300 font-mono" Style="font-size: 12px;">@context.TrackingNo</MudTd>
+                                 <MudTd DataLabel="Type" Class="text-slate-300">@context.Type</MudTd>
+                                 <MudTd DataLabel="Status">
+                                     @if (context.IsUsed)
+                                     {
+                                         <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Text">Used / Outward</MudChip>
+                                     }
+                                     else
+                                     {
+                                         <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">Available</MudChip>
+                                     }
+                                 </MudTd>
+                                 <MudTd DataLabel="Actions" Style="text-align: center;">
+                                     <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                    Color="Color.Error" 
+                                                    Size="Size.Small" 
+                                                    OnClick="@(() => ConfirmDeleteBarcode(context))" />
+                                 </MudTd>
+                             </RowTemplate>
+                         </MudTable>
+                     </div>
+                 }
+             </MudPaper>
         </MudItem>
     </MudGrid>
 
@@ -396,6 +412,24 @@
     private StockInward? _selectedInward = null;
     private string _inwardSearchQuery = "";
 
+    private string InwardSearchQuery
+    {
+        get => _inwardSearchQuery;
+        set
+        {
+            if (_inwardSearchQuery != value)
+            {
+                _inwardSearchQuery = value;
+                if (_selectedInward != null && !FilterInwardsFunc(_selectedInward))
+                {
+                    _selectedInward = null;
+                    _barcodes.Clear();
+                    _selectedBarcodes.Clear();
+                }
+            }
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadInwards();
@@ -429,7 +463,7 @@
         }
     }
 
-    private async Task OnInwardSelected(StockInward inward)
+    private async Task OnInwardSelected(StockInward? inward)
     {
         _selectedInward = inward;
         if (inward != null)
@@ -440,6 +474,65 @@
         {
             _barcodes.Clear();
             _selectedBarcodes.Clear();
+        }
+    }
+
+    private async Task OnInwardCheckboxChanged(bool val, StockInward inward)
+    {
+        if (val)
+        {
+            await OnInwardSelected(inward);
+        }
+        else
+        {
+            if (_selectedInward?.Id == inward.Id)
+            {
+                await OnInwardSelected(null);
+            }
+        }
+    }
+
+    private async Task ConfirmDeleteBarcode(BarcodeMaster barcode)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Delete Barcode Record", 
+            $"Are you sure you want to delete the barcode '{barcode.Barcode}' for item '{barcode.Item?.Name}'? This will also decrement the inward quantity and associated ledger data.", 
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/stockinward/barcode/{barcode.Id}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Barcode and associated inward detail updated/deleted successfully!", Severity.Success);
+                    
+                    // Keep track of the selected inward ID before loadingwards
+                    var prevInwardId = _selectedInward?.Id;
+                    
+                    await LoadInwards();
+                    
+                    if (prevInwardId.HasValue)
+                    {
+                        var stillExists = _inwards.FirstOrDefault(i => i.Id == prevInwardId.Value);
+                        if (stillExists != null)
+                        {
+                            _selectedInward = stillExists;
+                            await LoadBarcodesForInward(_selectedInward.Id);
+                        }
+                    }
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Delete failed: {error}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting barcode: {ex.Message}", Severity.Error);
+            }
         }
     }
 
