@@ -16,7 +16,7 @@
         </MudText>
     </div>
 
-    <EditForm Model="@_inwardHeader" OnValidSubmit="SaveInward">
+    <EditForm EditContext="@_editContext">
         <DataAnnotationsValidator />
         
         <MudGrid>
@@ -70,7 +70,7 @@
                     <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="ResetForm">
                         Reset
                     </MudButton>
-                    <MudButton ButtonType="ButtonType.Submit" 
+                    <MudButton OnClick="SaveInward" 
                                Variant="Variant.Filled" 
                                Color="Color.Success"
                                StartIcon="@Icons.Material.Filled.Save"
@@ -201,6 +201,7 @@
     private List<Item> _items = new();
     
     private StockInwardPostDto _inwardHeader = new();
+    private EditContext? _editContext;
     private DateTime? _inwardDate = DateTime.Today;
     private DateTime? _invoiceDate;
     private List<InwardLineItem> _lineItems = new();
@@ -364,6 +365,7 @@
             InwardDate = DateTimeOffset.UtcNow,
             SupplierId = _suppliers.FirstOrDefault()?.Id ?? Guid.Empty
         };
+        _editContext = new EditContext(_inwardHeader);
         _inwardDate = DateTime.Today;
         _invoiceDate = null;
         _lineItems.Clear();
@@ -383,6 +385,7 @@
 
     private async Task SaveInward()
     {
+        if (_editContext != null && !_editContext.Validate()) return;
         if (!_lineItems.Any()) return;
         
         _saving = true;
