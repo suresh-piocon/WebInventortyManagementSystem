@@ -252,104 +252,154 @@ namespace InventoryManagement.Api.Controllers
         {
             var year = DateTime.UtcNow.Year;
             var prefix = $"INW-{year}-";
-            var dbRecords = await _context.StockInwards
-                .Where(si => si.InwardNo.StartsWith(prefix))
+
+            var maxDbInward = await _context.StockInwards
+                .Where(si => si.InwardNo.ToUpper().StartsWith(prefix))
+                .OrderByDescending(si => si.InwardNo)
                 .Select(si => si.InwardNo)
-                .ToListAsync();
+                .FirstOrDefaultAsync();
 
-            var localRecords = _context.StockInwards.Local
-                .Where(si => si.InwardNo.StartsWith(prefix))
-                .Select(si => si.InwardNo);
+            var maxLocalInward = _context.StockInwards.Local
+                .Where(si => si.InwardNo.ToUpper().StartsWith(prefix))
+                .OrderByDescending(si => si.InwardNo)
+                .Select(si => si.InwardNo)
+                .FirstOrDefault();
 
-            var allRecords = dbRecords.Concat(localRecords).Distinct();
-
-            int maxNum = 0;
-            foreach (var r in allRecords)
+            string? maxInward = null;
+            if (maxDbInward != null && maxLocalInward != null)
             {
-                var parts = r.Split('-');
+                maxInward = string.Compare(maxDbInward, maxLocalInward, StringComparison.OrdinalIgnoreCase) > 0 ? maxDbInward : maxLocalInward;
+            }
+            else
+            {
+                maxInward = maxDbInward ?? maxLocalInward;
+            }
+
+            int nextNum = 1;
+            if (maxInward != null)
+            {
+                var parts = maxInward.Split('-');
                 if (parts.Length == 3 && int.TryParse(parts[2], out var num))
                 {
-                    if (num > maxNum) maxNum = num;
+                    nextNum = num + 1;
                 }
             }
-            return $"{prefix}{(maxNum + 1):D6}";
+
+            return $"{prefix}{nextNum:D6}";
         }
 
         private async Task<string> GenerateTrackingNumberAsync()
         {
             var year = DateTime.UtcNow.Year;
             var prefix = $"TRK-{year}-";
-            var dbRecords = await _context.StockInwardDetails
-                .Where(sid => sid.TrackingNo.StartsWith(prefix))
+
+            var maxDbTracking = await _context.StockInwardDetails
+                .Where(sid => sid.TrackingNo.ToUpper().StartsWith(prefix))
+                .OrderByDescending(sid => sid.TrackingNo)
                 .Select(sid => sid.TrackingNo)
-                .ToListAsync();
+                .FirstOrDefaultAsync();
 
-            var localRecords = _context.StockInwardDetails.Local
-                .Where(sid => sid.TrackingNo.StartsWith(prefix))
-                .Select(sid => sid.TrackingNo);
+            var maxLocalTracking = _context.StockInwardDetails.Local
+                .Where(sid => sid.TrackingNo.ToUpper().StartsWith(prefix))
+                .OrderByDescending(sid => sid.TrackingNo)
+                .Select(sid => sid.TrackingNo)
+                .FirstOrDefault();
 
-            var allRecords = dbRecords.Concat(localRecords).Distinct();
-
-            int maxNum = 0;
-            foreach (var r in allRecords)
+            string? maxTracking = null;
+            if (maxDbTracking != null && maxLocalTracking != null)
             {
-                var parts = r.Split('-');
+                maxTracking = string.Compare(maxDbTracking, maxLocalTracking, StringComparison.OrdinalIgnoreCase) > 0 ? maxDbTracking : maxLocalTracking;
+            }
+            else
+            {
+                maxTracking = maxDbTracking ?? maxLocalTracking;
+            }
+
+            int nextNum = 1;
+            if (maxTracking != null)
+            {
+                var parts = maxTracking.Split('-');
                 if (parts.Length == 3 && int.TryParse(parts[2], out var num))
                 {
-                    if (num > maxNum) maxNum = num;
+                    nextNum = num + 1;
                 }
             }
-            return $"{prefix}{(maxNum + 1):D6}";
+
+            return $"{prefix}{nextNum:D6}";
         }
 
         private async Task<string> GenerateUniqueBarcodeAsync()
         {
-            var dbBarcodes = await _context.BarcodeMasters
-                .Where(b => b.Barcode.StartsWith("ITEM"))
+            var maxDbBarcode = await _context.BarcodeMasters
+                .Where(b => b.Barcode.ToUpper().StartsWith("ITEM"))
+                .OrderByDescending(b => b.Barcode)
                 .Select(b => b.Barcode)
-                .ToListAsync();
+                .FirstOrDefaultAsync();
 
-            var localBarcodes = _context.BarcodeMasters.Local
-                .Where(b => b.Barcode.StartsWith("ITEM"))
-                .Select(b => b.Barcode);
+            var maxLocalBarcode = _context.BarcodeMasters.Local
+                .Where(b => b.Barcode.ToUpper().StartsWith("ITEM"))
+                .OrderByDescending(b => b.Barcode)
+                .Select(b => b.Barcode)
+                .FirstOrDefault();
 
-            var allBarcodes = dbBarcodes.Concat(localBarcodes).Distinct();
-
-            int maxNum = 0;
-            foreach (var b in allBarcodes)
+            string? maxBarcode = null;
+            if (maxDbBarcode != null && maxLocalBarcode != null)
             {
-                var numStr = b.Replace("ITEM", "");
+                maxBarcode = string.Compare(maxDbBarcode, maxLocalBarcode, StringComparison.OrdinalIgnoreCase) > 0 ? maxDbBarcode : maxLocalBarcode;
+            }
+            else
+            {
+                maxBarcode = maxDbBarcode ?? maxLocalBarcode;
+            }
+
+            int nextNum = 1;
+            if (maxBarcode != null)
+            {
+                var numStr = maxBarcode.ToUpper().Replace("ITEM", "");
                 if (int.TryParse(numStr, out var num))
                 {
-                    if (num > maxNum) maxNum = num;
+                    nextNum = num + 1;
                 }
             }
-            return $"ITEM{(maxNum + 1):D6}";
+
+            return $"ITEM{nextNum:D6}";
         }
 
         private async Task<string> GenerateBatchBarcodeAsync()
         {
-            var dbBarcodes = await _context.BarcodeMasters
-                .Where(b => b.Barcode.StartsWith("BATCH"))
+            var maxDbBarcode = await _context.BarcodeMasters
+                .Where(b => b.Barcode.ToUpper().StartsWith("BATCH"))
+                .OrderByDescending(b => b.Barcode)
                 .Select(b => b.Barcode)
-                .ToListAsync();
+                .FirstOrDefaultAsync();
 
-            var localBarcodes = _context.BarcodeMasters.Local
-                .Where(b => b.Barcode.StartsWith("BATCH"))
-                .Select(b => b.Barcode);
+            var maxLocalBarcode = _context.BarcodeMasters.Local
+                .Where(b => b.Barcode.ToUpper().StartsWith("BATCH"))
+                .OrderByDescending(b => b.Barcode)
+                .Select(b => b.Barcode)
+                .FirstOrDefault();
 
-            var allBarcodes = dbBarcodes.Concat(localBarcodes).Distinct();
-
-            int maxNum = 0;
-            foreach (var b in allBarcodes)
+            string? maxBarcode = null;
+            if (maxDbBarcode != null && maxLocalBarcode != null)
             {
-                var numStr = b.Replace("BATCH", "");
+                maxBarcode = string.Compare(maxDbBarcode, maxLocalBarcode, StringComparison.OrdinalIgnoreCase) > 0 ? maxDbBarcode : maxLocalBarcode;
+            }
+            else
+            {
+                maxBarcode = maxDbBarcode ?? maxLocalBarcode;
+            }
+
+            int nextNum = 1;
+            if (maxBarcode != null)
+            {
+                var numStr = maxBarcode.ToUpper().Replace("BATCH", "");
                 if (int.TryParse(numStr, out var num))
                 {
-                    if (num > maxNum) maxNum = num;
+                    nextNum = num + 1;
                 }
             }
-            return $"BATCH{(maxNum + 1):D6}";
+
+            return $"BATCH{nextNum:D6}";
         }
     }
 }
