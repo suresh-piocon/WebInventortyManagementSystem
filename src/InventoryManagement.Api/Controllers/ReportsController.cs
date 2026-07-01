@@ -349,6 +349,28 @@ namespace InventoryManagement.Api.Controllers
             return Ok(data);
         }
 
+        [HttpGet("barcodes/inward/{inwardId}")]
+        public async Task<IActionResult> GetBarcodesByInward(Guid inwardId)
+        {
+            var trackingNumbers = await _context.StockInwardDetails
+                .Where(d => d.StockInwardId == inwardId)
+                .Select(d => d.TrackingNo)
+                .ToListAsync();
+
+            if (trackingNumbers == null || !trackingNumbers.Any())
+            {
+                return Ok(new List<BarcodeMaster>());
+            }
+
+            var data = await _context.BarcodeMasters
+                .Include(b => b.Item)
+                .Where(b => trackingNumbers.Contains(b.TrackingNo))
+                .OrderBy(b => b.Barcode)
+                .ToListAsync();
+
+            return Ok(data);
+        }
+
         // ==========================================
         // AUDIT LOG REPORT
         // ==========================================

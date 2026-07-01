@@ -24,17 +24,26 @@
                     <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-2" /> Label Config
                 </MudText>
 
-                <MudSelect T="Guid" 
-                           Label="Select Item" 
-                           Value="@_selectedItemId" 
-                           ValueChanged="OnItemChanged"
-                           Variant="Variant.Outlined" 
-                           Class="mb-4 text-slate-200">
-                    @foreach (var item in _items)
-                    {
-                        <MudSelectItem Value="@item.Id">@item.Name (@item.BarcodeType)</MudSelectItem>
-                    }
-                </MudSelect>
+                <MudText Typo="Typo.body2" Class="text-slate-300 mb-2">Print Selection Mode</MudText>
+                <MudRadioGroup Value="@_selectionMode" T="string" ValueChanged="OnSelectionModeChanged" Class="mb-4 text-slate-200">
+                    <MudRadio T="string" Option="@("Inward")" Color="Color.Primary">By Inward/Invoice</MudRadio>
+                    <MudRadio T="string" Option="@("Item")" Color="Color.Primary">By Item</MudRadio>
+                </MudRadioGroup>
+
+                @if (_selectionMode == "Item")
+                {
+                    <MudSelect T="Guid" 
+                               Label="Select Item" 
+                               Value="@_selectedItemId" 
+                               ValueChanged="OnItemChanged"
+                               Variant="Variant.Outlined" 
+                               Class="mb-4 text-slate-200">
+                        @foreach (var item in _items)
+                        {
+                            <MudSelectItem Value="@item.Id">@item.Name (@item.BarcodeType)</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
 
                 <MudSelect T="string" 
                            Label="Label Format Size" 
@@ -69,10 +78,46 @@
 
         <!-- Barcode Selection List -->
         <MudItem xs="12" md="8">
+            @if (_selectionMode == "Inward")
+            {
+                <MudPaper Class="glass-panel pa-6 mb-6">
+                    <MudTable T="StockInward" Items="@_inwards" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0" 
+                              Filter="new Func<StockInward, bool>(FilterInwardsFunc)"
+                              SelectedItem="@_selectedInward" SelectedItemChanged="OnInwardSelected"
+                              Style="background: transparent;">
+                        <ToolBarContent>
+                            <MudText Typo="Typo.h6" Class="text-slate-200" Style="font-family: 'Outfit';">
+                                <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2 text-primary" /> 1. Select Inward Invoice
+                            </MudText>
+                            <MudSpacer />
+                            <MudTextField @bind-Value="_inwardSearchQuery" Placeholder="Search Supplier, Invoice No or Date..." 
+                                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                                          IconSize="Size.Medium" Class="mt-0 text-slate-200" Style="color: white; max-width: 320px;" />
+                        </ToolBarContent>
+                        <HeaderContent>
+                            <MudTh Style="color: #94A3B8;">Supplier Name</MudTh>
+                            <MudTh Style="color: #94A3B8;">Invoice No</MudTh>
+                            <MudTh Style="color: #94A3B8;">Invoice Date</MudTh>
+                            <MudTh Style="color: #94A3B8;">Inward Date</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Supplier Name" Class="text-slate-100 font-weight-bold">@context.Supplier?.Name</MudTd>
+                            <MudTd DataLabel="Invoice No" Class="text-slate-200">@context.InvoiceNo</MudTd>
+                            <MudTd DataLabel="Invoice Date" Class="text-slate-300">@(context.InvoiceDate?.LocalDateTime.ToString("yyyy-MM-dd") ?? "N/A")</MudTd>
+                            <MudTd DataLabel="Inward Date" Class="text-slate-300">@context.InwardDate.LocalDateTime.ToString("yyyy-MM-dd")</MudTd>
+                        </RowTemplate>
+                        <PagerContent>
+                            <MudTablePager PageSizeOptions="new int[]{5, 10, 20}" />
+                        </PagerContent>
+                    </MudTable>
+                </MudPaper>
+            }
+
             <MudPaper Class="glass-panel pa-6">
                 <div class="d-flex justify-between align-center mb-4">
                     <MudText Typo="Typo.h6" Class="text-slate-200" Style="font-family: 'Outfit';">
-                        <MudIcon Icon="@Icons.Material.Filled.FormatListBulleted" Class="mr-2" /> Select Barcodes to Print
+                        <MudIcon Icon="@Icons.Material.Filled.FormatListBulleted" Class="mr-2 text-secondary" /> 
+                        @(_selectionMode == "Inward" ? "2. Select Barcodes to Print" : "Select Barcodes to Print")
                     </MudText>
                     @if (_barcodes.Any())
                     {
@@ -93,13 +138,27 @@
                 {
                     <div class="d-flex flex-column align-center justify-center py-8 text-center text-slate-500">
                         <MudIcon Icon="@Icons.Material.Filled.QrCode" Size="Size.Large" Class="mb-2" />
-                        @if (_selectedItemId == Guid.Empty)
+                        @if (_selectionMode == "Inward")
                         {
-                            <MudText>Select an item on the left panel to list registered tracking barcodes.</MudText>
+                            @if (_selectedInward == null)
+                            {
+                                <MudText>Select an inward invoice from the list above to display its corresponding barcodes.</MudText>
+                            }
+                            else
+                            {
+                                <MudText>No barcodes registered for this stock inward invoice.</MudText>
+                            }
                         }
                         else
                         {
-                            <MudText>No barcodes registered for this item yet. Make a Stock Inward entry first.</MudText>
+                            @if (_selectedItemId == Guid.Empty)
+                            {
+                                <MudText>Select an item on the left panel to list registered tracking barcodes.</MudText>
+                            }
+                            else
+                            {
+                                <MudText>No barcodes registered for this item yet. Make a Stock Inward entry first.</MudText>
+                            }
                         }
                     </div>
                 }
@@ -108,6 +167,10 @@
                     <div style="max-height: 450px; overflow-y: auto;">
                         <MudTable Items="@_barcodes" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0" MultiSelection="true" @bind-SelectedItems="_selectedBarcodes" Style="background: transparent;">
                             <HeaderContent>
+                                @if (_selectionMode == "Inward")
+                                {
+                                    <MudTh Style="color: #94A3B8;">Item Name</MudTh>
+                                }
                                 <MudTh Style="color: #94A3B8;">Barcode Number</MudTh>
                                 <MudTh Style="color: #94A3B8;">Batch No</MudTh>
                                 <MudTh Style="color: #94A3B8;">Tracking No</MudTh>
@@ -115,6 +178,10 @@
                                 <MudTh Style="color: #94A3B8;">Status</MudTh>
                             </HeaderContent>
                             <RowTemplate>
+                                @if (_selectionMode == "Inward")
+                                {
+                                    <MudTd DataLabel="Item Name" Class="text-slate-100 font-weight-bold">@context.Item?.Name</MudTd>
+                                }
                                 <MudTd DataLabel="Barcode Number" Class="text-slate-100 font-mono font-weight-bold">@context.Barcode</MudTd>
                                 <MudTd DataLabel="Batch No" Class="text-slate-200">@context.BatchNo</MudTd>
                                 <MudTd DataLabel="Tracking No" Class="text-slate-300 font-mono" Style="font-size: 12px;">@context.TrackingNo</MudTd>
@@ -354,9 +421,16 @@
     private int _copies = 1;
     private bool _loading = false;
 
+    // Selection Mode: Inward vs Item
+    private string _selectionMode = "Inward";
+    private List<StockInward> _inwards = new();
+    private StockInward? _selectedInward = null;
+    private string _inwardSearchQuery = "";
+
     protected override async Task OnInitializedAsync()
     {
         await LoadItems();
+        await LoadInwards();
     }
 
     private async Task LoadItems()
@@ -364,17 +438,106 @@
         try
         {
             _items = await Http.GetFromJsonAsync<List<Item>>("api/masters/items") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading items list: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadInwards()
+    {
+        try
+        {
+            _inwards = await Http.GetFromJsonAsync<List<StockInward>>("api/stockinward") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading stock inwards: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OnSelectionModeChanged(string mode)
+    {
+        _selectionMode = mode;
+        _selectedBarcodes.Clear();
+        _barcodes.Clear();
+        _selectedInward = null;
+        
+        if (_selectionMode == "Item")
+        {
             if (_items.Any())
             {
                 _selectedItemId = _items.First().Id;
                 _selectedItemName = _items.First().Name;
                 await LoadBarcodes();
             }
+            else
+            {
+                _selectedItemId = Guid.Empty;
+                _selectedItemName = "";
+            }
+        }
+        else
+        {
+            _selectedItemId = Guid.Empty;
+            _selectedItemName = "";
+        }
+    }
+
+    private async Task OnInwardSelected(StockInward inward)
+    {
+        _selectedInward = inward;
+        if (inward != null)
+        {
+            await LoadBarcodesForInward(inward.Id);
+        }
+        else
+        {
+            _barcodes.Clear();
+            _selectedBarcodes.Clear();
+        }
+    }
+
+    private async Task LoadBarcodesForInward(Guid inwardId)
+    {
+        _loading = true;
+        _selectedBarcodes.Clear();
+        StateHasChanged();
+
+        try
+        {
+            _barcodes = await Http.GetFromJsonAsync<List<BarcodeMaster>>($"api/reports/barcodes/inward/{inwardId}") ?? new();
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error loading items list: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Error loading barcodes for stock inward: {ex.Message}", Severity.Error);
         }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private bool FilterInwardsFunc(StockInward element)
+    {
+        if (string.IsNullOrWhiteSpace(_inwardSearchQuery))
+            return true;
+
+        if (element.Supplier?.Name?.Contains(_inwardSearchQuery, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+
+        if (element.InvoiceNo?.Contains(_inwardSearchQuery, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+
+        if (element.InvoiceDate?.LocalDateTime.ToString("yyyy-MM-dd").Contains(_inwardSearchQuery, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+
+        if (element.InwardNo.Contains(_inwardSearchQuery, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
     }
 
     private async Task OnItemChanged(Guid itemId)
@@ -422,7 +585,7 @@
         var qrData = new
         {
             TrackingNo = codeItem.TrackingNo,
-            Item = _selectedItemName,
+            Item = codeItem.Item?.Name ?? _selectedItemName,
             Batch = codeItem.BatchNo,
             Barcode = codeItem.Barcode
         };
@@ -463,7 +626,7 @@
             {
                 list.Add(new LabelPrintItem
                 {
-                    ItemName = _selectedItemName,
+                    ItemName = codeItem.Item?.Name ?? _selectedItemName,
                     Barcode = codeItem.Barcode,
                     BatchNo = codeItem.BatchNo,
                     TrackingNo = codeItem.TrackingNo,
