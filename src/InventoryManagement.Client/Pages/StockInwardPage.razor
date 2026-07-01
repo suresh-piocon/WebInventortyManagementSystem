@@ -158,23 +158,25 @@
                                                                  @bind-Value="line.Quantity" 
                                                                  @ref="_qtyRefs[index]"
                                                                  @onkeydown="@((KeyboardEventArgs e) => HandleQtyKeyDown(e, index))"
+                                                                 OnFocus="@(() => SelectQtyField(index))"
                                                                  Min="0.01M" 
                                                                  HideSpinButtons="true" 
                                                                  Margin="Margin.Dense" 
                                                                  Variant="Variant.Outlined" 
-                                                                 Style="color: white; text-align: right;" />
+                                                                 Style="color: white; text-align: right; min-width: 90px;" />
                                             </td>
                                             <td style="padding: 6px;">
                                                 <MudNumericField T="decimal" 
                                                                  @bind-Value="line.Rate" 
                                                                  @ref="_rateRefs[index]"
                                                                  @onkeydown="@((KeyboardEventArgs e) => HandleRateKeyDown(e, index))"
+                                                                 OnFocus="@(() => SelectRateField(index))"
                                                                  Min="0" 
                                                                  HideSpinButtons="true" 
                                                                  Format="F2" 
                                                                  Margin="Margin.Dense" 
                                                                  Variant="Variant.Outlined" 
-                                                                 Style="color: white; text-align: right;" />
+                                                                 Style="color: white; text-align: right; min-width: 155px;" />
                                             </td>
                                             <td style="padding: 6px; text-align: right;" class="text-slate-300 font-weight-bold">
                                                 ₹@((line.Quantity * line.Rate).ToString("N2"))
@@ -249,6 +251,22 @@
         }
     }
 
+    private async Task SelectQtyField(int index)
+    {
+        if (_qtyRefs.TryGetValue(index, out var qtyField) && qtyField != null)
+        {
+            await qtyField.SelectAsync();
+        }
+    }
+
+    private async Task SelectRateField(int index)
+    {
+        if (_rateRefs.TryGetValue(index, out var rateField) && rateField != null)
+        {
+            await rateField.SelectAsync();
+        }
+    }
+
     private async Task HandleItemKeyDown(KeyboardEventArgs e, int index)
     {
         if (e.Key == "Enter")
@@ -256,6 +274,7 @@
             if (_qtyRefs.TryGetValue(index, out var qtyField) && qtyField != null)
             {
                 await qtyField.FocusAsync();
+                await qtyField.SelectAsync();
             }
         }
     }
@@ -267,6 +286,7 @@
             if (_rateRefs.TryGetValue(index, out var rateField) && rateField != null)
             {
                 await rateField.FocusAsync();
+                await rateField.SelectAsync();
             }
         }
     }
