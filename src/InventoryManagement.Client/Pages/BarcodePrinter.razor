@@ -32,7 +32,7 @@
                            Class="mb-4 text-slate-200">
                     @foreach (var item in _items)
                     {
-                        <MudSelectItem Value="@item.Id">@item.Code - @item.Name (@item.BarcodeType)</MudSelectItem>
+                        <MudSelectItem Value="@item.Id">@item.Name (@item.BarcodeType)</MudSelectItem>
                     }
                 </MudSelect>
 
