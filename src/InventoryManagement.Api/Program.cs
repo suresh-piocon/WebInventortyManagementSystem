@@ -27,6 +27,42 @@ builder.Services.AddScoped<ICurrentUserService, HttpContextCurrentUserService>()
 builder.Services.AddScoped<InventoryManagement.Api.Services.ValuationService>();
 builder.Services.AddScoped<InventoryManagement.Api.Services.ReportingService>();
 
+// Support standard Supabase environment variables (for docker, render, railway, etc.)
+var envSupabaseUrl = Environment.GetEnvironmentVariable("SUPABASE_URL");
+if (!string.IsNullOrEmpty(envSupabaseUrl))
+{
+    builder.Configuration["Supabase:Url"] = envSupabaseUrl;
+}
+
+var envJwtSecret = Environment.GetEnvironmentVariable("SUPABASE_JWT_SECRET") 
+                ?? Environment.GetEnvironmentVariable("SUPABASE_JWTSECRET");
+if (!string.IsNullOrEmpty(envJwtSecret))
+{
+    builder.Configuration["Supabase:JwtSecret"] = envJwtSecret;
+}
+
+var envAnonKey = Environment.GetEnvironmentVariable("SUPABASE_ANON_KEY") 
+              ?? Environment.GetEnvironmentVariable("SUPABASE_ANONKEY");
+if (!string.IsNullOrEmpty(envAnonKey))
+{
+    builder.Configuration["Supabase:AnonKey"] = envAnonKey;
+}
+
+var envServiceRoleKey = Environment.GetEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY") 
+                     ?? Environment.GetEnvironmentVariable("SUPABASE_SERVICEROLEKEY");
+if (!string.IsNullOrEmpty(envServiceRoleKey))
+{
+    builder.Configuration["Supabase:ServiceRoleKey"] = envServiceRoleKey;
+}
+
+var envSupabaseConnection = Environment.GetEnvironmentVariable("SUPABASE_CONNECTION") 
+                         ?? Environment.GetEnvironmentVariable("SUPABASE_CONNECTION_STRING")
+                         ?? Environment.GetEnvironmentVariable("ConnectionStrings__SupabaseConnection");
+if (!string.IsNullOrEmpty(envSupabaseConnection))
+{
+    builder.Configuration["ConnectionStrings:SupabaseConnection"] = envSupabaseConnection;
+}
+
 // Configure Database Connection (dynamic fallback SQLite / Npgsql)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=inventory.db";
 var supabaseConnection = builder.Configuration.GetConnectionString("SupabaseConnection");
@@ -36,6 +72,7 @@ if (!string.IsNullOrEmpty(supabaseConnection) && !supabaseConnection.Contains("Y
 {
     connectionString = supabaseConnection;
 }
+
 
 builder.Services.AddDbContext<InventoryDbContext>(options =>
 {
@@ -134,6 +171,34 @@ using (var scope = app.Services.CreateScope())
                 context.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS \"IX_QRCodeMaster_TrackingNo\" ON \"QRCodeMaster\"(\"TrackingNo\");");
             }
             Console.WriteLine("Database unique index constraints on TrackingNo adjusted successfully.");
+            
+            // Run purchase report query to see if IDs are populated
+            var query = context.StockInwardDetails
+                .Include(d => d.StockInward)
+                    .ThenInclude(si => si!.Supplier)
+                .Include(d => d.Item)
+                .AsQueryable();
+            var reportList = context.StockInwardDetails
+                .OrderByDescending(d => d.StockInward!.InwardDate)
+                .Select(d => new SupplierPurchaseReportDto
+                {
+                    Id = d.Id,
+                    StockInwardId = d.StockInwardId,
+                    InwardDate = d.StockInward!.InwardDate,
+                    SupplierName = d.StockInward.Supplier!.Name,
+                    InvoiceNo = d.StockInward.InvoiceNo ?? "N/A",
+                    ItemCode = d.Item!.Code,
+                    ItemName = d.Item.Name,
+                    Quantity = d.Quantity,
+                    Rate = d.Rate,
+                    Amount = d.Amount
+                })
+                .ToList();
+            Console.WriteLine($"Report list count: {reportList.Count}");
+            foreach (var r in reportList.Take(5))
+            {
+                Console.WriteLine($"Row Id: {r.Id}, StockInwardId: {r.StockInwardId}, InvoiceNo: {r.InvoiceNo}, SupplierName: {r.SupplierName}");
+            }
         }
         catch (Exception indexEx)
         {

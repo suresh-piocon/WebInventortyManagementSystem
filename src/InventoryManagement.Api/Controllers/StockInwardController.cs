@@ -458,11 +458,10 @@ namespace InventoryManagement.Api.Controllers
 
                 // 4. Delete the StockInwardDetail itself
                 _context.StockInwardDetails.Remove(detail);
-                await _context.SaveChangesAsync();
 
                 // 5. If the parent StockInward has no other details left, delete the parent record too
                 var otherDetailsCount = await _context.StockInwardDetails
-                    .CountAsync(d => d.StockInwardId == stockInwardId);
+                    .CountAsync(d => d.StockInwardId == stockInwardId && d.Id != detailId);
 
                 if (otherDetailsCount == 0)
                 {
@@ -470,10 +469,10 @@ namespace InventoryManagement.Api.Controllers
                     if (parent != null)
                     {
                         _context.StockInwards.Remove(parent);
-                        await _context.SaveChangesAsync();
                     }
                 }
 
+                await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
                 return Ok(new { message = "Stock inward detail and corresponding barcode tracking data deleted successfully." });
             }

@@ -41,11 +41,24 @@ namespace InventoryManagement.Api.Controllers
             var uniqueFileName = $"{Guid.NewGuid()}{extension}";
 
             var supabaseUrl = _config["Supabase:Url"];
-            var serviceKey = _config["Supabase:ServiceRoleKey"] ?? _config["Supabase:AnonKey"];
+            var serviceRoleKey = _config["Supabase:ServiceRoleKey"];
+            var anonKey = _config["Supabase:AnonKey"];
+
+            // Helper function to check if a value is a placeholder
+            bool IsPlaceholder(string? value)
+            {
+                if (string.IsNullOrWhiteSpace(value)) return true;
+                var v = value.ToLowerInvariant();
+                return v.Contains("your-anon-key") || v.Contains("your-service-role-key") || v.Contains("your-jwt-secret") || v.Contains("your-project");
+            }
+
+            if (IsPlaceholder(serviceRoleKey)) serviceRoleKey = null;
+            if (IsPlaceholder(anonKey)) anonKey = null;
+
+            var serviceKey = serviceRoleKey ?? anonKey;
 
             // If Supabase is not configured, fall back to local file storage
-            if (string.IsNullOrEmpty(supabaseUrl) || supabaseUrl.Contains("your-project") || 
-                string.IsNullOrEmpty(serviceKey) || serviceKey.Contains("your-anon-key") || serviceKey.Contains("your-service-role-key"))
+            if (string.IsNullOrEmpty(supabaseUrl) || IsPlaceholder(supabaseUrl) || string.IsNullOrEmpty(serviceKey))
             {
                 var uploadsFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "uploads");
                 if (!Directory.Exists(uploadsFolder))
