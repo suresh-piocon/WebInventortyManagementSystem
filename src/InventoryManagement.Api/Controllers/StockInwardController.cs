@@ -26,12 +26,27 @@ namespace InventoryManagement.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetInwards()
+        public async Task<IActionResult> GetInwards(
+            [FromQuery] DateTimeOffset? startDate,
+            [FromQuery] DateTimeOffset? endDate)
         {
-            var inwards = await _context.StockInwards
+            var query = _context.StockInwards
                 .Include(si => si.Supplier)
                 .Include(si => si.Details)
                     .ThenInclude(d => d.Item)
+                .AsQueryable();
+
+            if (startDate.HasValue)
+            {
+                query = query.Where(si => si.InwardDate >= startDate.Value);
+            }
+
+            if (endDate.HasValue)
+            {
+                query = query.Where(si => si.InwardDate <= endDate.Value);
+            }
+
+            var inwards = await query
                 .OrderByDescending(si => si.InwardDate)
                 .ToListAsync();
 
@@ -299,20 +314,38 @@ namespace InventoryManagement.Api.Controllers
                 .Select(sid => sid.TrackingNo)
                 .FirstOrDefaultAsync();
 
+            var maxDbQrTracking = await _context.QRCodeMasters
+                .Where(qm => qm.TrackingNo.ToUpper().StartsWith(prefix))
+                .OrderByDescending(qm => qm.TrackingNo)
+                .Select(qm => qm.TrackingNo)
+                .FirstOrDefaultAsync();
+
             var maxLocalTracking = _context.StockInwardDetails.Local
                 .Where(sid => sid.TrackingNo.ToUpper().StartsWith(prefix))
                 .OrderByDescending(sid => sid.TrackingNo)
                 .Select(sid => sid.TrackingNo)
                 .FirstOrDefault();
 
+            var maxLocalQrTracking = _context.QRCodeMasters.Local
+                .Where(qm => qm.TrackingNo.ToUpper().StartsWith(prefix))
+                .OrderByDescending(qm => qm.TrackingNo)
+                .Select(qm => qm.TrackingNo)
+                .FirstOrDefault();
+
+            var trackingNumbersList = new List<string?> { maxDbTracking, maxDbQrTracking, maxLocalTracking, maxLocalQrTracking };
             string? maxTracking = null;
-            if (maxDbTracking != null && maxLocalTracking != null)
+
+            foreach (var trk in trackingNumbersList)
             {
-                maxTracking = string.Compare(maxDbTracking, maxLocalTracking, StringComparison.OrdinalIgnoreCase) > 0 ? maxDbTracking : maxLocalTracking;
-            }
-            else
-            {
-                maxTracking = maxDbTracking ?? maxLocalTracking;
+                if (trk == null) continue;
+                if (maxTracking == null)
+                {
+                    maxTracking = trk;
+                }
+                else if (string.Compare(trk, maxTracking, StringComparison.OrdinalIgnoreCase) > 0)
+                {
+                    maxTracking = trk;
+                }
             }
 
             int nextNum = 1;
