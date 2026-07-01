@@ -64,7 +64,7 @@
             <MudTd DataLabel="Photo" Style="text-align: center;">
                 @if (!string.IsNullOrEmpty(context.ImageUrl))
                 {
-                    <img src="@context.ImageUrl" style="width: 38px; height: 38px; border-radius: 4px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewImage(context.ImageUrl))" />
+                    <img src="@GetAbsoluteImageUrl(context.ImageUrl)" style="width: 38px; height: 38px; border-radius: 4px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewImage(context.ImageUrl))" />
                 }
                 else
                 {
@@ -134,9 +134,23 @@
         element.BatchNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
         element.TrackingNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
 
+    private string GetAbsoluteImageUrl(string? url)
+    {
+        if (string.IsNullOrEmpty(url)) return string.Empty;
+        if (url.StartsWith("http://localhost") || url.StartsWith("https://localhost"))
+        {
+            var uri = new Uri(url);
+            var relativePath = uri.PathAndQuery;
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}{relativePath}";
+        }
+        return url;
+    }
+
     private async Task PreviewImage(string url)
     {
-        var parameters = new DialogParameters { ["imageUrl"] = url };
+        var absoluteUrl = GetAbsoluteImageUrl(url);
+        var parameters = new DialogParameters { ["imageUrl"] = absoluteUrl };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
         await DialogService.ShowAsync<ImagePreviewDialog>("Item Photo", parameters, options);
     }

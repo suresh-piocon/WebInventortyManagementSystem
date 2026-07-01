@@ -36,8 +36,6 @@
                     <MudTextField T="string" 
                                   Label="Customer Name" 
                                   @bind-Value="_outwardHeader.CustomerName" 
-                                  Required="true"
-                                  RequiredError="Customer name is required"
                                   Variant="Variant.Outlined" 
                                   Class="mb-4 text-slate-200" />
 
@@ -134,8 +132,8 @@
                                         <th style="color: #94A3B8; padding: 10px; text-align: left;">Item Details</th>
                                         <th style="color: #94A3B8; padding: 10px; text-align: left;">Batch / Tracking</th>
                                         <th style="color: #94A3B8; padding: 10px; text-align: right; width: 100px;">Available</th>
-                                        <th style="color: #94A3B8; padding: 10px; text-align: right; width: 110px;">Qty to Issue</th>
-                                        <th style="color: #94A3B8; padding: 10px; text-align: right; width: 100px;">Rate</th>
+                                        <th style="color: #94A3B8; padding: 10px; text-align: right; width: 90px;">Qty to Issue</th>
+                                        <th style="color: #94A3B8; padding: 10px; text-align: right; width: 130px;">Rate</th>
                                         <th style="color: #94A3B8; padding: 10px; text-align: right; width: 100px;">Amount</th>
                                         <th style="color: #94A3B8; padding: 10px; text-align: center; width: 50px;"></th>
                                     </tr>
@@ -149,7 +147,7 @@
                                             <td style="padding: 10px; text-align: center;">
                                                 @if (!string.IsNullOrEmpty(line.ImageUrl))
                                                 {
-                                                    <img src="@line.ImageUrl" style="width: 45px; height: 45px; border-radius: 6px; object-fit: cover; border: 1px solid #00E5FF; cursor: pointer;" @onclick="@(() => PreviewImage(line.ImageUrl))" />
+                                                    <img src="@GetAbsoluteImageUrl(line.ImageUrl)" style="width: 45px; height: 45px; border-radius: 6px; object-fit: cover; border: 1px solid #00E5FF; cursor: pointer;" @onclick="@(() => PreviewImage(line.ImageUrl))" />
                                                 }
                                                 else
                                                 {
@@ -168,10 +166,10 @@
                                                 @line.AvailableQuantity.ToString("N2") @line.UnitCode
                                             </td>
                                             <td style="padding: 10px;">
-                                                <MudNumericField T="decimal" @bind-Value="line.Quantity" Min="0.01M" Max="@line.AvailableQuantity" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right;" />
+                                                <MudNumericField T="decimal" @bind-Value="line.Quantity" Min="0.01M" Max="@line.AvailableQuantity" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 75px;" />
                                             </td>
                                             <td style="padding: 10px;">
-                                                <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right;" />
+                                                <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 120px;" />
                                             </td>
                                             <td style="padding: 10px; text-align: right;" class="text-slate-100 font-weight-bold">
                                                 ₹@((line.Quantity * line.Rate).ToString("N2"))
@@ -254,6 +252,11 @@
                         {
                             existing.Quantity += 1;
                             Snackbar.Add($"Incremented quantity for '{resolved.ItemName}'", Severity.Info);
+                            
+                            if (!string.IsNullOrEmpty(resolved.ImageUrl))
+                            {
+                                _ = ShowPhotoPopupTemporarily(resolved.ImageUrl);
+                            }
                         }
                         else
                         {
@@ -283,6 +286,11 @@
                                 ImageUrl = resolved.ImageUrl
                             });
                             Snackbar.Add($"Added '{resolved.ItemName}' to list.", Severity.Success);
+
+                            if (!string.IsNullOrEmpty(resolved.ImageUrl))
+                            {
+                                _ = ShowPhotoPopupTemporarily(resolved.ImageUrl);
+                            }
                         }
                     }
                     _scanInput = ""; // Clear input on success
@@ -312,9 +320,39 @@
         }
     }
 
+    private string GetAbsoluteImageUrl(string? url)
+    {
+        if (string.IsNullOrEmpty(url)) return string.Empty;
+        if (url.StartsWith("http://localhost") || url.StartsWith("https://localhost"))
+        {
+            var uri = new Uri(url);
+            var relativePath = uri.PathAndQuery;
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}{relativePath}";
+        }
+        return url;
+    }
+
+    private async Task ShowPhotoPopupTemporarily(string url)
+    {
+        var absoluteUrl = GetAbsoluteImageUrl(url);
+        if (string.IsNullOrEmpty(absoluteUrl)) return;
+
+        var parameters = new DialogParameters { ["imageUrl"] = absoluteUrl };
+        var options = new DialogOptions { NoHeader = true, CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium };
+        var dialogRef = await DialogService.ShowAsync<ImagePreviewDialog>("Item Photo", parameters, options);
+        
+        // Wait 3 seconds
+        await Task.Delay(3000);
+        
+        // Close the dialog
+        dialogRef.Close();
+    }
+
     private async Task PreviewImage(string url)
     {
-        var parameters = new DialogParameters { ["imageUrl"] = url };
+        var absoluteUrl = GetAbsoluteImageUrl(url);
+        var parameters = new DialogParameters { ["imageUrl"] = absoluteUrl };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
         await DialogService.ShowAsync<ImagePreviewDialog>("Photo View", parameters, options);
     }

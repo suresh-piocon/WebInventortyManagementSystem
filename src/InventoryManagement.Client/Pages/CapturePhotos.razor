@@ -72,7 +72,7 @@
                         @if (!string.IsNullOrEmpty(_existingImageUrl))
                         {
                             <div style="position: relative; display: inline-block;" class="w-100">
-                                <img src="@_existingImageUrl" style="max-width: 100%; max-height: 250px; border-radius: 8px; border: 2px solid #5C5CFF; object-fit: contain;" />
+                                <img src="@GetAbsoluteImageUrl(_existingImageUrl)" style="max-width: 100%; max-height: 250px; border-radius: 8px; border: 2px solid #5C5CFF; object-fit: contain;" />
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" 
                                                Color="Color.Error" 
                                                Class="mud-elevation-4"
@@ -223,6 +223,19 @@
         {
             Snackbar.Add($"Error deleting photo: {ex.Message}", Severity.Error);
         }
+    }
+
+    private string GetAbsoluteImageUrl(string? url)
+    {
+        if (string.IsNullOrEmpty(url)) return string.Empty;
+        if (url.StartsWith("http://localhost") || url.StartsWith("https://localhost"))
+        {
+            var uri = new Uri(url);
+            var relativePath = uri.PathAndQuery;
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}{relativePath}";
+        }
+        return url;
     }
 
     public class LookupResponseDto
