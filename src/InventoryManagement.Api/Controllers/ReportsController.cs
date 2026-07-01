@@ -371,6 +371,7 @@ namespace InventoryManagement.Api.Controllers
             return Ok(data);
         }
 
+
         // ==========================================
         // AUDIT LOG REPORT
         // ==========================================

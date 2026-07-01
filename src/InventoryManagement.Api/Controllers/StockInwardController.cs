@@ -308,130 +308,123 @@ namespace InventoryManagement.Api.Controllers
             var year = DateTime.UtcNow.Year;
             var prefix = $"TRK-{year}-";
 
-            var maxDbTracking = await _context.StockInwardDetails
+            var dbTrackings = await _context.StockInwardDetails
                 .Where(sid => sid.TrackingNo.ToUpper().StartsWith(prefix))
                 .OrderByDescending(sid => sid.TrackingNo)
                 .Select(sid => sid.TrackingNo)
-                .FirstOrDefaultAsync();
+                .Take(100)
+                .ToListAsync();
 
-            var maxDbQrTracking = await _context.QRCodeMasters
+            var dbQrTrackings = await _context.QRCodeMasters
                 .Where(qm => qm.TrackingNo.ToUpper().StartsWith(prefix))
                 .OrderByDescending(qm => qm.TrackingNo)
                 .Select(qm => qm.TrackingNo)
-                .FirstOrDefaultAsync();
+                .Take(100)
+                .ToListAsync();
 
-            var maxLocalTracking = _context.StockInwardDetails.Local
+            var localTrackings = _context.StockInwardDetails.Local
                 .Where(sid => sid.TrackingNo.ToUpper().StartsWith(prefix))
-                .OrderByDescending(sid => sid.TrackingNo)
                 .Select(sid => sid.TrackingNo)
-                .FirstOrDefault();
+                .ToList();
 
-            var maxLocalQrTracking = _context.QRCodeMasters.Local
+            var localQrTrackings = _context.QRCodeMasters.Local
                 .Where(qm => qm.TrackingNo.ToUpper().StartsWith(prefix))
-                .OrderByDescending(qm => qm.TrackingNo)
                 .Select(qm => qm.TrackingNo)
-                .FirstOrDefault();
+                .ToList();
 
-            var trackingNumbersList = new List<string?> { maxDbTracking, maxDbQrTracking, maxLocalTracking, maxLocalQrTracking };
-            string? maxTracking = null;
+            var allTrackings = dbTrackings
+                .Concat(dbQrTrackings)
+                .Concat(localTrackings)
+                .Concat(localQrTrackings)
+                .Where(t => !string.IsNullOrEmpty(t))
+                .Distinct();
 
-            foreach (var trk in trackingNumbersList)
+            int maxSeq = 0;
+            foreach (var trk in allTrackings)
             {
-                if (trk == null) continue;
-                if (maxTracking == null)
+                var parts = trk.Split('-');
+                if (parts.Length >= 3 && int.TryParse(parts[2], out var num))
                 {
-                    maxTracking = trk;
-                }
-                else if (string.Compare(trk, maxTracking, StringComparison.OrdinalIgnoreCase) > 0)
-                {
-                    maxTracking = trk;
+                    if (num > maxSeq)
+                    {
+                        maxSeq = num;
+                    }
                 }
             }
 
-            int nextNum = 1;
-            if (maxTracking != null)
-            {
-                var parts = maxTracking.Split('-');
-                if (parts.Length == 3 && int.TryParse(parts[2], out var num))
-                {
-                    nextNum = num + 1;
-                }
-            }
-
+            int nextNum = maxSeq + 1;
             return $"{prefix}{nextNum:D6}";
         }
 
         private async Task<string> GenerateUniqueBarcodeAsync()
         {
-            var maxDbBarcode = await _context.BarcodeMasters
+            var dbBarcodes = await _context.BarcodeMasters
                 .Where(b => b.Barcode.ToUpper().StartsWith("ITEM"))
                 .OrderByDescending(b => b.Barcode)
                 .Select(b => b.Barcode)
-                .FirstOrDefaultAsync();
+                .Take(100)
+                .ToListAsync();
 
-            var maxLocalBarcode = _context.BarcodeMasters.Local
+            var localBarcodes = _context.BarcodeMasters.Local
                 .Where(b => b.Barcode.ToUpper().StartsWith("ITEM"))
-                .OrderByDescending(b => b.Barcode)
                 .Select(b => b.Barcode)
-                .FirstOrDefault();
+                .ToList();
 
-            string? maxBarcode = null;
-            if (maxDbBarcode != null && maxLocalBarcode != null)
-            {
-                maxBarcode = string.Compare(maxDbBarcode, maxLocalBarcode, StringComparison.OrdinalIgnoreCase) > 0 ? maxDbBarcode : maxLocalBarcode;
-            }
-            else
-            {
-                maxBarcode = maxDbBarcode ?? maxLocalBarcode;
-            }
+            var allBarcodes = dbBarcodes
+                .Concat(localBarcodes)
+                .Where(b => !string.IsNullOrEmpty(b))
+                .Distinct();
 
-            int nextNum = 1;
-            if (maxBarcode != null)
+            int maxSeq = 0;
+            foreach (var bc in allBarcodes)
             {
-                var numStr = maxBarcode.ToUpper().Replace("ITEM", "");
+                var numStr = bc.ToUpper().Replace("ITEM", "");
                 if (int.TryParse(numStr, out var num))
                 {
-                    nextNum = num + 1;
+                    if (num > maxSeq)
+                    {
+                        maxSeq = num;
+                    }
                 }
             }
 
+            int nextNum = maxSeq + 1;
             return $"ITEM{nextNum:D6}";
         }
 
         private async Task<string> GenerateBatchBarcodeAsync()
         {
-            var maxDbBarcode = await _context.BarcodeMasters
+            var dbBarcodes = await _context.BarcodeMasters
                 .Where(b => b.Barcode.ToUpper().StartsWith("BATCH"))
                 .OrderByDescending(b => b.Barcode)
                 .Select(b => b.Barcode)
-                .FirstOrDefaultAsync();
+                .Take(100)
+                .ToListAsync();
 
-            var maxLocalBarcode = _context.BarcodeMasters.Local
+            var localBarcodes = _context.BarcodeMasters.Local
                 .Where(b => b.Barcode.ToUpper().StartsWith("BATCH"))
-                .OrderByDescending(b => b.Barcode)
                 .Select(b => b.Barcode)
-                .FirstOrDefault();
+                .ToList();
 
-            string? maxBarcode = null;
-            if (maxDbBarcode != null && maxLocalBarcode != null)
-            {
-                maxBarcode = string.Compare(maxDbBarcode, maxLocalBarcode, StringComparison.OrdinalIgnoreCase) > 0 ? maxDbBarcode : maxLocalBarcode;
-            }
-            else
-            {
-                maxBarcode = maxDbBarcode ?? maxLocalBarcode;
-            }
+            var allBarcodes = dbBarcodes
+                .Concat(localBarcodes)
+                .Where(b => !string.IsNullOrEmpty(b))
+                .Distinct();
 
-            int nextNum = 1;
-            if (maxBarcode != null)
+            int maxSeq = 0;
+            foreach (var bc in allBarcodes)
             {
-                var numStr = maxBarcode.ToUpper().Replace("BATCH", "");
+                var numStr = bc.ToUpper().Replace("BATCH", "");
                 if (int.TryParse(numStr, out var num))
                 {
-                    nextNum = num + 1;
+                    if (num > maxSeq)
+                    {
+                        maxSeq = num;
+                    }
                 }
             }
 
+            int nextNum = maxSeq + 1;
             return $"BATCH{nextNum:D6}";
         }
     }
