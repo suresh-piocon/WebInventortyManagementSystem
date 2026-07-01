@@ -16,8 +16,10 @@
         </MudText>
     </div>
 
-    <EditForm EditContext="@_editContext">
-        <DataAnnotationsValidator />
+    @if (_editContext != null)
+    {
+        <EditForm EditContext="@_editContext">
+            <DataAnnotationsValidator />
         
         <MudGrid>
             <!-- Inward Header Panel -->
@@ -193,7 +195,8 @@
                 </MudPaper>
             </MudItem>
         </MudGrid>
-    </EditForm>
+        </EditForm>
+    }
 </MudContainer>
 
 @code {
