@@ -271,10 +271,20 @@
         }
     }
 
+    private async Task CloseItemSelect(int index)
+    {
+        if (_itemRefs.TryGetValue(index, out var selectField) && selectField != null)
+        {
+            await selectField.CloseMenu(false);
+        }
+    }
+
     private async Task HandleRateKeyDown(KeyboardEventArgs e, int index)
     {
         if (e.Key == "Enter")
         {
+            await CloseItemSelect(index);
+
             if (index < _lineItems.Count - 1)
             {
                 await FocusItemSelect(index + 1);
@@ -355,6 +365,12 @@
 
     private async Task AddLineItemAsync()
     {
+        var currentIndex = _lineItems.Count - 1;
+        if (currentIndex >= 0)
+        {
+            await CloseItemSelect(currentIndex);
+        }
+
         var newIndex = _lineItems.Count;
         _lineItems.Add(new InwardLineItem
         {
