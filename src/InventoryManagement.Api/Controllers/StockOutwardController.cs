@@ -180,7 +180,7 @@ namespace InventoryManagement.Api.Controllers
                 {
                     Id = Guid.NewGuid(),
                     OutwardNo = outwardNo,
-                    OutwardDate = dto.OutwardDate,
+                    OutwardDate = dto.OutwardDate.ToUniversalTime(),
                     CustomerName = dto.CustomerName,
                     ReferenceNo = dto.ReferenceNo,
                     CreatedBy = userId,
@@ -244,7 +244,7 @@ namespace InventoryManagement.Api.Controllers
                     {
                         Id = Guid.NewGuid(),
                         ItemId = detailDto.ItemId,
-                        TransactionDate = dto.OutwardDate,
+                        TransactionDate = dto.OutwardDate.ToUniversalTime(),
                         TransactionType = "Sales",
                         ReferenceNo = outwardNo,
                         BatchNo = detailDto.BatchNo,

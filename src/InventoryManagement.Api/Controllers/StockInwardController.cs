@@ -100,10 +100,10 @@ namespace InventoryManagement.Api.Controllers
                 {
                     Id = Guid.NewGuid(),
                     InwardNo = inwardNo,
-                    InwardDate = dto.InwardDate,
+                    InwardDate = dto.InwardDate.ToUniversalTime(),
                     SupplierId = dto.SupplierId,
                     InvoiceNo = dto.InvoiceNo,
-                    InvoiceDate = dto.InvoiceDate,
+                    InvoiceDate = dto.InvoiceDate?.ToUniversalTime(),
                     CreatedBy = userId,
                     CreatedAt = DateTimeOffset.UtcNow
                 };
@@ -150,7 +150,7 @@ namespace InventoryManagement.Api.Controllers
                         Item = item.Name,
                         Batch = detailDto.BatchNo,
                         Quantity = detailDto.Quantity,
-                        InwardDate = dto.InwardDate.ToString("yyyy-MM-dd")
+                        InwardDate = dto.InwardDate.ToUniversalTime().ToString("yyyy-MM-dd")
                     };
                     var qrJson = JsonSerializer.Serialize(qrDataObj);
 
@@ -163,7 +163,7 @@ namespace InventoryManagement.Api.Controllers
                         ItemId = detailDto.ItemId,
                         BatchNo = detailDto.BatchNo,
                         Quantity = detailDto.Quantity,
-                        InwardDate = dto.InwardDate,
+                        InwardDate = dto.InwardDate.ToUniversalTime(),
                         CreatedAt = DateTimeOffset.UtcNow
                     };
                     _context.QRCodeMasters.Add(qrCodeMaster);
@@ -221,7 +221,7 @@ namespace InventoryManagement.Api.Controllers
                     {
                         Id = Guid.NewGuid(),
                         ItemId = detailDto.ItemId,
-                        TransactionDate = dto.InwardDate,
+                        TransactionDate = dto.InwardDate.ToUniversalTime(),
                         TransactionType = "Purchase",
                         ReferenceNo = inwardNo,
                         BatchNo = detailDto.BatchNo,
@@ -252,13 +252,19 @@ namespace InventoryManagement.Api.Controllers
         {
             var year = DateTime.UtcNow.Year;
             var prefix = $"INW-{year}-";
-            var records = await _context.StockInwards
+            var dbRecords = await _context.StockInwards
                 .Where(si => si.InwardNo.StartsWith(prefix))
                 .Select(si => si.InwardNo)
                 .ToListAsync();
 
+            var localRecords = _context.StockInwards.Local
+                .Where(si => si.InwardNo.StartsWith(prefix))
+                .Select(si => si.InwardNo);
+
+            var allRecords = dbRecords.Concat(localRecords).Distinct();
+
             int maxNum = 0;
-            foreach (var r in records)
+            foreach (var r in allRecords)
             {
                 var parts = r.Split('-');
                 if (parts.Length == 3 && int.TryParse(parts[2], out var num))
@@ -273,13 +279,19 @@ namespace InventoryManagement.Api.Controllers
         {
             var year = DateTime.UtcNow.Year;
             var prefix = $"TRK-{year}-";
-            var records = await _context.StockInwardDetails
+            var dbRecords = await _context.StockInwardDetails
                 .Where(sid => sid.TrackingNo.StartsWith(prefix))
                 .Select(sid => sid.TrackingNo)
                 .ToListAsync();
 
+            var localRecords = _context.StockInwardDetails.Local
+                .Where(sid => sid.TrackingNo.StartsWith(prefix))
+                .Select(sid => sid.TrackingNo);
+
+            var allRecords = dbRecords.Concat(localRecords).Distinct();
+
             int maxNum = 0;
-            foreach (var r in records)
+            foreach (var r in allRecords)
             {
                 var parts = r.Split('-');
                 if (parts.Length == 3 && int.TryParse(parts[2], out var num))
@@ -292,13 +304,19 @@ namespace InventoryManagement.Api.Controllers
 
         private async Task<string> GenerateUniqueBarcodeAsync()
         {
-            var barcodes = await _context.BarcodeMasters
+            var dbBarcodes = await _context.BarcodeMasters
                 .Where(b => b.Barcode.StartsWith("ITEM"))
                 .Select(b => b.Barcode)
                 .ToListAsync();
 
+            var localBarcodes = _context.BarcodeMasters.Local
+                .Where(b => b.Barcode.StartsWith("ITEM"))
+                .Select(b => b.Barcode);
+
+            var allBarcodes = dbBarcodes.Concat(localBarcodes).Distinct();
+
             int maxNum = 0;
-            foreach (var b in barcodes)
+            foreach (var b in allBarcodes)
             {
                 var numStr = b.Replace("ITEM", "");
                 if (int.TryParse(numStr, out var num))
@@ -311,13 +329,19 @@ namespace InventoryManagement.Api.Controllers
 
         private async Task<string> GenerateBatchBarcodeAsync()
         {
-            var barcodes = await _context.BarcodeMasters
+            var dbBarcodes = await _context.BarcodeMasters
                 .Where(b => b.Barcode.StartsWith("BATCH"))
                 .Select(b => b.Barcode)
                 .ToListAsync();
 
+            var localBarcodes = _context.BarcodeMasters.Local
+                .Where(b => b.Barcode.StartsWith("BATCH"))
+                .Select(b => b.Barcode);
+
+            var allBarcodes = dbBarcodes.Concat(localBarcodes).Distinct();
+
             int maxNum = 0;
-            foreach (var b in barcodes)
+            foreach (var b in allBarcodes)
             {
                 var numStr = b.Replace("BATCH", "");
                 if (int.TryParse(numStr, out var num))
