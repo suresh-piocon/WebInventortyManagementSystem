@@ -27,14 +27,14 @@
                     <!-- User profile menu -->
                     <div class="d-flex align-center mr-4">
                         <MudAvatar Color="Color.Primary" Size="Size.Small" Class="mr-2">
-                            @context.User.Identity?.Name?[0].ToString().ToUpper()
+                            @(context.User.Identity?.Name is string name && name.Length > 0 ? name[0].ToString().ToUpper() : "U")
                         </MudAvatar>
                         <div class="d-none d-sm-flex flex-column">
                             <MudText Typo="Typo.body2" Class="font-weight-bold text-slate-200">
-                                @context.User.Identity?.Name
+                                @(context.User.Identity?.Name ?? "User")
                             </MudText>
                             <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-size: 10px;">
-                                @context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
+                                @(context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "Viewer")
                             </MudText>
                         </div>
                     </div>
@@ -165,7 +165,7 @@
 
     private async Task Logout()
     {
-        await CustomAuthStateProvider.MarkUserAsLoggedOut();
         Navigation.NavigateTo("login");
+        await CustomAuthStateProvider.MarkUserAsLoggedOut();
     }
 }
