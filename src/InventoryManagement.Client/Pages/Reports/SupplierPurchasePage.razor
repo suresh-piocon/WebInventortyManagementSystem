@@ -25,7 +25,17 @@
                 Filter
             </MudButton>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 align-center">
+            @if (_selectedItems.Any())
+            {
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Error" 
+                           StartIcon="@Icons.Material.Filled.Delete" 
+                           OnClick="DeleteSelectedItems"
+                           Class="mr-2">
+                    Delete Selected (@_selectedItems.Count)
+                </MudButton>
+            }
             <MudMenu StartIcon="@Icons.Material.Filled.Download" Label="Export" Color="Color.Secondary" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.KeyboardArrowDown">
                 <MudMenuItem OnClick="@(() => ExportFile("excel"))" Icon="@Icons.Custom.FileFormats.FileExcel" IconColor="Color.Success">Excel (.xlsx)</MudMenuItem>
                 <MudMenuItem OnClick="@(() => ExportFile("csv"))" Icon="@Icons.Material.Filled.TextSnippet" IconColor="Color.Info">CSV (.csv)</MudMenuItem>
@@ -33,11 +43,14 @@
         </div>
     </MudPaper>
 
-    <MudTable Items="@_purchases" 
+    <MudTable T="SupplierPurchaseReportDto"
+              Items="@_purchases" 
               Hover="true" 
               Loading="@_loading" 
               SearchString="@_searchString" 
               Filter="new Func<SupplierPurchaseReportDto, bool>(FilterFunc)"
+              MultiSelection="true"
+              @bind-SelectedItems="_selectedItems"
               Class="glass-panel text-slate-200">
         <ToolBarContent>
             <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">Purchase Entries</MudText>
@@ -71,9 +84,15 @@
             <MudTd DataLabel="Purchase Rate" Style="text-align: right;" Class="text-slate-300">₹@context.Rate.ToString("N4")</MudTd>
             <MudTd DataLabel="Total Amount" Style="text-align: right;" Class="text-slate-100 font-weight-bold">₹@context.Amount.ToString("N2")</MudTd>
             <MudTd DataLabel="Actions" Style="text-align: center;">
-                <div class="d-flex align-center justify-center">
+                <div class="d-flex align-center justify-center gap-1">
+                    <MudTooltip Text="Delete this item only">
+                        <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" 
+                                       Color="Color.Warning" 
+                                       Size="Size.Small" 
+                                       OnClick="@(() => ConfirmDeleteRow(context))" />
+                    </MudTooltip>
                     <MudTooltip Text="Delete entire invoice">
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                        <MudIconButton Icon="@Icons.Material.Filled.DeleteForever" 
                                        Color="Color.Error" 
                                        Size="Size.Small" 
                                        OnClick="@(() => ConfirmDeleteInvoice(context))" />
@@ -89,6 +108,7 @@
 
 @code {
     private List<SupplierPurchaseReportDto> _purchases = new();
+    private HashSet<SupplierPurchaseReportDto> _selectedItems = new();
     private bool _loading = true;
     private string _searchString = "";
     
@@ -217,6 +237,61 @@
             catch (Exception ex)
             {
                 Snackbar.Add($"Error deleting invoice: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteSelectedItems()
+    {
+        if (!_selectedItems.Any()) return;
+
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Delete Selected Inward Items", 
+            $"Are you sure you want to delete the {_selectedItems.Count} selected items? This will also delete all corresponding barcode and ledger tracking data for these rows.", 
+            yesText: "Delete Selected", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            _loading = true;
+            StateHasChanged();
+            try
+            {
+                int successCount = 0;
+                int failCount = 0;
+                
+                foreach (var item in _selectedItems.ToList())
+                {
+                    var response = await Http.DeleteAsync($"api/stockinward/detail/{item.Id}");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        successCount++;
+                    }
+                    else
+                    {
+                        failCount++;
+                    }
+                }
+
+                if (successCount > 0)
+                {
+                    Snackbar.Add($"{successCount} item(s) deleted successfully!", Severity.Success);
+                }
+                if (failCount > 0)
+                {
+                    Snackbar.Add($"{failCount} item(s) failed to delete.", Severity.Error);
+                }
+
+                _selectedItems.Clear();
+                await LoadReport();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting records: {ex.Message}", Severity.Error);
+            }
+            finally
+            {
+                _loading = false;
+                StateHasChanged();
             }
         }
     }
