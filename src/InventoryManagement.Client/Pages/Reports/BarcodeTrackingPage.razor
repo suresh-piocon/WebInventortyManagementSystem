@@ -73,7 +73,7 @@
                             <MudItem xs="12" sm="5" Class="d-flex flex-column align-center justify-center">
                                 @if (!string.IsNullOrEmpty(_history.PhotoUrl))
                                 {
-                                    <img src="@_history.PhotoUrl" style="width: 100%; max-width: 160px; aspect-ratio: 1; border-radius: 8px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewImage(_history.PhotoUrl))" />
+                                    <img src="@GetAbsoluteImageUrl(_history.PhotoUrl)" style="width: 100%; max-width: 160px; aspect-ratio: 1; border-radius: 8px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewImage(_history.PhotoUrl))" />
                                     <MudText Typo="Typo.caption" Class="text-slate-400 mt-2">Captured Photo</MudText>
                                 }
                                 else
@@ -267,8 +267,43 @@
 
     private async Task PreviewImage(string url)
     {
-        var parameters = new DialogParameters { ["imageUrl"] = url };
+        var absoluteUrl = GetAbsoluteImageUrl(url);
+        var parameters = new DialogParameters { ["imageUrl"] = absoluteUrl };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
         await DialogService.ShowAsync<ImagePreviewDialog>("Item Photo", parameters, options);
+    }
+
+    private string GetAbsoluteImageUrl(string? url)
+    {
+        if (string.IsNullOrEmpty(url)) return string.Empty;
+        
+        var uploadsIndex = url.IndexOf("/uploads/", StringComparison.OrdinalIgnoreCase);
+        if (uploadsIndex >= 0)
+        {
+            var relativePath = url.Substring(uploadsIndex);
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}{relativePath}";
+        }
+        
+        if (url.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}/{url}";
+        }
+
+        if (url.StartsWith("http://localhost") || url.StartsWith("https://localhost"))
+        {
+            var uri = new Uri(url);
+            var relativePath = uri.PathAndQuery;
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}{relativePath}";
+        }
+
+        if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+        {
+            return "https://" + url.Substring(7);
+        }
+
+        return url;
     }
 }

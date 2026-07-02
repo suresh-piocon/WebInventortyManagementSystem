@@ -140,11 +140,20 @@ namespace InventoryManagement.Api.Controllers
                 return NotFound("Barcode or Batch number not found in system.");
             }
 
+            var imageUrl = barcode.ImageUrl;
+            if (string.IsNullOrEmpty(imageUrl))
+            {
+                imageUrl = await _context.BarcodeMasters
+                    .Where(b => b.TrackingNo == barcode.TrackingNo && b.BatchNo == barcode.BatchNo && b.ImageUrl != null && b.ImageUrl != "")
+                    .Select(b => b.ImageUrl)
+                    .FirstOrDefaultAsync();
+            }
+
             return Ok(new
             {
                 itemName = barcode.Item?.Name ?? "Unknown Item",
                 itemCode = barcode.Item?.Code ?? "Unknown Code",
-                existingImageUrl = barcode.ImageUrl
+                existingImageUrl = imageUrl
             });
         }
 

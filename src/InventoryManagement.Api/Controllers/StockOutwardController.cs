@@ -76,6 +76,15 @@ namespace InventoryManagement.Api.Controllers
                     batchNo = barcodeMaster.BatchNo;
                     itemId = barcodeMaster.ItemId;
                     imageUrl = barcodeMaster.ImageUrl;
+
+                    // Fallback to any barcode in the same batch/tracking that has an image
+                    if (string.IsNullOrEmpty(imageUrl))
+                    {
+                        imageUrl = await _context.BarcodeMasters
+                            .Where(b => b.TrackingNo == trackingNo && b.BatchNo == batchNo && b.ImageUrl != null && b.ImageUrl != "")
+                            .Select(b => b.ImageUrl)
+                            .FirstOrDefaultAsync();
+                    }
                 }
                 else
                 {
@@ -94,10 +103,15 @@ namespace InventoryManagement.Api.Controllers
             }
             else
             {
-                // Resolved from QR JSON, let's load item and image from BarcodeMaster
+                // Resolved from QR JSON, let's load item and image from BarcodeMaster (prioritize non-empty ImageUrl)
                 var barcodeMaster = await _context.BarcodeMasters
                     .Include(b => b.Item)
-                    .FirstOrDefaultAsync(b => b.TrackingNo == trackingNo && b.BatchNo == batchNo);
+                    .Where(b => b.TrackingNo == trackingNo && b.BatchNo == batchNo && b.ImageUrl != null && b.ImageUrl != "")
+                    .FirstOrDefaultAsync()
+                    ?? await _context.BarcodeMasters
+                    .Include(b => b.Item)
+                    .Where(b => b.TrackingNo == trackingNo && b.BatchNo == batchNo)
+                    .FirstOrDefaultAsync();
                 
                 if (barcodeMaster != null)
                 {

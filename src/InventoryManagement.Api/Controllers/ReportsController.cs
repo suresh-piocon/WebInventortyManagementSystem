@@ -174,8 +174,11 @@ namespace InventoryManagement.Api.Controllers
 
                 if (balance <= 0) continue; // Skip items with no stock left
 
-                // Load ImageUrl from BarcodeMaster
+                // Load ImageUrl from BarcodeMaster (prioritize non-null ImageUrl)
                 var barcodeMaster = await _context.BarcodeMasters
+                    .Where(b => b.TrackingNo == trackingNo && b.BatchNo == batchNo && b.ImageUrl != null && b.ImageUrl != "")
+                    .FirstOrDefaultAsync()
+                    ?? await _context.BarcodeMasters
                     .Where(b => b.TrackingNo == trackingNo && b.BatchNo == batchNo)
                     .FirstOrDefaultAsync();
 
