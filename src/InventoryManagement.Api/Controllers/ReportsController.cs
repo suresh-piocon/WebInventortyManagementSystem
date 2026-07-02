@@ -256,6 +256,15 @@ namespace InventoryManagement.Api.Controllers
                 .ThenBy(l => l.CreatedAt)
                 .ToListAsync();
 
+            // Recompute running balance from InwardQty/OutwardQty in order
+            // (stored BalanceQty may be stale/wrong for multi-row same-transaction outwards)
+            decimal running = 0;
+            foreach (var entry in data)
+            {
+                running += entry.InwardQty - entry.OutwardQty;
+                entry.BalanceQty = running;
+            }
+
             return Ok(data);
         }
 
@@ -301,8 +310,12 @@ namespace InventoryManagement.Api.Controllers
 
             if (inwardDetail == null) return NotFound("Inward details missing.");
 
-            // Get Outward Logs
-            var outwardDetails = await _context.StockOutwardDetails
+            // Fetch all supporting data
+            var barcodeInfo = await _context.BarcodeMasters
+                .Where(b => b.TrackingNo == trackingNo)
+                .ToListAsync();
+
+            var allOutwardDetails = await _context.StockOutwardDetails
                 .Include(od => od.StockOutward)
                 .Where(od => od.TrackingNo == trackingNo)
                 .ToListAsync();
@@ -313,9 +326,23 @@ namespace InventoryManagement.Api.Controllers
                 .OrderBy(l => l.TransactionDate)
                 .ToListAsync();
 
-            var barcodeInfo = await _context.BarcodeMasters
-                .Where(b => b.TrackingNo == trackingNo)
-                .ToListAsync();
+            // Determine if this is a specific unique barcode search
+            var specificBarcode = barcodeInfo.FirstOrDefault(b => b.Barcode == code);
+            bool isUniqueBarcodeLookup = specificBarcode?.Type == "Unique";
+
+            // For unique barcode: only show outward records specific to THIS barcode
+            // For tracking/batch search: show all outward records under the tracking number
+            List<StockOutwardDetail> filteredOutwardDetails;
+            if (isUniqueBarcodeLookup)
+            {
+                filteredOutwardDetails = allOutwardDetails
+                    .Where(od => od.Barcode == code)
+                    .ToList();
+            }
+            else
+            {
+                filteredOutwardDetails = allOutwardDetails;
+            }
 
             var trackingReport = new BarcodeTrackingReportDto
             {
@@ -326,13 +353,14 @@ namespace InventoryManagement.Api.Controllers
                 SupplierName = inwardDetail.StockInward!.Supplier!.Name,
                 InwardDate = inwardDetail.StockInward.InwardDate,
                 InvoiceNo = inwardDetail.StockInward.InvoiceNo,
-                QuantityInward = inwardDetail.Quantity,
+                // For unique barcode searches, inward qty is always 1 per barcode
+                QuantityInward = isUniqueBarcodeLookup ? 1 : inwardDetail.Quantity,
                 Rate = inwardDetail.Rate,
                 // Prefer the specific searched barcode's image, then fall back to any non-null image in the batch
                 PhotoUrl = barcodeInfo.FirstOrDefault(b => b.Barcode == code && !string.IsNullOrEmpty(b.ImageUrl))?.ImageUrl
                            ?? barcodeInfo.FirstOrDefault(b => !string.IsNullOrEmpty(b.ImageUrl))?.ImageUrl,
                 RegisteredBarcodes = barcodeInfo.Select(b => b.Barcode).ToList(),
-                Issues = outwardDetails.Select(o => new BarcodeIssueDto
+                Issues = filteredOutwardDetails.Select(o => new BarcodeIssueDto
                 {
                     OutwardNo = o.StockOutward!.OutwardNo,
                     OutwardDate = o.StockOutward.OutwardDate,
@@ -411,6 +439,9 @@ namespace InventoryManagement.Api.Controllers
 
             var result = barcodes.Select(b => {
                 var outward = outwardDetails.FirstOrDefault(od => od.Barcode == b.Barcode);
+                // Use IsUsed flag as source of truth for Unique barcodes;
+                // For batch items also cross-check outward records
+                bool isIssued = b.IsUsed == true || outward != null;
                 return new BarcodeDetailReportDto
                 {
                     ItemName = b.Item?.Name ?? "Unknown Item",
@@ -420,7 +451,7 @@ namespace InventoryManagement.Api.Controllers
                     Type = b.Type,
                     InwardDate = b.CreatedAt,
                     OutwardDate = outward?.StockOutward?.OutwardDate,
-                    Status = outward != null ? "Issued" : "In Stock",
+                    Status = isIssued ? "Issued" : "In Stock",
                     ImageUrl = b.ImageUrl
                 };
             }).ToList();
