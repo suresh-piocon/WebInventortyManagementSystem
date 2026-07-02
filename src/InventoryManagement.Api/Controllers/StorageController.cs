@@ -131,30 +131,45 @@ namespace InventoryManagement.Api.Controllers
         [HttpGet("lookup/{code}")]
         public async Task<IActionResult> LookupItem(string code)
         {
+            // Find by Barcode first
             var barcode = await _context.BarcodeMasters
                 .Include(b => b.Item)
-                .FirstOrDefaultAsync(b => b.Barcode == code || b.BatchNo == code);
+                .FirstOrDefaultAsync(b => b.Barcode == code);
 
-            if (barcode == null)
+            if (barcode != null)
             {
-                return NotFound("Barcode or Batch number not found in system.");
+                return Ok(new
+                {
+                    itemName = barcode.Item?.Name ?? "Unknown Item",
+                    itemCode = barcode.Item?.Code ?? "Unknown Code",
+                    isBarcode = true,
+                    selectedBarcode = barcode.Barcode,
+                    existingImageUrl = barcode.ImageUrl,
+                    barcodes = new[] { new { barcodeNo = barcode.Barcode, imageUrl = barcode.ImageUrl } }
+                });
             }
 
-            var imageUrl = barcode.ImageUrl;
-            if (string.IsNullOrEmpty(imageUrl))
+            // Try finding by BatchNo
+            var barcodesInBatch = await _context.BarcodeMasters
+                .Include(b => b.Item)
+                .Where(b => b.BatchNo == code)
+                .ToListAsync();
+
+            if (barcodesInBatch.Any())
             {
-                imageUrl = await _context.BarcodeMasters
-                    .Where(b => b.TrackingNo == barcode.TrackingNo && b.BatchNo == barcode.BatchNo && b.ImageUrl != null && b.ImageUrl != "")
-                    .Select(b => b.ImageUrl)
-                    .FirstOrDefaultAsync();
+                var first = barcodesInBatch.First();
+                return Ok(new
+                {
+                    itemName = first.Item?.Name ?? "Unknown Item",
+                    itemCode = first.Item?.Code ?? "Unknown Code",
+                    isBarcode = false,
+                    selectedBarcode = (string?)null,
+                    existingImageUrl = (string?)null,
+                    barcodes = barcodesInBatch.Select(b => new { barcodeNo = b.Barcode, imageUrl = b.ImageUrl }).ToList()
+                });
             }
 
-            return Ok(new
-            {
-                itemName = barcode.Item?.Name ?? "Unknown Item",
-                itemCode = barcode.Item?.Code ?? "Unknown Code",
-                existingImageUrl = imageUrl
-            });
+            return NotFound("Barcode or Batch number not found in system.");
         }
 
         [HttpGet("image")]
@@ -174,7 +189,7 @@ namespace InventoryManagement.Api.Controllers
 
             var serviceRoleKey = _config["Supabase:ServiceRoleKey"];
             var anonKey = _config["Supabase:AnonKey"];
-
+            
             bool IsPlaceholder(string? value)
             {
                 if (string.IsNullOrWhiteSpace(value)) return true;
@@ -191,6 +206,7 @@ namespace InventoryManagement.Api.Controllers
                 return false;
             }
 
+            // Check placeholders
             if (IsPlaceholder(serviceRoleKey)) serviceRoleKey = null;
             if (IsPlaceholder(anonKey)) anonKey = null;
 
@@ -217,6 +233,7 @@ namespace InventoryManagement.Api.Controllers
                 }
             }
 
+            // Supabase is configured - download from Supabase Storage REST API
             try
             {
                 using var httpClient = new HttpClient();
@@ -231,21 +248,11 @@ namespace InventoryManagement.Api.Controllers
                     var stream = await response.Content.ReadAsStreamAsync();
                     return File(stream, contentType);
                 }
-
-                // If public access with headers failed, try accessing via authenticated storage REST endpoint
-                if (url.Contains("/storage/v1/object/public/", StringComparison.OrdinalIgnoreCase))
+                else
                 {
-                    var authenticatedUrl = url.Replace("/storage/v1/object/public/", "/storage/v1/object/authenticated/", StringComparison.OrdinalIgnoreCase);
-                    var authResponse = await httpClient.GetAsync(authenticatedUrl);
-                    if (authResponse.IsSuccessStatusCode)
-                    {
-                        var contentType = authResponse.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
-                        var stream = await authResponse.Content.ReadAsStreamAsync();
-                        return File(stream, contentType);
-                    }
+                    var errorResponse = await response.Content.ReadAsStringAsync();
+                    return StatusCode((int)response.StatusCode, $"Failed to retrieve image from Supabase storage: {errorResponse}");
                 }
-
-                return StatusCode((int)response.StatusCode, "Failed to retrieve image from Supabase storage.");
             }
             catch (Exception ex)
             {
@@ -261,24 +268,25 @@ namespace InventoryManagement.Api.Controllers
                 return BadRequest("Code is required.");
             }
 
-            var barcodes = await _context.BarcodeMasters
-                .Where(b => b.Barcode == request.Code || b.BatchNo == request.Code)
-                .ToListAsync();
+            var barcode = await _context.BarcodeMasters
+                .FirstOrDefaultAsync(b => b.Barcode == request.Code);
 
-            if (!barcodes.Any())
+            if (barcode != null)
             {
-                return NotFound("No barcode or batch number found matching the code.");
+                barcode.ImageUrl = request.ImageUrl;
+                _context.BarcodeMasters.Update(barcode);
+                await _context.SaveChangesAsync();
+                return Ok(new { message = $"Photo updated successfully for barcode {barcode.Barcode}." });
             }
 
-            foreach (var b in barcodes)
+            // Check if they tried to update by batch number instead of barcode
+            var existsAsBatch = await _context.BarcodeMasters.AnyAsync(b => b.BatchNo == request.Code);
+            if (existsAsBatch)
             {
-                b.ImageUrl = request.ImageUrl;
+                return BadRequest("You must select a specific barcode number to update the image. Batch-wide updates are disabled.");
             }
 
-            _context.BarcodeMasters.UpdateRange(barcodes);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = $"Photo updated successfully for {barcodes.Count} item(s)." });
+            return NotFound("No barcode found matching the code.");
         }
     }
 

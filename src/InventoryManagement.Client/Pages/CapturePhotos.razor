@@ -64,41 +64,84 @@
                         Code: <span class="text-slate-200">@_itemCode</span>
                     </MudText>
                     <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
-                        Associated with: @_code
+                        Searched Code: @_code
                     </MudText>
 
-                    <div class="mt-6 w-100">
-                        <MudText Typo="Typo.subtitle2" Class="text-slate-400 mb-2">Existing Image</MudText>
-                        @if (!string.IsNullOrEmpty(_existingImageUrl))
-                        {
-                            <div style="position: relative; display: inline-block;" class="w-100">
-                                <img src="@GetAbsoluteImageUrl(_existingImageUrl)" style="max-width: 100%; max-height: 250px; border-radius: 8px; border: 2px solid #5C5CFF; object-fit: contain;" />
-                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
-                                               Color="Color.Error" 
-                                               Class="mud-elevation-4"
-                                               Style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5);" 
-                                               OnClick="DeletePhoto" />
-                            </div>
-                        }
-                        else
-                        {
-                            <div style="height: 180px; border: 2px dashed rgba(255,255,255,0.15); border-radius: 8px;" class="d-flex align-center justify-center text-slate-500">
-                                <div class="d-flex flex-column align-center">
-                                    <MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Size="Size.Large" Class="mb-1" />
-                                    <MudText Typo="Typo.body2">No Image Associated</MudText>
+                    @if (!_isBarcode && _barcodes.Any())
+                    {
+                        <div class="mt-4 w-100 text-left">
+                            <MudSelect T="string" 
+                                       Label="Select Barcode Number" 
+                                       Variant="Variant.Outlined" 
+                                       Value="@_selectedBarcode" 
+                                       ValueChanged="OnSelectedBarcodeChanged"
+                                       Class="text-slate-200"
+                                       Style="font-family: 'Outfit';">
+                                @foreach (var bc in _barcodes)
+                                {
+                                    <MudSelectItem Value="@bc.BarcodeNo">
+                                        @bc.BarcodeNo @(string.IsNullOrEmpty(bc.ImageUrl) ? "📷" : "📷 ✅")
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </div>
+                    }
+                    else if (_isBarcode)
+                    {
+                        <div class="mt-2">
+                            <MudChip T="string" Color="Color.Info" Variant="Variant.Text" Style="font-family: 'Outfit'; font-weight: 500;">
+                                Barcode: @_selectedBarcode
+                            </MudChip>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(_selectedBarcode))
+                    {
+                        <div class="mt-6 w-100">
+                            <MudText Typo="Typo.subtitle2" Class="text-slate-400 mb-2">Existing Image for @_selectedBarcode</MudText>
+                            @if (!string.IsNullOrEmpty(_existingImageUrl))
+                            {
+                                <div style="position: relative; display: inline-block;" class="w-100">
+                                    <img src="@GetAbsoluteImageUrl(_existingImageUrl)" style="max-width: 100%; max-height: 250px; border-radius: 8px; border: 2px solid #5C5CFF; object-fit: contain;" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                   Color="Color.Error" 
+                                                   Class="mud-elevation-4"
+                                                   Style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5);" 
+                                                   OnClick="DeletePhoto" />
                                 </div>
-                            </div>
-                        }
-                    </div>
+                            }
+                            else
+                            {
+                                <div style="height: 180px; border: 2px dashed rgba(255,255,255,0.15); border-radius: 8px;" class="d-flex align-center justify-center text-slate-500">
+                                    <div class="d-flex flex-column align-center">
+                                        <MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Size="Size.Large" Class="mb-1" />
+                                        <MudText Typo="Typo.body2">No Image Associated</MudText>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
                 </MudPaper>
             </MudItem>
 
             <MudItem xs="12" md="7">
                 <MudPaper Class="glass-panel pa-6">
-                    <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
-                        <MudIcon Icon="@Icons.Material.Filled.CameraAlt" Class="mr-2" /> Capture / Upload Image
-                    </MudText>
-                    <CameraCapture OnPhotoCaptured="OnPhotoUploaded" />
+                    @if (string.IsNullOrEmpty(_selectedBarcode))
+                    {
+                        <div style="height: 250px;" class="d-flex align-center justify-center text-slate-400">
+                            <div class="d-flex flex-column align-center">
+                                <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Large" Class="mb-2" />
+                                <MudText Typo="Typo.h6">Please select a barcode number first</MudText>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                            <MudIcon Icon="@Icons.Material.Filled.CameraAlt" Class="mr-2" /> Capture / Upload Image for @_selectedBarcode
+                        </MudText>
+                        <CameraCapture OnPhotoCaptured="OnPhotoUploaded" />
+                    }
                 </MudPaper>
             </MudItem>
         }
@@ -115,6 +158,11 @@
     private string _itemName = string.Empty;
     private string _itemCode = string.Empty;
     private string? _existingImageUrl;
+
+    // Barcode selection properties
+    private bool _isBarcode = false;
+    private string? _selectedBarcode;
+    private List<BarcodeItemDto> _barcodes = new();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -142,6 +190,9 @@
 
         _searching = true;
         _itemFound = false;
+        _selectedBarcode = null;
+        _existingImageUrl = null;
+        _barcodes.Clear();
         StateHasChanged();
 
         try
@@ -154,26 +205,24 @@
                 {
                     _itemName = lookup.ItemName;
                     _itemCode = lookup.ItemCode;
-                    _existingImageUrl = lookup.ExistingImageUrl;
+                    _isBarcode = lookup.IsBarcode;
+                    _barcodes = lookup.Barcodes ?? new();
                     _itemFound = true;
 
-                    if (!string.IsNullOrEmpty(_existingImageUrl) && _existingImageUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+                    if (_isBarcode && !string.IsNullOrEmpty(lookup.SelectedBarcode))
                     {
-                        _ = Task.Run(async () => {
-                            try
-                            {
-                                var base64Url = await ImageLoader.LoadImageAsBase64Async(_existingImageUrl);
-                                if (!string.IsNullOrEmpty(base64Url))
-                                {
-                                    _existingImageUrl = base64Url;
-                                    await InvokeAsync(StateHasChanged);
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                await InvokeAsync(() => Snackbar.Add($"Failed to load existing image: {ex.Message}", Severity.Warning));
-                            }
-                        });
+                        _selectedBarcode = lookup.SelectedBarcode;
+                        _existingImageUrl = lookup.ExistingImageUrl;
+                    }
+                    else if (_barcodes.Count == 1)
+                    {
+                        _selectedBarcode = _barcodes[0].BarcodeNo;
+                        _existingImageUrl = _barcodes[0].ImageUrl;
+                    }
+
+                    if (!string.IsNullOrEmpty(_existingImageUrl))
+                    {
+                        TriggerImagePreload();
                     }
                 }
             }
@@ -194,17 +243,59 @@
         }
     }
 
+    private void OnSelectedBarcodeChanged(string newBarcode)
+    {
+        _selectedBarcode = newBarcode;
+        var selectedItem = _barcodes.FirstOrDefault(b => b.BarcodeNo == newBarcode);
+        _existingImageUrl = selectedItem?.ImageUrl;
+
+        if (!string.IsNullOrEmpty(_existingImageUrl))
+        {
+            TriggerImagePreload();
+        }
+    }
+
+    private void TriggerImagePreload()
+    {
+        if (!string.IsNullOrEmpty(_existingImageUrl) && _existingImageUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = Task.Run(async () => {
+                try
+                {
+                    var base64Url = await ImageLoader.LoadImageAsBase64Async(_existingImageUrl);
+                    if (!string.IsNullOrEmpty(base64Url))
+                    {
+                        _existingImageUrl = base64Url;
+                        await InvokeAsync(StateHasChanged);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await InvokeAsync(() => Snackbar.Add($"Failed to load existing image: {ex.Message}", Severity.Warning));
+                }
+            });
+        }
+    }
+
     private async Task OnPhotoUploaded(string publicUrl)
     {
+        if (string.IsNullOrEmpty(_selectedBarcode)) return;
+
         try
         {
-            var updatePayload = new { Code = _code, ImageUrl = publicUrl };
+            var updatePayload = new { Code = _selectedBarcode, ImageUrl = publicUrl };
             var response = await Http.PostAsJsonAsync("api/storage/update-photo", updatePayload);
             
             if (response.IsSuccessStatusCode)
             {
                 Snackbar.Add("Photo saved and associated successfully!", Severity.Success);
                 _existingImageUrl = publicUrl;
+
+                var localItem = _barcodes.FirstOrDefault(b => b.BarcodeNo == _selectedBarcode);
+                if (localItem != null)
+                {
+                    localItem.ImageUrl = publicUrl;
+                }
                 StateHasChanged();
             }
             else
@@ -221,15 +312,23 @@
 
     private async Task DeletePhoto()
     {
+        if (string.IsNullOrEmpty(_selectedBarcode)) return;
+
         try
         {
-            var updatePayload = new { Code = _code, ImageUrl = (string?)null };
+            var updatePayload = new { Code = _selectedBarcode, ImageUrl = (string?)null };
             var response = await Http.PostAsJsonAsync("api/storage/update-photo", updatePayload);
             
             if (response.IsSuccessStatusCode)
             {
                 Snackbar.Add("Photo association deleted.", Severity.Success);
                 _existingImageUrl = null;
+
+                var localItem = _barcodes.FirstOrDefault(b => b.BarcodeNo == _selectedBarcode);
+                if (localItem != null)
+                {
+                    localItem.ImageUrl = null;
+                }
                 StateHasChanged();
             }
             else
@@ -267,7 +366,7 @@
             var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
             return $"{baseAddress}/{url}";
         }
-
+        
         if (url.StartsWith("http://localhost") || url.StartsWith("https://localhost"))
         {
             var uri = new Uri(url);
@@ -284,10 +383,19 @@
         return url;
     }
 
+    public class BarcodeItemDto
+    {
+        public string BarcodeNo { get; set; } = string.Empty;
+        public string? ImageUrl { get; set; }
+    }
+
     public class LookupResponseDto
     {
         public string ItemName { get; set; } = string.Empty;
         public string ItemCode { get; set; } = string.Empty;
+        public bool IsBarcode { get; set; }
+        public string? SelectedBarcode { get; set; }
         public string? ExistingImageUrl { get; set; }
+        public List<BarcodeItemDto> Barcodes { get; set; } = new();
     }
 }
