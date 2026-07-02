@@ -2,6 +2,7 @@
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Stock Ledger - AG Inventory</PageTitle>
 
@@ -105,7 +106,8 @@
 
     @if (_showBarcodeDetails)
     {
-        <MudTable Items="@_barcodeDetails" 
+        <MudTable id="barcode-table-container"
+                  Items="@_barcodeDetails" 
                   Hover="true" 
                   Loading="@_loadingBarcodes" 
                   Class="glass-panel text-slate-200 mt-6">
@@ -114,6 +116,11 @@
                     <MudIcon Icon="@Icons.Material.Filled.QrCode" Class="mr-2 text-cyan" /> Detailed Barcode In/Out Logs
                 </MudText>
                 <MudSpacer />
+                <MudMenu StartIcon="@Icons.Material.Filled.Download" Label="Export Barcodes" Color="Color.Info" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Class="mr-2">
+                    <MudMenuItem OnClick="ExportBarcodesExcel" Icon="@Icons.Custom.FileFormats.FileExcel" IconColor="Color.Success">Excel (.xlsx)</MudMenuItem>
+                    <MudMenuItem OnClick="ExportBarcodesCsv" Icon="@Icons.Material.Filled.TextSnippet" IconColor="Color.Info">CSV (.csv)</MudMenuItem>
+                    <MudMenuItem OnClick="ExportBarcodesPdf" Icon="@Icons.Material.Filled.PictureAsPdf" IconColor="Color.Error">PDF Report (.pdf)</MudMenuItem>
+                </MudMenu>
             </ToolBarContent>
             <HeaderContent>
                 <MudTh Style="color: #94A3B8; text-align: center; width: 60px;">Photo</MudTh>
@@ -418,5 +425,103 @@
         var parameters = new DialogParameters { ["imageUrl"] = absoluteUrl };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
         await DialogService.ShowAsync<ImagePreviewDialog>("Item Photo", parameters, options);
+    }
+
+    private async Task ExportBarcodesExcel() => await ExportBarcodes("excel");
+    private async Task ExportBarcodesCsv() => await ExportBarcodes("csv");
+    private async Task ExportBarcodesPdf() => await ExportBarcodes("pdf");
+
+    private async Task ExportBarcodes(string format)
+    {
+        if (!_barcodeDetails.Any())
+        {
+            Snackbar.Add("No barcode details to export.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            if (format == "pdf")
+            {
+                await JSRuntime.InvokeVoidAsync("webcamInterop.printElement", "barcode-table-container", "Detailed Barcode In/Out Logs");
+                Snackbar.Add("Print preview opened for PDF export.", Severity.Info);
+                return;
+            }
+
+            if (format == "csv")
+            {
+                var csvContent = GenerateBarcodesCsv();
+                var bytes = System.Text.Encoding.UTF8.GetBytes(csvContent);
+                var base64 = Convert.ToBase64String(bytes);
+                var fileName = $"BarcodeLogs_{DateTime.Now:yyyyMMddHHmmss}.csv";
+                await JSRuntime.InvokeVoidAsync("webcamInterop.downloadFile", fileName, "text/csv", base64);
+                Snackbar.Add("Barcodes CSV exported successfully!", Severity.Success);
+            }
+            else // Excel (.xlsx / .xls)
+            {
+                var excelContent = GenerateBarcodesExcelHtml();
+                var bytes = System.Text.Encoding.UTF8.GetBytes(excelContent);
+                var base64 = Convert.ToBase64String(bytes);
+                var fileName = $"BarcodeLogs_{DateTime.Now:yyyyMMddHHmmss}.xls";
+                await JSRuntime.InvokeVoidAsync("webcamInterop.downloadFile", fileName, "application/vnd.ms-excel", base64);
+                Snackbar.Add("Barcodes Excel exported successfully!", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error exporting barcodes: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private string GenerateBarcodesCsv()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Item Name,Barcode No,Batch No,Tracking No,Type,Inward Date,Outward Date,Status");
+        foreach (var item in _barcodeDetails)
+        {
+            sb.Append(EscapedCsv(item.ItemName)).Append(",")
+              .Append(EscapedCsv(item.BarcodeNo)).Append(",")
+              .Append(EscapedCsv(item.BatchNo)).Append(",")
+              .Append(EscapedCsv(item.TrackingNo)).Append(",")
+              .Append(EscapedCsv(item.Type)).Append(",")
+              .Append(EscapedCsv(item.InwardDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm"))).Append(",")
+              .Append(EscapedCsv(item.OutwardDate.HasValue ? item.OutwardDate.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm") : "-")).Append(",")
+              .Append(EscapedCsv(item.Status)).Append("\n");
+        }
+        return sb.ToString();
+    }
+
+    private string EscapedCsv(string val)
+    {
+        if (string.IsNullOrEmpty(val)) return "";
+        if (val.Contains(",") || val.Contains("\"") || val.Contains("\n") || val.Contains("\r"))
+        {
+            return "\"" + val.Replace("\"", "\"\"") + "\"";
+        }
+        return val;
+    }
+
+    private string GenerateBarcodesExcelHtml()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("<html><head><meta charset=\"utf-8\"><style>table { border-collapse: collapse; } th, td { border: 1px solid #000; padding: 5px; }</style></head><body>");
+        sb.AppendLine("<table border=\"1\">");
+        sb.AppendLine("<thead><tr><th>Item Name</th><th>Barcode No</th><th>Batch No</th><th>Tracking No</th><th>Type</th><th>Inward Date</th><th>Outward Date</th><th>Status</th></tr></thead>");
+        sb.AppendLine("<tbody>");
+        foreach (var item in _barcodeDetails)
+        {
+            sb.Append("<tr>");
+            sb.Append("<td>").Append(System.Net.WebUtility.HtmlEncode(item.ItemName)).Append("</td>");
+            sb.Append("<td>").Append(System.Net.WebUtility.HtmlEncode(item.BarcodeNo)).Append("</td>");
+            sb.Append("<td>").Append(System.Net.WebUtility.HtmlEncode(item.BatchNo)).Append("</td>");
+            sb.Append("<td>").Append(System.Net.WebUtility.HtmlEncode(item.TrackingNo)).Append("</td>");
+            sb.Append("<td>").Append(System.Net.WebUtility.HtmlEncode(item.Type)).Append("</td>");
+            sb.Append("<td>").Append(item.InwardDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm")).Append("</td>");
+            sb.Append("<td>").Append(item.OutwardDate.HasValue ? item.OutwardDate.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm") : "-").Append("</td>");
+            sb.Append("<td>").Append(System.Net.WebUtility.HtmlEncode(item.Status)).Append("</td>");
+            sb.Append("</tr>");
+        }
+        sb.AppendLine("</tbody></table></body></html>");
+        return sb.ToString();
     }
 }
