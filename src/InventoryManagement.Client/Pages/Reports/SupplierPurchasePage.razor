@@ -147,7 +147,7 @@
                 var fileBytes = await response.Content.ReadAsByteArrayAsync();
                 var base64 = Convert.ToBase64String(fileBytes);
 
-                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, contentType, base64);
+                await JSRuntime.InvokeVoidAsync("webcamInterop.downloadFile", fileName, contentType, base64);
                 Snackbar.Add("Report exported successfully!", Severity.Success);
             }
             else

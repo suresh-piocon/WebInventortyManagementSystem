@@ -82,6 +82,32 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+            },
+            printElement: function (elementId, title) {
+                const element = document.getElementById(elementId);
+                if (!element) return;
+                
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write('<html><head><title>' + title + '</title>');
+                // Copy styles
+                for (const sheet of document.styleSheets) {
+                    try {
+                        if (sheet.cssRules) {
+                            printWindow.document.write('<style>');
+                            for (const rule of sheet.cssRules) {
+                                printWindow.document.write(rule.cssText);
+                            }
+                            printWindow.document.write('</style>');
+                        }
+                    } catch (e) {
+                        // Ignore cross-origin stylesheet errors
+                    }
+                }
+                printWindow.document.write('</head><body style="background-color: white; color: black; padding: 20px;">');
+                printWindow.document.write(element.outerHTML);
+                printWindow.document.write('</body></html>');
+                printWindow.document.close();
+                printWindow.print();
             }
         };
 
