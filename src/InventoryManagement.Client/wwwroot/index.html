@@ -103,11 +103,27 @@
                         // Ignore cross-origin stylesheet errors
                     }
                 }
+                // Add overrides for printing (force black text on white background and hide pager/menu elements)
+                printWindow.document.write('<style>');
+                printWindow.document.write('body { background-color: white !important; color: black !important; font-family: sans-serif; }');
+                printWindow.document.write(\'#\' + elementId + \', #\' + elementId + \' * { background: transparent !important; background-color: transparent !important; color: black !important; border-color: #cbd5e1 !important; text-shadow: none !important; box-shadow: none !important; }\');
+                printWindow.document.write(\'th, td { color: black !important; border: 1px solid #cbd5e1 !important; padding: 10px !important; text-align: left !important; }\');
+                printWindow.document.write(\'th { font-weight: bold !important; background-color: #f1f5f9 !important; }\');
+                printWindow.document.write(\'img { max-width: 50px !important; max-height: 50px !important; object-fit: cover !important; border-radius: 4px !important; }\');
+                printWindow.document.write(\'.mud-table-pager, .mud-menu, button, .mud-button-root { display: none !important; }\');
+                printWindow.document.write('</style>');
+                
                 printWindow.document.write('</head><body style="background-color: white; color: black; padding: 20px;">');
+                printWindow.document.write(\'<h2 style="margin-bottom: 20px; font-family: sans-serif; border-bottom: 2px solid #334155; padding-bottom: 10px; color: #1e293b;">\' + title + \'</h2>\');
                 printWindow.document.write(element.outerHTML);
                 printWindow.document.write('</body></html>');
                 printWindow.document.close();
-                printWindow.print();
+                
+                // Wait for rendering before printing
+                setTimeout(function() {
+                    printWindow.print();
+                    printWindow.close();
+                }, 500);
             }
         };
 
