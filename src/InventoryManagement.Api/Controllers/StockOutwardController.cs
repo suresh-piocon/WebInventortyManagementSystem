@@ -43,6 +43,7 @@ namespace InventoryManagement.Api.Controllers
             string? batchNo = null;
             Guid? itemId = null;
             string? imageUrl = null;
+            string itemType = "Batch";
 
             // 1. Try parsing code as JSON (QR Code payload format)
             try
@@ -72,10 +73,16 @@ namespace InventoryManagement.Api.Controllers
 
                 if (barcodeMaster != null)
                 {
+                    if (barcodeMaster.Type == "Unique" && barcodeMaster.IsUsed)
+                    {
+                        return BadRequest("This unique barcode has already been issued.");
+                    }
+
                     trackingNo = barcodeMaster.TrackingNo;
                     batchNo = barcodeMaster.BatchNo;
                     itemId = barcodeMaster.ItemId;
                     imageUrl = barcodeMaster.ImageUrl;
+                    itemType = barcodeMaster.Type;
 
                     // Fallback to any barcode in the same batch/tracking that has an image
                     if (string.IsNullOrEmpty(imageUrl))
@@ -115,8 +122,14 @@ namespace InventoryManagement.Api.Controllers
                 
                 if (barcodeMaster != null)
                 {
+                    if (barcodeMaster.Type == "Unique" && barcodeMaster.IsUsed)
+                    {
+                        return BadRequest("This unique barcode has already been issued.");
+                    }
+
                     itemId = barcodeMaster.ItemId;
                     imageUrl = barcodeMaster.ImageUrl;
+                    itemType = barcodeMaster.Type;
                 }
                 else
                 {
@@ -168,7 +181,8 @@ namespace InventoryManagement.Api.Controllers
                 Barcode = code,
                 AvailableQuantity = availableQty,
                 Rate = rate, // Defaults to the purchase price
-                ImageUrl = imageUrl
+                ImageUrl = imageUrl,
+                Type = itemType
             };
 
             return Ok(result);

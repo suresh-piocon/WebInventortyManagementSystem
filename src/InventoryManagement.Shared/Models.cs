@@ -504,6 +504,7 @@ namespace InventoryManagement.Shared
         public decimal AvailableQuantity { get; set; }
         public decimal Rate { get; set; }
         public string? ImageUrl { get; set; }
+        public string Type { get; set; } = "Batch";
     }
 
     public class StockOutwardPostDto

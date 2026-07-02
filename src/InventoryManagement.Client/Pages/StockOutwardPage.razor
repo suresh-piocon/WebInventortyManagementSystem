@@ -153,7 +153,7 @@
                                                 @line.AvailableQuantity.ToString("N2") @line.UnitCode
                                             </td>
                                             <td style="padding: 10px;">
-                                                <MudNumericField T="decimal" @bind-Value="line.Quantity" Min="0.01M" Max="@line.AvailableQuantity" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 75px;" />
+                                                <MudNumericField T="decimal" @bind-Value="line.Quantity" Min="0.01M" Max="@line.AvailableQuantity" Disabled="@(line.Type == "Unique")" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 75px;" />
                                             </td>
                                             <td style="padding: 10px;">
                                                 <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" HideSpinButtons="true" Format="F2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 140px;" />
@@ -231,75 +231,98 @@
                 var resolved = await response.Content.ReadFromJsonAsync<ScannedItemDto>();
                 if (resolved != null)
                 {
-                    // Check if already added
-                    var existing = _lineItems.FirstOrDefault(l => l.TrackingNo == resolved.TrackingNo && l.BatchNo == resolved.BatchNo);
-                    if (existing != null)
+                    if (resolved.Type == "Unique")
                     {
-                        if (existing.Quantity < existing.AvailableQuantity)
+                        // Check if this specific barcode has already been scanned
+                        var alreadyAdded = _lineItems.Any(l => l.Barcode == resolved.Barcode);
+                        if (alreadyAdded)
                         {
-                            existing.Quantity += 1;
-                            Snackbar.Add($"Incremented quantity for '{resolved.ItemName}'", Severity.Info);
-                            
-                            if (!string.IsNullOrEmpty(resolved.ImageUrl))
-                            {
-                                if (resolved.ImageUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    _ = Task.Run(async () => {
-                                        var base64Url = await ImageLoader.LoadImageAsBase64Async(resolved.ImageUrl);
-                                        if (!string.IsNullOrEmpty(base64Url))
-                                        {
-                                            existing.ImageUrl = base64Url;
-                                            await InvokeAsync(StateHasChanged);
-                                        }
-                                    });
-                                }
-                                _ = ShowPhotoPopupTemporarily(resolved.ImageUrl);
-                            }
+                            Snackbar.Add($"Unique barcode '{resolved.Barcode}' has already been added to the list.", Severity.Warning);
                         }
                         else
                         {
-                            Snackbar.Add($"Cannot issue more than available stock ({existing.AvailableQuantity}) for '{resolved.ItemName}'", Severity.Warning);
+                            if (resolved.AvailableQuantity <= 0)
+                            {
+                                Snackbar.Add($"Unique barcode item '{resolved.ItemName}' (Barcode: {resolved.Barcode}) is out of stock.", Severity.Warning);
+                            }
+                            else
+                            {
+                                var line = new OutwardLineItem
+                                {
+                                    ItemId = resolved.ItemId,
+                                    ItemCode = resolved.ItemCode,
+                                    ItemName = resolved.ItemName,
+                                    UnitCode = resolved.UnitCode,
+                                    BatchNo = resolved.BatchNo,
+                                    TrackingNo = resolved.TrackingNo,
+                                    Barcode = resolved.Barcode,
+                                    AvailableQuantity = resolved.AvailableQuantity,
+                                    Quantity = 1,
+                                    Rate = resolved.Rate,
+                                    ImageUrl = resolved.ImageUrl,
+                                    Type = "Unique"
+                                };
+                                _lineItems.Add(line);
+                                Snackbar.Add($"Added unique barcode '{resolved.Barcode}' to list.", Severity.Success);
+
+                                if (!string.IsNullOrEmpty(resolved.ImageUrl))
+                                {
+                                    PreloadImageAndShowPopup(line, resolved.ImageUrl);
+                                }
+                            }
                         }
                     }
                     else
                     {
-                        if (resolved.AvailableQuantity <= 0)
+                        // Batch item: Merge into same line if matches BatchNo & TrackingNo and is not a Unique line
+                        var existing = _lineItems.FirstOrDefault(l => l.Type == "Batch" && l.TrackingNo == resolved.TrackingNo && l.BatchNo == resolved.BatchNo);
+                        if (existing != null)
                         {
-                            Snackbar.Add($"This item batch '{resolved.ItemName}' (Batch: {resolved.BatchNo}) has 0 stock remaining. Cannot issue.", Severity.Warning);
+                            if (existing.Quantity < existing.AvailableQuantity)
+                            {
+                                existing.Quantity += 1;
+                                Snackbar.Add($"Incremented quantity for '{resolved.ItemName}'", Severity.Info);
+                                
+                                if (!string.IsNullOrEmpty(resolved.ImageUrl))
+                                {
+                                    PreloadImageAndShowPopup(existing, resolved.ImageUrl);
+                                }
+                            }
+                            else
+                            {
+                                Snackbar.Add($"Cannot issue more than available stock ({existing.AvailableQuantity}) for '{resolved.ItemName}'", Severity.Warning);
+                            }
                         }
                         else
                         {
-                            var line = new OutwardLineItem
+                            if (resolved.AvailableQuantity <= 0)
                             {
-                                ItemId = resolved.ItemId,
-                                ItemCode = resolved.ItemCode,
-                                ItemName = resolved.ItemName,
-                                UnitCode = resolved.UnitCode,
-                                BatchNo = resolved.BatchNo,
-                                TrackingNo = resolved.TrackingNo,
-                                Barcode = resolved.Barcode,
-                                AvailableQuantity = resolved.AvailableQuantity,
-                                Quantity = 1,
-                                Rate = resolved.Rate,
-                                ImageUrl = resolved.ImageUrl
-                            };
-                            _lineItems.Add(line);
-                            Snackbar.Add($"Added '{resolved.ItemName}' to list.", Severity.Success);
-
-                            if (!string.IsNullOrEmpty(resolved.ImageUrl))
+                                Snackbar.Add($"This item batch '{resolved.ItemName}' (Batch: {resolved.BatchNo}) has 0 stock remaining. Cannot issue.", Severity.Warning);
+                            }
+                            else
                             {
-                                if (resolved.ImageUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+                                var line = new OutwardLineItem
                                 {
-                                    _ = Task.Run(async () => {
-                                        var base64Url = await ImageLoader.LoadImageAsBase64Async(resolved.ImageUrl);
-                                        if (!string.IsNullOrEmpty(base64Url))
-                                        {
-                                            line.ImageUrl = base64Url;
-                                            await InvokeAsync(StateHasChanged);
-                                        }
-                                    });
+                                    ItemId = resolved.ItemId,
+                                    ItemCode = resolved.ItemCode,
+                                    ItemName = resolved.ItemName,
+                                    UnitCode = resolved.UnitCode,
+                                    BatchNo = resolved.BatchNo,
+                                    TrackingNo = resolved.TrackingNo,
+                                    Barcode = resolved.Barcode,
+                                    AvailableQuantity = resolved.AvailableQuantity,
+                                    Quantity = 1,
+                                    Rate = resolved.Rate,
+                                    ImageUrl = resolved.ImageUrl,
+                                    Type = "Batch"
+                                };
+                                _lineItems.Add(line);
+                                Snackbar.Add($"Added batch '{resolved.ItemName}' to list.", Severity.Success);
+
+                                if (!string.IsNullOrEmpty(resolved.ImageUrl))
+                                {
+                                    PreloadImageAndShowPopup(line, resolved.ImageUrl);
                                 }
-                                _ = ShowPhotoPopupTemporarily(resolved.ImageUrl);
                             }
                         }
                     }
@@ -308,7 +331,8 @@
             }
             else
             {
-                Snackbar.Add("Scanned barcode or QR code could not be resolved or is not in inventory.", Severity.Error);
+                var errorMsg = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Resolve failed: {errorMsg}", Severity.Error);
             }
         }
         catch (Exception ex)
@@ -320,6 +344,26 @@
             _resolving = false;
             StateHasChanged();
         }
+    }
+
+    private void PreloadImageAndShowPopup(OutwardLineItem line, string url)
+    {
+        if (url.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = Task.Run(async () => {
+                try
+                {
+                    var base64Url = await ImageLoader.LoadImageAsBase64Async(url);
+                    if (!string.IsNullOrEmpty(base64Url))
+                    {
+                        line.ImageUrl = base64Url;
+                        await InvokeAsync(StateHasChanged);
+                    }
+                }
+                catch { }
+            });
+        }
+        _ = ShowPhotoPopupTemporarily(url);
     }
 
     private void RemoveLineItem(int index)
@@ -380,8 +424,8 @@
         var options = new DialogOptions { NoHeader = true, CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium };
         var dialogRef = await DialogService.ShowAsync<ImagePreviewDialog>("Item Photo", parameters, options);
         
-        // Wait 3 seconds
-        await Task.Delay(3000);
+        // Wait 1 second (1000ms) then close the dialog automatically
+        await Task.Delay(1000);
         
         // Close the dialog
         dialogRef.Close();
@@ -460,5 +504,6 @@
         public decimal Quantity { get; set; }
         public decimal Rate { get; set; }
         public string? ImageUrl { get; set; }
+        public string Type { get; set; } = "Batch";
     }
 }
