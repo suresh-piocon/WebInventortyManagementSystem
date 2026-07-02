@@ -84,20 +84,12 @@
             <MudTd DataLabel="Purchase Rate" Style="text-align: right;" Class="text-slate-300">₹@context.Rate.ToString("N4")</MudTd>
             <MudTd DataLabel="Total Amount" Style="text-align: right;" Class="text-slate-100 font-weight-bold">₹@context.Amount.ToString("N2")</MudTd>
             <MudTd DataLabel="Actions" Style="text-align: center;">
-                <div class="d-flex align-center justify-center gap-1">
-                    <MudTooltip Text="Delete this item only">
-                        <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" 
-                                       Color="Color.Warning" 
-                                       Size="Size.Small" 
-                                       OnClick="@(() => ConfirmDeleteRow(context))" />
-                    </MudTooltip>
-                    <MudTooltip Text="Delete entire invoice">
-                        <MudIconButton Icon="@Icons.Material.Filled.DeleteForever" 
-                                       Color="Color.Error" 
-                                       Size="Size.Small" 
-                                       OnClick="@(() => ConfirmDeleteInvoice(context))" />
-                    </MudTooltip>
-                </div>
+                <MudTooltip Text="Delete this item row">
+                    <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" 
+                                   Color="Color.Warning" 
+                                   Size="Size.Small" 
+                                   OnClick="@(() => ConfirmDeleteRow(context))" />
+                </MudTooltip>
             </MudTd>
         </RowTemplate>
         <PagerContent>

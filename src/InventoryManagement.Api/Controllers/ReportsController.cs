@@ -328,7 +328,9 @@ namespace InventoryManagement.Api.Controllers
                 InvoiceNo = inwardDetail.StockInward.InvoiceNo,
                 QuantityInward = inwardDetail.Quantity,
                 Rate = inwardDetail.Rate,
-                PhotoUrl = barcodeInfo.FirstOrDefault(b => !string.IsNullOrEmpty(b.ImageUrl))?.ImageUrl,
+                // Prefer the specific searched barcode's image, then fall back to any non-null image in the batch
+                PhotoUrl = barcodeInfo.FirstOrDefault(b => b.Barcode == code && !string.IsNullOrEmpty(b.ImageUrl))?.ImageUrl
+                           ?? barcodeInfo.FirstOrDefault(b => !string.IsNullOrEmpty(b.ImageUrl))?.ImageUrl,
                 RegisteredBarcodes = barcodeInfo.Select(b => b.Barcode).ToList(),
                 Issues = outwardDetails.Select(o => new BarcodeIssueDto
                 {

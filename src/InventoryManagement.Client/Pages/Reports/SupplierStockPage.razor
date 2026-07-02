@@ -71,7 +71,7 @@
             <MudTd DataLabel="Photo" Style="text-align: center;">
                 @if (!string.IsNullOrEmpty(context.ImageUrl))
                 {
-                    <img src="@GetAbsoluteImageUrl(context.ImageUrl)" style="width: 38px; height: 38px; border-radius: 4px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewImage(context.ImageUrl))" />
+                    <img src="@context.ImageUrl" style="width: 38px; height: 38px; border-radius: 4px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewLoadedImage(context.ImageUrl))" />
                 }
                 else
                 {
@@ -129,7 +129,7 @@
                 <MudTd Style="text-align: center;">
                     @if (!string.IsNullOrEmpty(context.ImageUrl))
                     {
-                        <img src="@GetAbsoluteImageUrl(context.ImageUrl)" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewImage(context.ImageUrl))" />
+                        <img src="@context.ImageUrl" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewLoadedImage(context.ImageUrl))" />
                     }
                     else
                     {
@@ -190,16 +190,17 @@
         {
             _reportLines = await Http.GetFromJsonAsync<List<SupplierStockReportDto>>($"api/reports/supplier-stock?valuationMethod={_valuationMethod}") ?? new();
             
-            // Load images in background
+            // Load images in background via proxy (all image types)
             foreach (var line in _reportLines)
             {
-                if (!string.IsNullOrEmpty(line.ImageUrl) && line.ImageUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(line.ImageUrl))
                 {
+                    var capturedLine = line;
                     _ = Task.Run(async () => {
-                        var base64Url = await ImageLoader.LoadImageAsBase64Async(line.ImageUrl);
+                        var base64Url = await ImageLoader.LoadImageAsBase64Async(capturedLine.ImageUrl);
                         if (!string.IsNullOrEmpty(base64Url))
                         {
-                            line.ImageUrl = base64Url;
+                            capturedLine.ImageUrl = base64Url;
                             await InvokeAsync(StateHasChanged);
                         }
                     });
@@ -286,13 +287,14 @@
                 {
                     foreach (var d in details)
                     {
-                        if (!string.IsNullOrEmpty(d.ImageUrl) && d.ImageUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+                        if (!string.IsNullOrEmpty(d.ImageUrl))
                         {
+                            var capturedD = d;
                             _ = Task.Run(async () => {
-                                var base64 = await ImageLoader.LoadImageAsBase64Async(d.ImageUrl);
+                                var base64 = await ImageLoader.LoadImageAsBase64Async(capturedD.ImageUrl);
                                 if (!string.IsNullOrEmpty(base64))
                                 {
-                                    d.ImageUrl = base64;
+                                    capturedD.ImageUrl = base64;
                                     await InvokeAsync(StateHasChanged);
                                 }
                             });
@@ -337,13 +339,14 @@
                                 ImageUrl = tracking.PhotoUrl
                             };
                             
-                            if (!string.IsNullOrEmpty(item.ImageUrl) && item.ImageUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+                            if (!string.IsNullOrEmpty(item.ImageUrl))
                             {
+                                var capturedItem = item;
                                 _ = Task.Run(async () => {
-                                    var base64 = await ImageLoader.LoadImageAsBase64Async(item.ImageUrl);
+                                    var base64 = await ImageLoader.LoadImageAsBase64Async(capturedItem.ImageUrl);
                                     if (!string.IsNullOrEmpty(base64))
                                     {
-                                        item.ImageUrl = base64;
+                                        capturedItem.ImageUrl = base64;
                                         await InvokeAsync(StateHasChanged);
                                     }
                                 });
@@ -410,6 +413,15 @@
         }
 
         return url;
+    }
+
+    private async Task PreviewLoadedImage(string? alreadyLoadedUrl)
+    {
+        if (string.IsNullOrEmpty(alreadyLoadedUrl)) return;
+        // Image is already base64 data URL from background loading
+        var parameters = new DialogParameters { ["imageUrl"] = alreadyLoadedUrl };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
+        await DialogService.ShowAsync<ImagePreviewDialog>("Item Photo", parameters, options);
     }
 
     private async Task PreviewImage(string url)

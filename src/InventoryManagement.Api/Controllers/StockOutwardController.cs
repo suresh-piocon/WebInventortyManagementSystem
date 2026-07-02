@@ -217,23 +217,48 @@ namespace InventoryManagement.Api.Controllers
 
                 _context.StockOutwards.Add(stockOutward);
 
+                // Track quantity already committed in this transaction (for batch balance accuracy)
+                var committedOutwardQtyByTracking = new Dictionary<string, decimal>();
+
                 foreach (var detailDto in dto.Details)
                 {
-                    // 2. Validate current available stock balance of this batch (Negative Stock Prevention)
-                    var inwardQty = await _context.StockLedgers
-                        .Where(l => l.ItemId == detailDto.ItemId && l.TrackingNo == detailDto.TrackingNo && l.BatchNo == detailDto.BatchNo)
-                        .SumAsync(l => l.InwardQty);
+                    // 2. Look up BarcodeMaster to determine if this is a Unique barcode
+                    var barcodeMaster = await _context.BarcodeMasters
+                        .FirstOrDefaultAsync(b => b.Barcode == detailDto.Barcode);
 
-                    var outwardQty = await _context.StockLedgers
-                        .Where(l => l.ItemId == detailDto.ItemId && l.TrackingNo == detailDto.TrackingNo && l.BatchNo == detailDto.BatchNo)
-                        .SumAsync(l => l.OutwardQty);
+                    bool isUniqueBarcode = barcodeMaster?.Type == "Unique";
 
-                    var currentBatchBalance = inwardQty - outwardQty;
-
-                    if (currentBatchBalance < detailDto.Quantity)
+                    if (isUniqueBarcode)
                     {
-                        var item = await _context.Items.FindAsync(detailDto.ItemId);
-                        return BadRequest($"Insufficient stock for item '{item?.Name}' (Batch: {detailDto.BatchNo}, Tracking: {detailDto.TrackingNo}). Available: {currentBatchBalance}, Requested: {detailDto.Quantity}");
+                        // For unique barcodes: simply check IsUsed flag (qty is always 1)
+                        if (barcodeMaster!.IsUsed)
+                        {
+                            var itemName = (await _context.Items.FindAsync(detailDto.ItemId))?.Name ?? detailDto.Barcode;
+                            return BadRequest($"Unique barcode '{detailDto.Barcode}' (Item: '{itemName}') has already been issued.");
+                        }
+                    }
+                    else
+                    {
+                        // For batch items: validate against ledger balance minus already committed in this request
+                        var inwardQty = await _context.StockLedgers
+                            .Where(l => l.ItemId == detailDto.ItemId && l.TrackingNo == detailDto.TrackingNo && l.BatchNo == detailDto.BatchNo)
+                            .SumAsync(l => l.InwardQty);
+
+                        var outwardQty = await _context.StockLedgers
+                            .Where(l => l.ItemId == detailDto.ItemId && l.TrackingNo == detailDto.TrackingNo && l.BatchNo == detailDto.BatchNo)
+                            .SumAsync(l => l.OutwardQty);
+
+                        var trackingKey = $"{detailDto.TrackingNo}|{detailDto.BatchNo}";
+                        var alreadyCommitted = committedOutwardQtyByTracking.TryGetValue(trackingKey, out var prev) ? prev : 0m;
+                        var currentBatchBalance = inwardQty - outwardQty - alreadyCommitted;
+
+                        if (currentBatchBalance < detailDto.Quantity)
+                        {
+                            var item = await _context.Items.FindAsync(detailDto.ItemId);
+                            return BadRequest($"Insufficient stock for item '{item?.Name}' (Batch: {detailDto.BatchNo}, Tracking: {detailDto.TrackingNo}). Available: {currentBatchBalance}, Requested: {detailDto.Quantity}");
+                        }
+
+                        committedOutwardQtyByTracking[trackingKey] = alreadyCommitted + detailDto.Quantity;
                     }
 
                     var detail = new StockOutwardDetail
@@ -251,9 +276,7 @@ namespace InventoryManagement.Api.Controllers
 
                     _context.StockOutwardDetails.Add(detail);
 
-                    // 3. Mark barcode as used if it is a unique barcode
-                    var barcodeMaster = await _context.BarcodeMasters
-                        .FirstOrDefaultAsync(b => b.Barcode == detailDto.Barcode);
+                    // 3. Mark barcode as used
                     if (barcodeMaster != null)
                     {
                         barcodeMaster.IsUsed = true;

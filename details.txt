@@ -1,0 +1,13 @@
+How to fix this permanently (so images never get deleted):
+To prevent your images from getting wiped on server restarts, you must store them in your Supabase Bucket instead of the local server disk.
+
+You can configure this easily without changing the code:
+
+Go to your Render Dashboard for your API service (webinventory-api).
+Go to Environment settings.
+Add the following environment variables with your actual Supabase credentials:
+SUPABASE_URL = https://tpmgujjlyuecnpgyzsor.supabase.co
+SUPABASE_ANON_KEY = (Your Supabase Anonymous Key)
+SUPABASE_SERVICE_ROLE_KEY = (Your Supabase Service Role Key)
+SUPABASE_JWT_SECRET = (Your Supabase JWT Secret)
+Once these are set, all future uploaded images will be stored permanently in your Supabase bucket (inventory-images) and will never be lost during server redeployments or restarts!
