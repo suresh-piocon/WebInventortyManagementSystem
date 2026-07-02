@@ -248,6 +248,20 @@
             if (response.IsSuccessStatusCode)
             {
                 _history = await response.Content.ReadFromJsonAsync<BarcodeTrackingReportDto>();
+                if (_history != null && !string.IsNullOrEmpty(_history.PhotoUrl))
+                {
+                    if (_history.PhotoUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _ = Task.Run(async () => {
+                            var base64Url = await ImageLoader.LoadImageAsBase64Async(_history.PhotoUrl);
+                            if (!string.IsNullOrEmpty(base64Url))
+                            {
+                                _history.PhotoUrl = base64Url;
+                                await InvokeAsync(StateHasChanged);
+                            }
+                        });
+                    }
+                }
             }
             else
             {
@@ -267,7 +281,8 @@
 
     private async Task PreviewImage(string url)
     {
-        var absoluteUrl = GetAbsoluteImageUrl(url);
+        var resolvedUrl = await ImageLoader.LoadImageAsBase64Async(url);
+        var absoluteUrl = GetAbsoluteImageUrl(resolvedUrl);
         var parameters = new DialogParameters { ["imageUrl"] = absoluteUrl };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
         await DialogService.ShowAsync<ImagePreviewDialog>("Item Photo", parameters, options);
@@ -276,6 +291,12 @@
     private string GetAbsoluteImageUrl(string? url)
     {
         if (string.IsNullOrEmpty(url)) return string.Empty;
+        
+        if (url.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}/api/storage/image?url={Uri.EscapeDataString(url)}";
+        }
         
         var uploadsIndex = url.IndexOf("/uploads/", StringComparison.OrdinalIgnoreCase);
         if (uploadsIndex >= 0)

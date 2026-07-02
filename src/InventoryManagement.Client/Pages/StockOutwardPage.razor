@@ -242,6 +242,17 @@
                             
                             if (!string.IsNullOrEmpty(resolved.ImageUrl))
                             {
+                                if (resolved.ImageUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    _ = Task.Run(async () => {
+                                        var base64Url = await ImageLoader.LoadImageAsBase64Async(resolved.ImageUrl);
+                                        if (!string.IsNullOrEmpty(base64Url))
+                                        {
+                                            existing.ImageUrl = base64Url;
+                                            await InvokeAsync(StateHasChanged);
+                                        }
+                                    });
+                                }
                                 _ = ShowPhotoPopupTemporarily(resolved.ImageUrl);
                             }
                         }
@@ -258,7 +269,7 @@
                         }
                         else
                         {
-                            _lineItems.Add(new OutwardLineItem
+                            var line = new OutwardLineItem
                             {
                                 ItemId = resolved.ItemId,
                                 ItemCode = resolved.ItemCode,
@@ -271,11 +282,23 @@
                                 Quantity = 1,
                                 Rate = resolved.Rate,
                                 ImageUrl = resolved.ImageUrl
-                            });
+                            };
+                            _lineItems.Add(line);
                             Snackbar.Add($"Added '{resolved.ItemName}' to list.", Severity.Success);
 
                             if (!string.IsNullOrEmpty(resolved.ImageUrl))
                             {
+                                if (resolved.ImageUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    _ = Task.Run(async () => {
+                                        var base64Url = await ImageLoader.LoadImageAsBase64Async(resolved.ImageUrl);
+                                        if (!string.IsNullOrEmpty(base64Url))
+                                        {
+                                            line.ImageUrl = base64Url;
+                                            await InvokeAsync(StateHasChanged);
+                                        }
+                                    });
+                                }
                                 _ = ShowPhotoPopupTemporarily(resolved.ImageUrl);
                             }
                         }
@@ -311,6 +334,12 @@
     {
         if (string.IsNullOrEmpty(url)) return string.Empty;
         
+        if (url.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}/api/storage/image?url={Uri.EscapeDataString(url)}";
+        }
+        
         var uploadsIndex = url.IndexOf("/uploads/", StringComparison.OrdinalIgnoreCase);
         if (uploadsIndex >= 0)
         {
@@ -343,7 +372,8 @@
 
     private async Task ShowPhotoPopupTemporarily(string url)
     {
-        var absoluteUrl = GetAbsoluteImageUrl(url);
+        var resolvedUrl = await ImageLoader.LoadImageAsBase64Async(url);
+        var absoluteUrl = GetAbsoluteImageUrl(resolvedUrl);
         if (string.IsNullOrEmpty(absoluteUrl)) return;
 
         var parameters = new DialogParameters { ["imageUrl"] = absoluteUrl };
@@ -359,7 +389,8 @@
 
     private async Task PreviewImage(string url)
     {
-        var absoluteUrl = GetAbsoluteImageUrl(url);
+        var resolvedUrl = await ImageLoader.LoadImageAsBase64Async(url);
+        var absoluteUrl = GetAbsoluteImageUrl(resolvedUrl);
         var parameters = new DialogParameters { ["imageUrl"] = absoluteUrl };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
         await DialogService.ShowAsync<ImagePreviewDialog>("Photo View", parameters, options);

@@ -156,6 +156,18 @@
                     _itemCode = lookup.ItemCode;
                     _existingImageUrl = lookup.ExistingImageUrl;
                     _itemFound = true;
+
+                    if (!string.IsNullOrEmpty(_existingImageUrl) && _existingImageUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _ = Task.Run(async () => {
+                            var base64Url = await ImageLoader.LoadImageAsBase64Async(_existingImageUrl);
+                            if (!string.IsNullOrEmpty(base64Url))
+                            {
+                                _existingImageUrl = base64Url;
+                                await InvokeAsync(StateHasChanged);
+                            }
+                        });
+                    }
                 }
             }
             else
@@ -228,6 +240,12 @@
     private string GetAbsoluteImageUrl(string? url)
     {
         if (string.IsNullOrEmpty(url)) return string.Empty;
+        
+        if (url.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}/api/storage/image?url={Uri.EscapeDataString(url)}";
+        }
         
         var uploadsIndex = url.IndexOf("/uploads/", StringComparison.OrdinalIgnoreCase);
         if (uploadsIndex >= 0)

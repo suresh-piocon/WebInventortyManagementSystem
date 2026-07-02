@@ -157,6 +157,102 @@ namespace InventoryManagement.Api.Controllers
             });
         }
 
+        [HttpGet("image")]
+        public async Task<IActionResult> GetImage([FromQuery] string url)
+        {
+            if (string.IsNullOrEmpty(url))
+            {
+                return BadRequest("URL is required.");
+            }
+
+            var supabaseUrl = _config["Supabase:Url"];
+            if (string.IsNullOrEmpty(supabaseUrl) || !url.Contains(supabaseUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                // If not a Supabase URL, redirect to local or external target
+                return Redirect(url);
+            }
+
+            var serviceRoleKey = _config["Supabase:ServiceRoleKey"];
+            var anonKey = _config["Supabase:AnonKey"];
+
+            bool IsPlaceholder(string? value)
+            {
+                if (string.IsNullOrWhiteSpace(value)) return true;
+                var v = value.ToLowerInvariant();
+                if (v.Contains("your-anon-key") || v.Contains("your-service-role-key") || v.Contains("your-jwt-secret") || v.Contains("your-project"))
+                {
+                    return true;
+                }
+                var parts = value.Split('.');
+                if (parts.Length != 3)
+                {
+                    return true;
+                }
+                return false;
+            }
+
+            if (IsPlaceholder(serviceRoleKey)) serviceRoleKey = null;
+            if (IsPlaceholder(anonKey)) anonKey = null;
+
+            var serviceKey = serviceRoleKey ?? anonKey;
+
+            if (string.IsNullOrEmpty(serviceKey))
+            {
+                // Fallback to anonymous fetch if no keys are configured
+                try
+                {
+                    using var httpClient = new HttpClient();
+                    var response = await httpClient.GetAsync(url);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
+                        var stream = await response.Content.ReadAsStreamAsync();
+                        return File(stream, contentType);
+                    }
+                    return StatusCode((int)response.StatusCode, "Failed to retrieve image anonymously.");
+                }
+                catch (Exception ex)
+                {
+                    return StatusCode(StatusCodes.Status500InternalServerError, $"Error: {ex.Message}");
+                }
+            }
+
+            try
+            {
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", serviceKey);
+                httpClient.DefaultRequestHeaders.Add("apikey", serviceKey);
+
+                // Try the public URL with authorization headers
+                var response = await httpClient.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                {
+                    var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
+                    var stream = await response.Content.ReadAsStreamAsync();
+                    return File(stream, contentType);
+                }
+
+                // If public access with headers failed, try accessing via authenticated storage REST endpoint
+                if (url.Contains("/storage/v1/object/public/", StringComparison.OrdinalIgnoreCase))
+                {
+                    var authenticatedUrl = url.Replace("/storage/v1/object/public/", "/storage/v1/object/authenticated/", StringComparison.OrdinalIgnoreCase);
+                    var authResponse = await httpClient.GetAsync(authenticatedUrl);
+                    if (authResponse.IsSuccessStatusCode)
+                    {
+                        var contentType = authResponse.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
+                        var stream = await authResponse.Content.ReadAsStreamAsync();
+                        return File(stream, contentType);
+                    }
+                }
+
+                return StatusCode((int)response.StatusCode, "Failed to retrieve image from Supabase storage.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Error fetching from Supabase: {ex.Message}");
+            }
+        }
+
         [HttpPost("update-photo")]
         public async Task<IActionResult> UpdatePhoto([FromBody] UpdatePhotoRequest request)
         {

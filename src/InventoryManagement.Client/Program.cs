@@ -41,6 +41,8 @@ namespace InventoryManagement.Client
             builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<ApiAuthenticationStateProvider>());
             // Register Barcode SVG Generator Service
             builder.Services.AddScoped<InventoryManagement.Client.Services.BarcodeGeneratorService>();
+            // Register Image Loader Service
+            builder.Services.AddScoped<InventoryManagement.Client.Services.ImageLoaderService>();
 
             await builder.Build().RunAsync();
         }
