@@ -626,4 +626,17 @@ namespace InventoryManagement.Shared
         public DateTimeOffset Timestamp { get; set; }
         public string UserEmail { get; set; } = string.Empty;
     }
+
+    public class BarcodeDetailReportDto
+    {
+        public string ItemName { get; set; } = string.Empty;
+        public string BarcodeNo { get; set; } = string.Empty;
+        public string BatchNo { get; set; } = string.Empty;
+        public string TrackingNo { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public DateTimeOffset InwardDate { get; set; }
+        public DateTimeOffset? OutwardDate { get; set; }
+        public string Status { get; set; } = "In Stock";
+        public string? ImageUrl { get; set; }
+    }
 }

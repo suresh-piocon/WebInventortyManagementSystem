@@ -1,6 +1,7 @@
 @page "/reports/ledger"
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Stock Ledger - AG Inventory</PageTitle>
 
@@ -38,6 +39,14 @@
                         <span>Tracking Mode: <b>@_selectedItem.BarcodeType</b></span>
                     </div>
                 }
+            </MudItem>
+            <MudItem xs="12" sm="12" md="4" Class="d-flex align-center">
+                <MudCheckBox T="bool" 
+                             Value="@_showBarcodeDetails" 
+                             ValueChanged="OnShowBarcodeDetailsChanged" 
+                             Label="Show Detailed Barcode Info (In/Out with Photos)" 
+                             Color="Color.Primary" 
+                             Class="text-slate-200" />
             </MudItem>
         </MudGrid>
     </MudPaper>
@@ -93,6 +102,68 @@
             <MudTablePager />
         </PagerContent>
     </MudTable>
+
+    @if (_showBarcodeDetails)
+    {
+        <MudTable Items="@_barcodeDetails" 
+                  Hover="true" 
+                  Loading="@_loadingBarcodes" 
+                  Class="glass-panel text-slate-200 mt-6">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">
+                    <MudIcon Icon="@Icons.Material.Filled.QrCode" Class="mr-2 text-cyan" /> Detailed Barcode In/Out Logs
+                </MudText>
+                <MudSpacer />
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh Style="color: #94A3B8; text-align: center; width: 60px;">Photo</MudTh>
+                <MudTh Style="color: #94A3B8;">Item Name</MudTh>
+                <MudTh Style="color: #94A3B8;">Barcode No</MudTh>
+                <MudTh Style="color: #94A3B8;">Batch No</MudTh>
+                <MudTh Style="color: #94A3B8;">Tracking No</MudTh>
+                <MudTh Style="color: #94A3B8;">Type</MudTh>
+                <MudTh Style="color: #94A3B8;">Inward Date</MudTh>
+                <MudTh Style="color: #94A3B8;">Outward Date</MudTh>
+                <MudTh Style="color: #94A3B8;">Status</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd Style="text-align: center;">
+                    @if (!string.IsNullOrEmpty(context.ImageUrl))
+                    {
+                        <img src="@GetAbsoluteImageUrl(context.ImageUrl)" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewImage(context.ImageUrl))" />
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Color="Color.Dark" />
+                    }
+                </MudTd>
+                <MudTd DataLabel="Item Name" Class="text-slate-100 font-weight-bold">@context.ItemName</MudTd>
+                <MudTd DataLabel="Barcode No" Class="text-slate-200 font-mono">@context.BarcodeNo</MudTd>
+                <MudTd DataLabel="Batch No" Class="text-slate-300">@context.BatchNo</MudTd>
+                <MudTd DataLabel="Tracking No" Class="text-slate-400 font-mono" Style="font-size: 11px;">@context.TrackingNo</MudTd>
+                <MudTd DataLabel="Type">
+                    <MudChip T="string" Color="Color.Default" Size="Size.Small">@context.Type</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Inward Date" Class="text-slate-300">@context.InwardDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                <MudTd DataLabel="Outward Date" Class="text-slate-300">
+                    @(context.OutwardDate.HasValue ? context.OutwardDate.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm") : "-")
+                </MudTd>
+                <MudTd DataLabel="Status">
+                    @if (context.Status == "Issued")
+                    {
+                        <MudChip T="string" Color="Color.Error" Size="Size.Small">Issued</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Color="Color.Success" Size="Size.Small">In Stock</MudChip>
+                    }
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    }
 </MudContainer>
 
 @code {
@@ -102,6 +173,10 @@
     
     private List<StockLedger> _ledger = new();
     private bool _loading = false;
+
+    private bool _showBarcodeDetails = false;
+    private List<BarcodeDetailReportDto> _barcodeDetails = new();
+    private bool _loadingBarcodes = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -142,6 +217,10 @@
         try
         {
             _ledger = await Http.GetFromJsonAsync<List<StockLedger>>($"api/reports/ledger/{_selectedItemId}") ?? new();
+            if (_showBarcodeDetails)
+            {
+                await LoadBarcodeDetails();
+            }
         }
         catch (Exception ex)
         {
@@ -152,5 +231,192 @@
             _loading = false;
             StateHasChanged();
         }
+    }
+
+    private async Task OnShowBarcodeDetailsChanged(bool val)
+    {
+        _showBarcodeDetails = val;
+        if (_showBarcodeDetails)
+        {
+            await LoadBarcodeDetails();
+        }
+    }
+
+    private async Task LoadBarcodeDetails()
+    {
+        if (!_showBarcodeDetails) return;
+        _loadingBarcodes = true;
+        StateHasChanged();
+        try
+        {
+            _barcodeDetails.Clear();
+            var batchTrackings = _ledger
+                .Select(l => new { l.BatchNo, l.TrackingNo })
+                .Distinct()
+                .ToList();
+
+            foreach (var bt in batchTrackings)
+            {
+                var details = await LoadBarcodeDetailsAsync(bt.BatchNo, bt.TrackingNo);
+                if (details != null && details.Any())
+                {
+                    foreach (var d in details)
+                    {
+                        if (!_barcodeDetails.Any(b => b.BarcodeNo == d.BarcodeNo))
+                        {
+                            _barcodeDetails.Add(d);
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading barcode details: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingBarcodes = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task<List<BarcodeDetailReportDto>> LoadBarcodeDetailsAsync(string? batchNo, string? trackingNo)
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/reports/barcodes/detail?batchNo={Uri.EscapeDataString(batchNo ?? "")}&trackingNo={Uri.EscapeDataString(trackingNo ?? "")}");
+            if (response.IsSuccessStatusCode)
+            {
+                var details = await response.Content.ReadFromJsonAsync<List<BarcodeDetailReportDto>>();
+                if (details != null)
+                {
+                    foreach (var d in details)
+                    {
+                        if (!string.IsNullOrEmpty(d.ImageUrl) && d.ImageUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _ = Task.Run(async () => {
+                                var base64 = await ImageLoader.LoadImageAsBase64Async(d.ImageUrl);
+                                if (!string.IsNullOrEmpty(base64))
+                                {
+                                    d.ImageUrl = base64;
+                                    await InvokeAsync(StateHasChanged);
+                                }
+                            });
+                        }
+                    }
+                    return details;
+                }
+            }
+        }
+        catch
+        {
+            // Fallback
+        }
+
+        try
+        {
+            var code = !string.IsNullOrEmpty(trackingNo) ? trackingNo : batchNo;
+            if (!string.IsNullOrEmpty(code))
+            {
+                var response = await Http.GetAsync($"api/reports/barcode-tracking/{Uri.EscapeDataString(code)}");
+                if (response.IsSuccessStatusCode)
+                {
+                    var tracking = await response.Content.ReadFromJsonAsync<BarcodeTrackingReportDto>();
+                    if (tracking != null)
+                    {
+                        var list = new List<BarcodeDetailReportDto>();
+                        foreach (var bc in tracking.RegisteredBarcodes)
+                        {
+                            var isUnique = tracking.RegisteredBarcodes.Count > 1;
+                            var issue = tracking.Issues.FirstOrDefault();
+                            
+                            var item = new BarcodeDetailReportDto
+                            {
+                                ItemName = tracking.ItemName,
+                                BarcodeNo = bc,
+                                BatchNo = tracking.BatchNo,
+                                TrackingNo = tracking.TrackingNo,
+                                Type = isUnique ? "Unique" : "Batch",
+                                InwardDate = tracking.InwardDate,
+                                OutwardDate = issue?.OutwardDate,
+                                Status = issue != null ? "Issued" : "In Stock",
+                                ImageUrl = tracking.PhotoUrl
+                            };
+                            
+                            if (!string.IsNullOrEmpty(item.ImageUrl) && item.ImageUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+                            {
+                                _ = Task.Run(async () => {
+                                    var base64 = await ImageLoader.LoadImageAsBase64Async(item.ImageUrl);
+                                    if (!string.IsNullOrEmpty(base64))
+                                    {
+                                        item.ImageUrl = base64;
+                                        await InvokeAsync(StateHasChanged);
+                                    }
+                                });
+                            }
+                            
+                            list.Add(item);
+                        }
+                        return list;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading barcode fallback: {ex.Message}", Severity.Warning);
+        }
+
+        return new List<BarcodeDetailReportDto>();
+    }
+
+    private string GetAbsoluteImageUrl(string? url)
+    {
+        if (string.IsNullOrEmpty(url)) return string.Empty;
+        
+        if (url.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}/api/storage/image?url={Uri.EscapeDataString(url)}";
+        }
+        
+        var uploadsIndex = url.IndexOf("/uploads/", StringComparison.OrdinalIgnoreCase);
+        if (uploadsIndex >= 0)
+        {
+            var relativePath = url.Substring(uploadsIndex);
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}{relativePath}";
+        }
+        
+        if (url.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}/{url}";
+        }
+
+        if (url.StartsWith("http://localhost") || url.StartsWith("https://localhost"))
+        {
+            var uri = new Uri(url);
+            var relativePath = uri.PathAndQuery;
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}{relativePath}";
+        }
+
+        if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+        {
+            return "https://" + url.Substring(7);
+        }
+
+        return url;
+    }
+
+    private async Task PreviewImage(string url)
+    {
+        var resolvedUrl = await ImageLoader.LoadImageAsBase64Async(url);
+        var absoluteUrl = GetAbsoluteImageUrl(resolvedUrl);
+        var parameters = new DialogParameters { ["imageUrl"] = absoluteUrl };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
+        await DialogService.ShowAsync<ImagePreviewDialog>("Item Photo", parameters, options);
     }
 }

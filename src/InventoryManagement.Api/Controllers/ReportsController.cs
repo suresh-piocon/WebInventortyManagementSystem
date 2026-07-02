@@ -376,6 +376,55 @@ namespace InventoryManagement.Api.Controllers
             return Ok(data);
         }
 
+        [HttpGet("barcodes/detail")]
+        public async Task<IActionResult> GetBarcodeDetails([FromQuery] string? batchNo, [FromQuery] string? trackingNo)
+        {
+            if (string.IsNullOrEmpty(batchNo) && string.IsNullOrEmpty(trackingNo))
+            {
+                return BadRequest("Batch number or tracking number is required.");
+            }
+
+            var query = _context.BarcodeMasters
+                .Include(b => b.Item)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(batchNo))
+            {
+                query = query.Where(b => b.BatchNo == batchNo);
+            }
+
+            if (!string.IsNullOrEmpty(trackingNo))
+            {
+                query = query.Where(b => b.TrackingNo == trackingNo);
+            }
+
+            var barcodes = await query.OrderBy(b => b.Barcode).ToListAsync();
+            var barcodeList = barcodes.Select(b => b.Barcode).ToList();
+
+            // Fetch outward details for these barcodes
+            var outwardDetails = await _context.StockOutwardDetails
+                .Include(od => od.StockOutward)
+                .Where(od => barcodeList.Contains(od.Barcode))
+                .ToListAsync();
+
+            var result = barcodes.Select(b => {
+                var outward = outwardDetails.FirstOrDefault(od => od.Barcode == b.Barcode);
+                return new BarcodeDetailReportDto
+                {
+                    ItemName = b.Item?.Name ?? "Unknown Item",
+                    BarcodeNo = b.Barcode,
+                    BatchNo = b.BatchNo,
+                    TrackingNo = b.TrackingNo,
+                    Type = b.Type,
+                    InwardDate = b.CreatedAt,
+                    OutwardDate = outward?.StockOutward?.OutwardDate,
+                    Status = outward != null ? "Issued" : "In Stock",
+                    ImageUrl = b.ImageUrl
+                };
+            }).ToList();
+
+            return Ok(result);
+        }
 
         // ==========================================
         // AUDIT LOG REPORT
