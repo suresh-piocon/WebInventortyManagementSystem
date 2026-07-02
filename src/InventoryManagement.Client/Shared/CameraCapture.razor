@@ -114,17 +114,26 @@
     {
         if (_isStreamActive) return;
         
-        // Brief delay to ensure HTML elements render
-        await Task.Delay(200);
-        
-        bool success = await JSRuntime.InvokeAsync<bool>("webcamInterop.startStream", "webcamVideo");
-        if (success)
+        try
         {
-            _isStreamActive = true;
+            // Brief delay to ensure HTML elements render
+            await Task.Delay(200);
+            
+            bool success = await JSRuntime.InvokeAsync<bool>("webcamInterop.startStream", "webcamVideo");
+            if (success)
+            {
+                _isStreamActive = true;
+            }
+            else
+            {
+                Snackbar.Add("Could not access camera. Please check camera connections and permissions. Switched to File Upload.", Severity.Warning);
+                _captureMode = "Upload";
+                StateHasChanged();
+            }
         }
-        else
+        catch (Exception ex)
         {
-            Snackbar.Add("Could not access camera. Please make sure camera is connected and permissions are granted. Switched to File Upload.", Severity.Warning);
+            Snackbar.Add($"Camera initialization failed: {ex.Message}. Switched to File Upload.", Severity.Warning);
             _captureMode = "Upload";
             StateHasChanged();
         }
@@ -133,17 +142,28 @@
     private async Task StopWebcamAsync()
     {
         if (!_isStreamActive) return;
-        await JSRuntime.InvokeVoidAsync("webcamInterop.stopStream");
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("webcamInterop.stopStream");
+        }
+        catch { }
         _isStreamActive = false;
     }
 
     private async Task CaptureWebcamPhoto()
     {
-        var photoBase64 = await JSRuntime.InvokeAsync<string>("webcamInterop.capturePhoto", "webcamVideo", "webcamCanvas");
-        if (!string.IsNullOrEmpty(photoBase64))
+        try
         {
-            _capturedImageBase64 = photoBase64;
-            await StopWebcamAsync();
+            var photoBase64 = await JSRuntime.InvokeAsync<string>("webcamInterop.capturePhoto", "webcamVideo", "webcamCanvas");
+            if (!string.IsNullOrEmpty(photoBase64))
+            {
+                _capturedImageBase64 = photoBase64;
+                await StopWebcamAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to snap photo: {ex.Message}", Severity.Error);
         }
     }
 

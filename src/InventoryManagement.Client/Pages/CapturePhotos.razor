@@ -160,11 +160,18 @@
                     if (!string.IsNullOrEmpty(_existingImageUrl) && _existingImageUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
                     {
                         _ = Task.Run(async () => {
-                            var base64Url = await ImageLoader.LoadImageAsBase64Async(_existingImageUrl);
-                            if (!string.IsNullOrEmpty(base64Url))
+                            try
                             {
-                                _existingImageUrl = base64Url;
-                                await InvokeAsync(StateHasChanged);
+                                var base64Url = await ImageLoader.LoadImageAsBase64Async(_existingImageUrl);
+                                if (!string.IsNullOrEmpty(base64Url))
+                                {
+                                    _existingImageUrl = base64Url;
+                                    await InvokeAsync(StateHasChanged);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                await InvokeAsync(() => Snackbar.Add($"Failed to load existing image: {ex.Message}", Severity.Warning));
                             }
                         });
                     }
