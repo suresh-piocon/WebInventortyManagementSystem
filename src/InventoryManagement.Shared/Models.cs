@@ -640,4 +640,21 @@ namespace InventoryManagement.Shared
         public string Status { get; set; } = "In Stock";
         public string? ImageUrl { get; set; }
     }
+
+    public class AllItemsLedgerDto
+    {
+        public Guid Id { get; set; }
+        public Guid ItemId { get; set; }
+        public string ItemCode { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public DateTimeOffset TransactionDate { get; set; }
+        public string TransactionType { get; set; } = string.Empty;
+        public string ReferenceNo { get; set; } = string.Empty;
+        public string BatchNo { get; set; } = string.Empty;
+        public string TrackingNo { get; set; } = string.Empty;
+        public decimal InwardQty { get; set; }
+        public decimal OutwardQty { get; set; }
+        public decimal BalanceQty { get; set; }
+        public decimal UnitPrice { get; set; }
+    }
 }

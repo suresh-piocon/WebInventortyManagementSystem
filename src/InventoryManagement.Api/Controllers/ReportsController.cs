@@ -248,10 +248,20 @@ namespace InventoryManagement.Api.Controllers
         // STOCK LEDGER REPORT
         // ==========================================
         [HttpGet("ledger/{itemId}")]
-        public async Task<IActionResult> GetStockLedger(Guid itemId)
+        public async Task<IActionResult> GetStockLedger(Guid itemId, [FromQuery] DateTimeOffset? upToDate)
         {
-            var data = await _context.StockLedgers
+            var query = _context.StockLedgers
                 .Where(l => l.ItemId == itemId)
+                .AsQueryable();
+
+            if (upToDate.HasValue)
+            {
+                // Include all records up to end of the selected date (23:59:59 UTC)
+                var endOfDay = upToDate.Value.ToUniversalTime().Date.AddDays(1).AddTicks(-1);
+                query = query.Where(l => l.TransactionDate <= new DateTimeOffset(endOfDay, TimeSpan.Zero));
+            }
+
+            var data = await query
                 .OrderBy(l => l.TransactionDate)
                 .ThenBy(l => l.CreatedAt)
                 .ToListAsync();
@@ -266,6 +276,59 @@ namespace InventoryManagement.Api.Controllers
             }
 
             return Ok(data);
+        }
+
+        // ==========================================
+        // ALL-ITEMS STOCK LEDGER (with optional upToDate filter)
+        // ==========================================
+        [HttpGet("ledger/all")]
+        public async Task<IActionResult> GetAllItemsLedger([FromQuery] DateTimeOffset? upToDate)
+        {
+            var query = _context.StockLedgers
+                .Include(l => l.Item)
+                .AsQueryable();
+
+            if (upToDate.HasValue)
+            {
+                var endOfDay = upToDate.Value.ToUniversalTime().Date.AddDays(1).AddTicks(-1);
+                query = query.Where(l => l.TransactionDate <= new DateTimeOffset(endOfDay, TimeSpan.Zero));
+            }
+
+            var data = await query
+                .OrderBy(l => l.ItemId)
+                .ThenBy(l => l.TransactionDate)
+                .ThenBy(l => l.CreatedAt)
+                .ToListAsync();
+
+            // Recompute running balance per-item
+            var runningByItem = new Dictionary<Guid, decimal>();
+            foreach (var entry in data)
+            {
+                if (!runningByItem.ContainsKey(entry.ItemId))
+                    runningByItem[entry.ItemId] = 0;
+                runningByItem[entry.ItemId] += entry.InwardQty - entry.OutwardQty;
+                entry.BalanceQty = runningByItem[entry.ItemId];
+            }
+
+            // Project to include item name/code for the all-items view
+            var result = data.Select(l => new AllItemsLedgerDto
+            {
+                Id = l.Id,
+                ItemId = l.ItemId,
+                ItemCode = l.Item?.Code ?? string.Empty,
+                ItemName = l.Item?.Name ?? string.Empty,
+                TransactionDate = l.TransactionDate,
+                TransactionType = l.TransactionType,
+                ReferenceNo = l.ReferenceNo,
+                BatchNo = l.BatchNo,
+                TrackingNo = l.TrackingNo,
+                InwardQty = l.InwardQty,
+                OutwardQty = l.OutwardQty,
+                BalanceQty = l.BalanceQty,
+                UnitPrice = l.UnitPrice
+            }).ToList();
+
+            return Ok(result);
         }
 
         // ==========================================
@@ -407,7 +470,11 @@ namespace InventoryManagement.Api.Controllers
         }
 
         [HttpGet("barcodes/detail")]
-        public async Task<IActionResult> GetBarcodeDetails([FromQuery] string? batchNo, [FromQuery] string? trackingNo)
+        public async Task<IActionResult> GetBarcodeDetails(
+            [FromQuery] string? batchNo,
+            [FromQuery] string? trackingNo,
+            [FromQuery] DateTimeOffset? fromDate,
+            [FromQuery] DateTimeOffset? toDate)
         {
             if (string.IsNullOrEmpty(batchNo) && string.IsNullOrEmpty(trackingNo))
             {
@@ -419,13 +486,21 @@ namespace InventoryManagement.Api.Controllers
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(batchNo))
-            {
                 query = query.Where(b => b.BatchNo == batchNo);
-            }
 
             if (!string.IsNullOrEmpty(trackingNo))
-            {
                 query = query.Where(b => b.TrackingNo == trackingNo);
+
+            // Filter by inward date range (CreatedAt = inward date of the barcode)
+            if (fromDate.HasValue)
+            {
+                var start = fromDate.Value.ToUniversalTime().Date;
+                query = query.Where(b => b.CreatedAt >= new DateTimeOffset(start, TimeSpan.Zero));
+            }
+            if (toDate.HasValue)
+            {
+                var end = toDate.Value.ToUniversalTime().Date.AddDays(1).AddTicks(-1);
+                query = query.Where(b => b.CreatedAt <= new DateTimeOffset(end, TimeSpan.Zero));
             }
 
             var barcodes = await query.OrderBy(b => b.Barcode).ToListAsync();
@@ -455,6 +530,7 @@ namespace InventoryManagement.Api.Controllers
                     ImageUrl = b.ImageUrl
                 };
             }).ToList();
+
 
             return Ok(result);
         }
