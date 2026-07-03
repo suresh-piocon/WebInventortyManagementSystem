@@ -642,6 +642,16 @@ namespace InventoryManagement.Shared
         public string? ImageUrl { get; set; }
     }
 
+    public class BarcodeStockImageReportDto
+    {
+        public string BarcodeNo { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public string? ImageUrl { get; set; }
+        public DateTimeOffset InwardDate { get; set; }
+        public string SupplierName { get; set; } = string.Empty;
+        public int StockAgeDays { get; set; }
+    }
+
     public class AllItemsLedgerDto
     {
         public Guid Id { get; set; }

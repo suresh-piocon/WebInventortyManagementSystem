@@ -735,5 +735,130 @@ namespace InventoryManagement.Api.Controllers
             }
             return BadRequest("Error retrieving report data.");
         }
+
+        [HttpGet("barcode-stock-images")]
+        public async Task<IActionResult> GetBarcodeStockImages([FromQuery] DateTimeOffset? upToDate)
+        {
+            var upToDateVal = upToDate?.ToUniversalTime() ?? DateTimeOffset.UtcNow;
+
+            // 1. Fetch all BarcodeMasters created on or before upToDateVal
+            var barcodes = await _context.BarcodeMasters
+                .Include(b => b.Item)
+                .Where(b => b.CreatedAt <= upToDateVal)
+                .OrderBy(b => b.Barcode)
+                .ToListAsync();
+
+            if (!barcodes.Any())
+            {
+                return Ok(new List<BarcodeStockImageReportDto>());
+            }
+
+            // 2. Fetch all StockOutwardDetails issued on or before upToDateVal
+            var outwardDetails = await _context.StockOutwardDetails
+                .Include(od => od.StockOutward)
+                .Where(od => od.StockOutward!.OutwardDate <= upToDateVal)
+                .ToListAsync();
+
+            // 3. Fetch all StockLedger records on or before upToDateVal
+            var ledgers = await _context.StockLedgers
+                .Where(l => l.TransactionDate <= upToDateVal)
+                .ToListAsync();
+
+            // 4. Fetch all StockInwardDetails to resolve Supplier Name and Inward Date
+            var inwardDetails = await _context.StockInwardDetails
+                .Include(d => d.StockInward)
+                    .ThenInclude(si => si!.Supplier)
+                .ToListAsync();
+
+            // Create lookups
+            var inwardDetailsLookup = inwardDetails
+                .GroupBy(d => d.TrackingNo)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var outwardDetailsLookup = outwardDetails
+                .GroupBy(od => od.Barcode)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var ledgerOutwardQtyLookup = ledgers
+                .Where(l => l.OutwardQty > 0)
+                .GroupBy(l => $"{l.TrackingNo}|{l.BatchNo}")
+                .ToDictionary(g => g.Key, g => g.Sum(l => l.OutwardQty));
+
+            var result = new List<BarcodeStockImageReportDto>();
+
+            // Group barcodes by (TrackingNo, BatchNo) to accurately apply the "issued" count for batch barcodes
+            var grouped = barcodes.GroupBy(b => new { b.TrackingNo, b.BatchNo });
+
+            foreach (var grp in grouped)
+            {
+                var trackingNo = grp.Key.TrackingNo;
+                var batchNo = grp.Key.BatchNo;
+                
+                // Get supplier & inward date from inward details lookup
+                string supplierName = "N/A";
+                DateTimeOffset inwardDate = DateTimeOffset.MinValue;
+                if (inwardDetailsLookup.TryGetValue(trackingNo, out var inwardDetail))
+                {
+                    supplierName = inwardDetail.StockInward?.Supplier?.Name ?? "N/A";
+                    inwardDate = inwardDetail.StockInward?.InwardDate ?? inwardDetail.StockInward?.CreatedAt ?? DateTimeOffset.MinValue;
+                }
+
+                // If inward date is after the upToDate filter, skip this group entirely
+                if (inwardDate > upToDateVal) continue;
+
+                var isUnique = grp.First().Type == "Unique";
+
+                if (isUnique)
+                {
+                    // Unique barcodes: check if each barcode is issued on or before upToDateVal
+                    foreach (var b in grp)
+                    {
+                        var isIssued = outwardDetailsLookup.ContainsKey(b.Barcode);
+                        if (!isIssued)
+                        {
+                            var ageDays = (upToDateVal.Date - inwardDate.Date).Days;
+                            result.Add(new BarcodeStockImageReportDto
+                            {
+                                BarcodeNo = b.Barcode,
+                                ItemName = b.Item?.Name ?? "Unknown Item",
+                                ImageUrl = b.ImageUrl,
+                                InwardDate = inwardDate,
+                                SupplierName = supplierName,
+                                StockAgeDays = ageDays >= 0 ? ageDays : 0
+                            });
+                        }
+                    }
+                }
+                else
+                {
+                    // Batch barcodes: use total OutwardQty from StockLedger to determine how many barcodes are issued
+                    var ledgerKey = $"{trackingNo}|{batchNo}";
+                    var outwardQty = ledgerOutwardQtyLookup.TryGetValue(ledgerKey, out var qty) ? qty : 0m;
+                    int issuedCount = (int)Math.Ceiling(outwardQty);
+
+                    int index = 0;
+                    foreach (var b in grp)
+                    {
+                        var isIssued = index < issuedCount;
+                        if (!isIssued)
+                        {
+                            var ageDays = (upToDateVal.Date - inwardDate.Date).Days;
+                            result.Add(new BarcodeStockImageReportDto
+                            {
+                                BarcodeNo = b.Barcode,
+                                ItemName = b.Item?.Name ?? "Unknown Item",
+                                ImageUrl = b.ImageUrl,
+                                InwardDate = inwardDate,
+                                SupplierName = supplierName,
+                                StockAgeDays = ageDays >= 0 ? ageDays : 0
+                            });
+                        }
+                        index++;
+                    }
+                }
+            }
+
+            return Ok(result.OrderBy(r => r.BarcodeNo).ToList());
+        }
     }
 }
