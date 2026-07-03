@@ -435,6 +435,14 @@ namespace InventoryManagement.Api.Controllers
                 var trackingNo = detail.TrackingNo;
                 var stockInwardId = detail.StockInwardId;
 
+                // Check if any barcodes under this tracking number have been issued/outwarded
+                var hasOutward = await _context.StockOutwardDetails.AnyAsync(od => od.TrackingNo == trackingNo);
+                var isAnyBarcodeUsed = await _context.BarcodeMasters.AnyAsync(b => b.TrackingNo == trackingNo && b.IsUsed);
+                if (hasOutward || isAnyBarcodeUsed)
+                {
+                    return BadRequest("Cannot delete this inward line item because some barcodes/units have already been issued in a stock outward transaction. You must first delete the corresponding outward issues.");
+                }
+
                 // 1. Delete associated BarcodeMaster records
                 if (!string.IsNullOrEmpty(trackingNo))
                 {
@@ -506,6 +514,13 @@ namespace InventoryManagement.Api.Controllers
 
                 if (trackingNos.Any())
                 {
+                    // Check if any of these tracking numbers/barcodes have been issued
+                    var hasOutward = await _context.StockOutwardDetails.AnyAsync(od => trackingNos.Contains(od.TrackingNo));
+                    var isAnyBarcodeUsed = await _context.BarcodeMasters.AnyAsync(b => trackingNos.Contains(b.TrackingNo) && b.IsUsed);
+                    if (hasOutward || isAnyBarcodeUsed)
+                    {
+                        return BadRequest("Cannot delete this stock inward invoice because some barcodes/units have already been issued in a stock outward transaction. You must first delete the corresponding outward issues.");
+                    }
                     // 2. Delete associated BarcodeMaster records
                     var barcodes = await _context.BarcodeMasters
                         .Where(b => trackingNos.Contains(b.TrackingNo))
@@ -549,6 +564,13 @@ namespace InventoryManagement.Api.Controllers
                 if (barcode == null)
                 {
                     return NotFound("Barcode record not found.");
+                }
+
+                // Check if this specific barcode has been issued
+                var hasOutward = await _context.StockOutwardDetails.AnyAsync(od => od.Barcode == barcode.Barcode);
+                if (barcode.IsUsed || hasOutward)
+                {
+                    return BadRequest("Cannot delete this barcode because it has already been issued in a stock outward transaction. You must first delete the corresponding outward issues.");
                 }
 
                 var trackingNo = barcode.TrackingNo;
