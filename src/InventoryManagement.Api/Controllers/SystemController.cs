@@ -33,28 +33,28 @@ namespace InventoryManagement.Api.Controllers
                 // Delete in order to satisfy foreign keys / relationships
                 
                 // 1. Delete StockOutwardDetails
-                await _context.Database.ExecuteSqlRawAsync("DELETE FROM StockOutwardDetails");
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"StockOutwardDetails\"");
                 
                 // 2. Delete StockOutwards
-                await _context.Database.ExecuteSqlRawAsync("DELETE FROM StockOutwards");
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"StockOutwards\"");
                 
                 // 3. Delete StockInwardDetails
-                await _context.Database.ExecuteSqlRawAsync("DELETE FROM StockInwardDetails");
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"StockInwardDetails\"");
                 
                 // 4. Delete StockInwards
-                await _context.Database.ExecuteSqlRawAsync("DELETE FROM StockInwards");
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"StockInwards\"");
                 
                 // 5. Delete BarcodeMasters
-                await _context.Database.ExecuteSqlRawAsync("DELETE FROM BarcodeMasters");
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"BarcodeMasters\"");
                 
                 // 6. Delete QRCodeMasters
-                await _context.Database.ExecuteSqlRawAsync("DELETE FROM QRCodeMasters");
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"QRCodeMasters\"");
                 
                 // 7. Delete StockLedgers
-                await _context.Database.ExecuteSqlRawAsync("DELETE FROM StockLedgers");
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"StockLedgers\"");
 
                 // 8. Delete AuditLogs
-                await _context.Database.ExecuteSqlRawAsync("DELETE FROM AuditLogs");
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"AuditLogs\"");
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
