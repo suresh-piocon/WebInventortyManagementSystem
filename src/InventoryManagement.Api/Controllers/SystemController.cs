@@ -35,23 +35,23 @@ namespace InventoryManagement.Api.Controllers
                 // 1. Delete StockOutwardDetails
                 await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"StockOutwardDetails\"");
                 
-                // 2. Delete StockOutwards
-                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"StockOutwards\"");
+                // 2. Delete StockOutwards (is StockOutward singular)
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"StockOutward\"");
                 
                 // 3. Delete StockInwardDetails
                 await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"StockInwardDetails\"");
                 
-                // 4. Delete StockInwards
-                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"StockInwards\"");
+                // 4. Delete StockInwards (is StockInward singular)
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"StockInward\"");
                 
-                // 5. Delete BarcodeMasters
-                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"BarcodeMasters\"");
+                // 5. Delete BarcodeMasters (is BarcodeMaster singular)
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"BarcodeMaster\"");
                 
-                // 6. Delete QRCodeMasters
-                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"QRCodeMasters\"");
+                // 6. Delete QRCodeMasters (is QRCodeMaster singular)
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"QRCodeMaster\"");
                 
-                // 7. Delete StockLedgers
-                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"StockLedgers\"");
+                // 7. Delete StockLedgers (is StockLedger singular)
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"StockLedger\"");
 
                 // 8. Delete AuditLogs
                 await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"AuditLogs\"");
