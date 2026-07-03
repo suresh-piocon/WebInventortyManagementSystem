@@ -144,14 +144,30 @@ namespace InventoryManagement.Api.Controllers
         // SUPPLIER WISE STOCK REPORT
         // ==========================================
         [HttpGet("supplier-stock")]
-        public async Task<IActionResult> GetSupplierStockReport([FromQuery] string valuationMethod = "WeightedAverage")
+        public async Task<IActionResult> GetSupplierStockReport(
+            [FromQuery] string valuationMethod = "WeightedAverage",
+            [FromQuery] DateTimeOffset? upToDate = null)
         {
+            // Compute end-of-day cutoff for the selected date
+            DateTimeOffset? cutoff = null;
+            if (upToDate.HasValue)
+            {
+                var endOfDay = upToDate.Value.ToUniversalTime().Date.AddDays(1).AddTicks(-1);
+                cutoff = new DateTimeOffset(endOfDay, TimeSpan.Zero);
+            }
+
             // Join StockInwardDetails to retrieve tracking image and original purchase cost
-            var inwardDetails = await _context.StockInwardDetails
+            var inwardQuery = _context.StockInwardDetails
                 .Include(d => d.StockInward)
                     .ThenInclude(si => si!.Supplier)
                 .Include(d => d.Item)
-                .ToListAsync();
+                .AsQueryable();
+
+            // Filter inward records up to date
+            if (cutoff.HasValue)
+                inwardQuery = inwardQuery.Where(d => d.StockInward!.InwardDate <= cutoff.Value);
+
+            var inwardDetails = await inwardQuery.ToListAsync();
 
             var report = new List<SupplierStockReportDto>();
 
@@ -165,10 +181,14 @@ namespace InventoryManagement.Api.Controllers
                 // Total inward qty for this batch/tracking
                 var totalIn = detail.Quantity;
 
-                // Sum outward qty in stock ledger matching this tracking number
-                var totalOut = await _context.StockLedgers
-                    .Where(l => l.ItemId == itemId && l.TrackingNo == trackingNo && l.BatchNo == batchNo)
-                    .SumAsync(l => l.OutwardQty);
+                // Sum outward qty scoped up to the cutoff date
+                var outwardQuery = _context.StockLedgers
+                    .Where(l => l.ItemId == itemId && l.TrackingNo == trackingNo && l.BatchNo == batchNo);
+
+                if (cutoff.HasValue)
+                    outwardQuery = outwardQuery.Where(l => l.TransactionDate <= cutoff.Value);
+
+                var totalOut = await outwardQuery.SumAsync(l => l.OutwardQty);
 
                 var balance = totalIn - totalOut;
 
@@ -203,6 +223,7 @@ namespace InventoryManagement.Api.Controllers
 
             return Ok(report);
         }
+
 
         // ==========================================
         // SUPPLIER PURCHASE REPORT (DATE WISE)
@@ -566,9 +587,12 @@ namespace InventoryManagement.Api.Controllers
         // EXPORT TO EXCEL / CSV
         // ==========================================
         [HttpGet("export/supplier-stock")]
-        public async Task<IActionResult> ExportSupplierStock([FromQuery] string format, [FromQuery] string valuationMethod = "WeightedAverage")
+        public async Task<IActionResult> ExportSupplierStock(
+            [FromQuery] string format,
+            [FromQuery] string valuationMethod = "WeightedAverage",
+            [FromQuery] DateTimeOffset? upToDate = null)
         {
-            var res = await GetSupplierStockReport(valuationMethod);
+            var res = await GetSupplierStockReport(valuationMethod, upToDate);
             if (res is OkObjectResult okResult && okResult.Value is List<SupplierStockReportDto> list)
             {
                 var headers = new[] { "Supplier", "Item Code", "Item Name", "Batch No", "Tracking No", "Inward Qty", "Outward Qty", "Balance Qty", "Unit Cost", "Total Value" };
@@ -591,6 +615,7 @@ namespace InventoryManagement.Api.Controllers
             }
             return BadRequest("Error retrieving report data.");
         }
+
 
         [HttpGet("export/supplier-purchase")]
         public async Task<IActionResult> ExportSupplierPurchase([FromQuery] string format, [FromQuery] DateTimeOffset? startDate, [FromQuery] DateTimeOffset? endDate)

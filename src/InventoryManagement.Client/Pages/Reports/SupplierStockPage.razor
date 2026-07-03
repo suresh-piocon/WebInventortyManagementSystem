@@ -7,71 +7,173 @@
 <PageTitle>Supplier Stock Report - AG Inventory</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
-    <div class="d-flex justify-between align-center mb-6">
-        <div>
-            <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
-                Supplier Stock Report
-            </MudText>
-            <MudText Typo="Typo.body2" Class="text-slate-400">
-                View current stock balances grouped by supplier, batch codes, and tracking numbers
-            </MudText>
-        </div>
-        <div class="d-flex align-center gap-2">
-            <MudSelect T="string" Label="Valuation Mode" Value="@_valuationMethod" ValueChanged="OnValuationChanged" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 200px; color: white;">
-                <MudSelectItem Value="@("WeightedAverage")">Weighted Average</MudSelectItem>
-                <MudSelectItem Value="@("FIFO")">FIFO Method</MudSelectItem>
-            </MudSelect>
-            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Primary" OnClick="LoadReport" />
-        </div>
+
+    <!-- Page Header -->
+    <div class="mb-6">
+        <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+            Supplier Stock Report
+        </MudText>
+        <MudText Typo="Typo.body2" Class="text-slate-400">
+            View stock balances grouped by supplier, batch codes, and tracking numbers — with optional as-of-date snapshot
+        </MudText>
     </div>
 
-    <MudTable Items="@_reportLines" 
-              Hover="true" 
-              Loading="@_loading" 
-              SearchString="@_searchString" 
-              Filter="new Func<SupplierStockReportDto, bool>(FilterFunc)"
-              Class="glass-panel text-slate-200">
-        <ToolBarContent>
-            <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">Stock Ledger Balances</MudText>
-            <MudSpacer />
-            
-            <MudCheckBox T="bool" 
-                         Value="@_showBarcodeDetails" 
-                         ValueChanged="OnShowBarcodeDetailsChanged" 
-                         Label="Show Detailed Barcode Info (In/Out with Photos)" 
-                         Color="Color.Primary" 
-                         Class="mt-0 mr-4 text-slate-200" />
-            
-            <MudTextField @bind-Value="_searchString" 
-                          Placeholder="Search by item, supplier, batch..." 
-                          Adornment="Adornment.Start" 
-                          AdornmentIcon="@Icons.Material.Filled.Search" 
-                          IconSize="Size.Medium" 
-                          Class="mt-0 mr-4 text-slate-200" 
-                          Style="color: white;"/>
+    <!-- Filter Panel -->
+    <MudPaper Class="glass-panel pa-6 mb-4">
+        <MudGrid Spacing="3">
+            <!-- Valuation Method -->
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="string"
+                           Label="Valuation Mode"
+                           Value="@_valuationMethod"
+                           ValueChanged="OnValuationChanged"
+                           Variant="Variant.Outlined"
+                           Class="text-slate-200">
+                    <MudSelectItem Value="@("WeightedAverage")">Weighted Average</MudSelectItem>
+                    <MudSelectItem Value="@("FIFO")">FIFO Method</MudSelectItem>
+                </MudSelect>
+            </MudItem>
 
-            <MudMenu StartIcon="@Icons.Material.Filled.Download" Label="Export Data" Color="Color.Secondary" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.KeyboardArrowDown">
+            <!-- Up To Date Picker -->
+            <MudItem xs="12" sm="6" md="3">
+                <MudDatePicker Label="Up To Date (Stock Snapshot)"
+                               Date="@_upToDate"
+                               DateChanged="OnUpToDateChanged"
+                               Variant="Variant.Outlined"
+                               Placeholder="Current stock (no filter)"
+                               Clearable="true"
+                               Class="text-slate-200" />
+            </MudItem>
+
+            <!-- Search -->
+            <MudItem xs="12" sm="6" md="4">
+                <MudTextField @bind-Value="_searchString"
+                              Label="Search by item, supplier, batch, tracking..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Variant="Variant.Outlined"
+                              Immediate="true"
+                              Class="text-slate-200" />
+            </MudItem>
+
+            <!-- Refresh + Active filter chip -->
+            <MudItem xs="12" sm="6" md="2" Class="d-flex align-center gap-2">
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                               Color="Color.Primary"
+                               OnClick="LoadReport"
+                               Disabled="@_loading"
+                               Title="Refresh" />
+                @if (_upToDate.HasValue)
+                {
+                    <MudChip T="string" Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.CalendarToday">
+                        @_upToDate.Value.ToString("dd MMM yyyy")
+                    </MudChip>
+                }
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <!-- Summary Cards -->
+    @if (_reportLines.Any())
+    {
+        <MudGrid Spacing="3" Class="mb-4">
+            <MudItem xs="6" sm="3">
+                <MudPaper Class="glass-panel pa-4 d-flex align-center gap-3" Style="border-left: 3px solid #22c55e;">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Style="color:#22c55e;font-size:2rem;" />
+                    <div>
+                        <MudText Typo="Typo.caption" Class="text-slate-400">Total Inward</MudText>
+                        <MudText Typo="Typo.h6" Class="text-green-400 font-weight-bold">
+                            @_reportLines.Sum(r => r.InwardQty).ToString("N2")
+                        </MudText>
+                    </div>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudPaper Class="glass-panel pa-4 d-flex align-center gap-3" Style="border-left: 3px solid #ef4444;">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Style="color:#ef4444;font-size:2rem;" />
+                    <div>
+                        <MudText Typo="Typo.caption" Class="text-slate-400">Total Outward</MudText>
+                        <MudText Typo="Typo.h6" Class="text-red-400 font-weight-bold">
+                            @_reportLines.Sum(r => r.OutwardQty).ToString("N2")
+                        </MudText>
+                    </div>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudPaper Class="glass-panel pa-4 d-flex align-center gap-3" Style="border-left: 3px solid #eab308;">
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory2" Style="color:#eab308;font-size:2rem;" />
+                    <div>
+                        <MudText Typo="Typo.caption" Class="text-slate-400">Balance Qty</MudText>
+                        <MudText Typo="Typo.h6" Class="text-yellow-400 font-weight-bold">
+                            @_reportLines.Sum(r => r.BalanceQty).ToString("N2")
+                        </MudText>
+                    </div>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudPaper Class="glass-panel pa-4 d-flex align-center gap-3" Style="border-left: 3px solid #6366f1;">
+                    <MudIcon Icon="@Icons.Material.Filled.CurrencyRupee" Style="color:#818cf8;font-size:2rem;" />
+                    <div>
+                        <MudText Typo="Typo.caption" Class="text-slate-400">Stock Value</MudText>
+                        <MudText Typo="Typo.h6" Class="text-slate-100 font-weight-bold">
+                            ₹@_reportLines.Sum(r => r.Value).ToString("N2")
+                        </MudText>
+                    </div>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+
+    <!-- Main Stock Table -->
+    <MudTable Items="@FilteredLines"
+              Hover="true"
+              Loading="@_loading"
+              Class="glass-panel text-slate-200"
+              Dense="true"
+              Striped="true">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">
+                <MudIcon Icon="@Icons.Material.Filled.Storefront" Class="mr-2" />
+                Supplier Stock Balances
+                @if (_upToDate.HasValue)
+                {
+                    <span class="text-slate-400" style="font-size:13px;font-weight:400;">
+                        — as of @_upToDate.Value.ToString("dd MMM yyyy")
+                    </span>
+                }
+            </MudText>
+            <MudSpacer />
+            <MudChip T="string" Color="Color.Default" Size="Size.Small" Class="mr-3">
+                @FilteredLines.Count() Rows
+            </MudChip>
+            <MudMenu StartIcon="@Icons.Material.Filled.Download"
+                     Label="Export"
+                     Color="Color.Secondary"
+                     Variant="Variant.Filled"
+                     EndIcon="@Icons.Material.Filled.KeyboardArrowDown">
                 <MudMenuItem OnClick="@(() => ExportFile("excel"))" Icon="@Icons.Custom.FileFormats.FileExcel" IconColor="Color.Success">Excel (.xlsx)</MudMenuItem>
                 <MudMenuItem OnClick="@(() => ExportFile("csv"))" Icon="@Icons.Material.Filled.TextSnippet" IconColor="Color.Info">CSV (.csv)</MudMenuItem>
             </MudMenu>
         </ToolBarContent>
         <HeaderContent>
-            <MudTh Style="color: #94A3B8; text-align: center; width: 60px;">Photo</MudTh>
-            <MudTh Style="color: #94A3B8;">Supplier</MudTh>
-            <MudTh Style="color: #94A3B8;">Item Name</MudTh>
-            <MudTh Style="color: #94A3B8;">Batch No</MudTh>
-            <MudTh Style="color: #94A3B8;">Tracking No</MudTh>
-            <MudTh Style="color: #94A3B8; text-align: right;">Inward Qty</MudTh>
-            <MudTh Style="color: #94A3B8; text-align: right;">Outward Qty</MudTh>
-            <MudTh Style="color: #94A3B8; text-align: right;">Balance Qty</MudTh>
-            <MudTh Style="color: #94A3B8; text-align: right;">Unit Cost</MudTh>
-            <MudTh Style="color: #94A3B8; text-align: right;">Total Value</MudTh>
+            <MudTh Style="color:#94A3B8;text-align:center;width:56px;">Photo</MudTh>
+            <MudTh Style="color:#94A3B8;">Supplier</MudTh>
+            <MudTh Style="color:#94A3B8;">Item</MudTh>
+            <MudTh Style="color:#94A3B8;">Batch No</MudTh>
+            <MudTh Style="color:#94A3B8;">Tracking No</MudTh>
+            <MudTh Style="color:#94A3B8;text-align:right;">Inward Qty</MudTh>
+            <MudTh Style="color:#94A3B8;text-align:right;">Outward Qty</MudTh>
+            <MudTh Style="color:#94A3B8;text-align:right;">Balance Qty</MudTh>
+            <MudTh Style="color:#94A3B8;text-align:right;">Unit Cost</MudTh>
+            <MudTh Style="color:#94A3B8;text-align:right;">Total Value</MudTh>
         </HeaderContent>
         <RowTemplate>
-            <MudTd DataLabel="Photo" Style="text-align: center;">
+            <MudTd DataLabel="Photo" Style="text-align:center;">
                 @if (!string.IsNullOrEmpty(context.ImageUrl))
                 {
-                    <img src="@context.ImageUrl" style="width: 38px; height: 38px; border-radius: 4px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewLoadedImage(context.ImageUrl))" />
+                    <img src="@GetAbsoluteImageUrl(context.ImageUrl)"
+                         style="width:38px;height:38px;border-radius:5px;object-fit:cover;border:1px solid #5C5CFF;cursor:pointer;"
+                         @onclick="@(() => PreviewImage(context.ImageUrl))" />
                 }
                 else
                 {
@@ -79,98 +181,197 @@
                 }
             </MudTd>
             <MudTd DataLabel="Supplier" Class="text-slate-200">@context.SupplierName</MudTd>
-            <MudTd DataLabel="Item Name" Class="text-slate-100 font-weight-bold">
-                @context.ItemName <br/>
-                <span class="text-slate-400 font-mono" style="font-size: 11px;">@context.ItemCode</span>
+            <MudTd DataLabel="Item">
+                <div class="text-slate-100 font-weight-bold" style="font-size:13px;">@context.ItemName</div>
+                <div class="text-slate-500 font-mono" style="font-size:10px;">@context.ItemCode</div>
             </MudTd>
             <MudTd DataLabel="Batch No" Class="text-slate-200">@context.BatchNo</MudTd>
-            <MudTd DataLabel="Tracking No" Class="text-slate-300 font-mono" Style="font-size: 12px;">@context.TrackingNo</MudTd>
-            <MudTd DataLabel="Inward Qty" Style="text-align: right;" Class="text-slate-300">@context.InwardQty.ToString("N2")</MudTd>
-            <MudTd DataLabel="Outward Qty" Style="text-align: right;" Class="text-slate-300">@context.OutwardQty.ToString("N2")</MudTd>
-            <MudTd DataLabel="Balance Qty" Style="text-align: right;" Class="text-yellow-500 font-weight-bold">@context.BalanceQty.ToString("N2")</MudTd>
-            <MudTd DataLabel="Unit Cost" Style="text-align: right;" Class="text-slate-300">₹@context.UnitCost.ToString("N4")</MudTd>
-            <MudTd DataLabel="Total Value" Style="text-align: right;" Class="text-slate-100 font-weight-bold">₹@context.Value.ToString("N2")</MudTd>
+            <MudTd DataLabel="Tracking No" Class="text-slate-300 font-mono" Style="font-size:12px;">@context.TrackingNo</MudTd>
+            <MudTd DataLabel="Inward Qty" Style="text-align:right;" Class="text-slate-300">@context.InwardQty.ToString("N2")</MudTd>
+            <MudTd DataLabel="Outward Qty" Style="text-align:right;" Class="text-slate-300">@context.OutwardQty.ToString("N2")</MudTd>
+            <MudTd DataLabel="Balance Qty" Style="text-align:right;" Class="text-yellow-400 font-weight-bold">@context.BalanceQty.ToString("N2")</MudTd>
+            <MudTd DataLabel="Unit Cost" Style="text-align:right;" Class="text-slate-300">₹@context.UnitCost.ToString("N4")</MudTd>
+            <MudTd DataLabel="Total Value" Style="text-align:right;" Class="text-slate-100 font-weight-bold">₹@context.Value.ToString("N2")</MudTd>
         </RowTemplate>
         <PagerContent>
             <MudTablePager />
         </PagerContent>
+        <NoRecordsContent>
+            <MudText Class="text-slate-400 pa-6">
+                @(_loading ? "Loading..." : "No stock records found. Try clearing the date filter.")
+            </MudText>
+        </NoRecordsContent>
     </MudTable>
 
-    @if (_showBarcodeDetails)
-    {
-        <MudTable id="barcode-table-container"
-                  Items="@_barcodeDetails" 
-                  Hover="true" 
-                  Loading="@_loadingBarcodes" 
-                  Class="glass-panel text-slate-200 mt-6">
-            <ToolBarContent>
-                <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">
-                    <MudIcon Icon="@Icons.Material.Filled.QrCode" Class="mr-2 text-cyan" /> Detailed Barcode In/Out Logs
-                </MudText>
-                <MudSpacer />
-                <MudMenu StartIcon="@Icons.Material.Filled.Download" Label="Export Barcodes" Color="Color.Info" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Class="mr-2">
-                    <MudMenuItem OnClick="ExportBarcodesExcel" Icon="@Icons.Custom.FileFormats.FileExcel" IconColor="Color.Success">Excel (.xlsx)</MudMenuItem>
-                    <MudMenuItem OnClick="ExportBarcodesCsv" Icon="@Icons.Material.Filled.TextSnippet" IconColor="Color.Info">CSV (.csv)</MudMenuItem>
-                    <MudMenuItem OnClick="ExportBarcodesPdf" Icon="@Icons.Material.Filled.PictureAsPdf" IconColor="Color.Error">PDF Report (.pdf)</MudMenuItem>
-                </MudMenu>
-            </ToolBarContent>
-            <HeaderContent>
-                <MudTh Style="color: #94A3B8; text-align: center; width: 60px;">Photo</MudTh>
-                <MudTh Style="color: #94A3B8;">Item Name</MudTh>
-                <MudTh Style="color: #94A3B8;">Barcode No</MudTh>
-                <MudTh Style="color: #94A3B8;">Batch No</MudTh>
-                <MudTh Style="color: #94A3B8;">Tracking No</MudTh>
-                <MudTh Style="color: #94A3B8;">Type</MudTh>
-                <MudTh Style="color: #94A3B8;">Inward Date</MudTh>
-                <MudTh Style="color: #94A3B8;">Outward Date</MudTh>
-                <MudTh Style="color: #94A3B8;">Status</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd Style="text-align: center;">
-                    @if (!string.IsNullOrEmpty(context.ImageUrl))
+    <!-- ============================================================ -->
+    <!-- BARCODE DETAIL PANEL -->
+    <!-- ============================================================ -->
+    <MudPaper Class="glass-panel pa-6 mt-4">
+        <div class="d-flex align-center justify-between mb-4">
+            <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">
+                <MudIcon Icon="@Icons.Material.Filled.QrCode" Class="mr-2 text-cyan" />
+                Detailed Barcode Info (In/Out with Photos)
+            </MudText>
+            <MudSwitch T="bool"
+                       Value="@_showBarcodeDetails"
+                       ValueChanged="OnShowBarcodeDetailsChanged"
+                       Color="Color.Info"
+                       Label="@(_showBarcodeDetails ? "Visible" : "Show")"
+                       Class="text-slate-200" />
+        </div>
+
+        @if (_showBarcodeDetails)
+        {
+            <!-- Barcode Date Filters -->
+            <MudGrid Spacing="2" Class="mb-4">
+                <MudItem xs="12" sm="4" md="3">
+                    <MudDatePicker Label="From Date"
+                                   Date="@_barcodeFromDate"
+                                   DateChanged="OnBarcodeFromDateChanged"
+                                   Variant="Variant.Outlined"
+                                   Placeholder="All dates"
+                                   Clearable="true"
+                                   Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="4" md="3">
+                    <MudDatePicker Label="To Date"
+                                   Date="@_barcodeToDate"
+                                   DateChanged="OnBarcodeToDateChanged"
+                                   Variant="Variant.Outlined"
+                                   Placeholder="All dates"
+                                   Clearable="true"
+                                   Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="4" md="3" Class="d-flex align-center gap-2">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Info"
+                               StartIcon="@Icons.Material.Filled.FilterAlt"
+                               OnClick="LoadBarcodeDetails"
+                               Disabled="@_loadingBarcodes"
+                               Size="Size.Medium">
+                        Apply Filter
+                    </MudButton>
+                    @if (_barcodeFromDate.HasValue || _barcodeToDate.HasValue)
                     {
-                        <img src="@context.ImageUrl" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewLoadedImage(context.ImageUrl))" />
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Default"
+                                   OnClick="ClearBarcodeDateFilter"
+                                   Size="Size.Medium">
+                            Clear
+                        </MudButton>
                     }
-                    else
-                    {
-                        <MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Color="Color.Dark" />
-                    }
-                </MudTd>
-                <MudTd DataLabel="Item Name" Class="text-slate-100 font-weight-bold">@context.ItemName</MudTd>
-                <MudTd DataLabel="Barcode No" Class="text-slate-200 font-mono">@context.BarcodeNo</MudTd>
-                <MudTd DataLabel="Batch No" Class="text-slate-300">@context.BatchNo</MudTd>
-                <MudTd DataLabel="Tracking No" Class="text-slate-400 font-mono" Style="font-size: 11px;">@context.TrackingNo</MudTd>
-                <MudTd DataLabel="Type">
-                    <MudChip T="string" Color="Color.Default" Size="Size.Small">@context.Type</MudChip>
-                </MudTd>
-                <MudTd DataLabel="Inward Date" Class="text-slate-300">@context.InwardDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</MudTd>
-                <MudTd DataLabel="Outward Date" Class="text-slate-300">
-                    @(context.OutwardDate.HasValue ? context.OutwardDate.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm") : "-")
-                </MudTd>
-                <MudTd DataLabel="Status">
-                    @if (context.Status == "Issued")
-                    {
-                        <MudChip T="string" Color="Color.Error" Size="Size.Small">Issued</MudChip>
-                    }
-                    else
-                    {
-                        <MudChip T="string" Color="Color.Success" Size="Size.Small">In Stock</MudChip>
-                    }
-                </MudTd>
-            </RowTemplate>
-            <PagerContent>
-                <MudTablePager />
-            </PagerContent>
-        </MudTable>
-    }
+                </MudItem>
+                <MudItem xs="12" sm="12" md="3" Class="d-flex align-center justify-end">
+                    <MudMenu StartIcon="@Icons.Material.Filled.Download"
+                             Label="Export Barcodes"
+                             Color="Color.Info"
+                             Variant="Variant.Filled"
+                             EndIcon="@Icons.Material.Filled.KeyboardArrowDown">
+                        <MudMenuItem OnClick="ExportBarcodesExcel" Icon="@Icons.Custom.FileFormats.FileExcel" IconColor="Color.Success">Excel (.xls)</MudMenuItem>
+                        <MudMenuItem OnClick="ExportBarcodesCsv" Icon="@Icons.Material.Filled.TextSnippet" IconColor="Color.Info">CSV (.csv)</MudMenuItem>
+                        <MudMenuItem OnClick="ExportBarcodesPdf" Icon="@Icons.Material.Filled.PictureAsPdf" IconColor="Color.Error">PDF Print</MudMenuItem>
+                    </MudMenu>
+                </MudItem>
+            </MudGrid>
+
+            <MudTable id="barcode-table-container"
+                      Items="@_barcodeDetails"
+                      Hover="true"
+                      Loading="@_loadingBarcodes"
+                      Dense="true"
+                      Class="text-slate-200"
+                      Style="background:transparent;">
+                <HeaderContent>
+                    <MudTh Style="color:#94A3B8;text-align:center;width:60px;">Photo</MudTh>
+                    <MudTh Style="color:#94A3B8;">Item Name</MudTh>
+                    <MudTh Style="color:#94A3B8;">Barcode No</MudTh>
+                    <MudTh Style="color:#94A3B8;">Batch No</MudTh>
+                    <MudTh Style="color:#94A3B8;">Tracking No</MudTh>
+                    <MudTh Style="color:#94A3B8;">Type</MudTh>
+                    <MudTh Style="color:#94A3B8;">Inward Date</MudTh>
+                    <MudTh Style="color:#94A3B8;">Outward Date</MudTh>
+                    <MudTh Style="color:#94A3B8;">Status</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd Style="text-align:center;">
+                        @if (!string.IsNullOrEmpty(context.ImageUrl))
+                        {
+                            <img src="@GetAbsoluteImageUrl(context.ImageUrl)"
+                                 style="width:44px;height:44px;border-radius:6px;object-fit:cover;border:1px solid #5C5CFF;cursor:pointer;"
+                                 @onclick="@(() => PreviewImage(context.ImageUrl))" />
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Color="Color.Dark" />
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Item Name" Class="text-slate-100 font-weight-bold">@context.ItemName</MudTd>
+                    <MudTd DataLabel="Barcode No" Class="text-slate-200 font-mono">@context.BarcodeNo</MudTd>
+                    <MudTd DataLabel="Batch No" Class="text-slate-300">@context.BatchNo</MudTd>
+                    <MudTd DataLabel="Tracking No" Class="text-slate-400 font-mono" Style="font-size:11px;">@context.TrackingNo</MudTd>
+                    <MudTd DataLabel="Type">
+                        <MudChip T="string" Color="Color.Default" Size="Size.Small">@context.Type</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Inward Date" Class="text-slate-300">
+                        @context.InwardDate.LocalDateTime.ToString("dd-MM-yyyy HH:mm")
+                    </MudTd>
+                    <MudTd DataLabel="Outward Date" Class="text-slate-300">
+                        @(context.OutwardDate.HasValue ? context.OutwardDate.Value.LocalDateTime.ToString("dd-MM-yyyy HH:mm") : "-")
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        @if (context.Status == "Issued")
+                        {
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small">Issued</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">In Stock</MudChip>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+                <NoRecordsContent>
+                    <MudText Class="text-slate-400 pa-4">
+                        No barcode records found for the selected filters.
+                    </MudText>
+                </NoRecordsContent>
+            </MudTable>
+        }
+    </MudPaper>
+
 </MudContainer>
 
 @code {
+    // ── Main report state ─────────────────────────────────────────
     private List<SupplierStockReportDto> _reportLines = new();
     private bool _loading = true;
-    private string _searchString = "";
+    private string _searchString = string.Empty;
     private string _valuationMethod = "WeightedAverage";
 
+    // ── Up-to-date filter ─────────────────────────────────────────
+    private DateTime? _upToDate = null;
+
+    // ── Barcode detail panel ──────────────────────────────────────
+    private bool _showBarcodeDetails = false;
+    private List<BarcodeDetailReportDto> _barcodeDetails = new();
+    private bool _loadingBarcodes = false;
+    private DateTime? _barcodeFromDate = null;
+    private DateTime? _barcodeToDate = null;
+
+    // ── Filtered rows ─────────────────────────────────────────────
+    private IEnumerable<SupplierStockReportDto> FilteredLines =>
+        string.IsNullOrWhiteSpace(_searchString)
+            ? _reportLines
+            : _reportLines.Where(r =>
+                r.ItemName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+                r.ItemCode.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+                r.SupplierName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+                r.BatchNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+                r.TrackingNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+
+    // ─────────────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
         await LoadReport();
@@ -182,35 +383,26 @@
         await LoadReport();
     }
 
+    private async Task OnUpToDateChanged(DateTime? date)
+    {
+        _upToDate = date;
+        await LoadReport();
+    }
+
     private async Task LoadReport()
     {
         _loading = true;
         StateHasChanged();
         try
         {
-            _reportLines = await Http.GetFromJsonAsync<List<SupplierStockReportDto>>($"api/reports/supplier-stock?valuationMethod={_valuationMethod}") ?? new();
-            
-            // Load images in background via proxy (all image types)
-            foreach (var line in _reportLines)
-            {
-                if (!string.IsNullOrEmpty(line.ImageUrl))
-                {
-                    var capturedLine = line;
-                    _ = Task.Run(async () => {
-                        var base64Url = await ImageLoader.LoadImageAsBase64Async(capturedLine.ImageUrl);
-                        if (!string.IsNullOrEmpty(base64Url))
-                        {
-                            capturedLine.ImageUrl = base64Url;
-                            await InvokeAsync(StateHasChanged);
-                        }
-                    });
-                }
-            }
+            var url = $"api/reports/supplier-stock?valuationMethod={_valuationMethod}";
+            if (_upToDate.HasValue)
+                url += $"&upToDate={Uri.EscapeDataString(_upToDate.Value.ToString("yyyy-MM-dd"))}";
+
+            _reportLines = await Http.GetFromJsonAsync<List<SupplierStockReportDto>>(url) ?? new();
 
             if (_showBarcodeDetails)
-            {
                 await LoadBarcodeDetails();
-            }
         }
         catch (Exception ex)
         {
@@ -223,17 +415,22 @@
         }
     }
 
-    private bool _showBarcodeDetails = false;
-    private List<BarcodeDetailReportDto> _barcodeDetails = new();
-    private bool _loadingBarcodes = false;
-
+    // ── Barcode detail panel ──────────────────────────────────────
     private async Task OnShowBarcodeDetailsChanged(bool val)
     {
         _showBarcodeDetails = val;
         if (_showBarcodeDetails)
-        {
             await LoadBarcodeDetails();
-        }
+    }
+
+    private void OnBarcodeFromDateChanged(DateTime? date) => _barcodeFromDate = date;
+    private void OnBarcodeToDateChanged(DateTime? date)  => _barcodeToDate   = date;
+
+    private async Task ClearBarcodeDateFilter()
+    {
+        _barcodeFromDate = null;
+        _barcodeToDate   = null;
+        await LoadBarcodeDetails();
     }
 
     private async Task LoadBarcodeDetails()
@@ -244,24 +441,32 @@
         try
         {
             _barcodeDetails.Clear();
-            var batchTrackings = _reportLines
-                .Select(l => new { l.BatchNo, l.TrackingNo })
+
+            var combos = _reportLines
+                .Select(r => (r.BatchNo, r.TrackingNo))
                 .Distinct()
                 .ToList();
 
-            foreach (var bt in batchTrackings)
+            foreach (var (batchNo, trackingNo) in combos)
             {
-                var details = await LoadBarcodeDetailsAsync(bt.BatchNo, bt.TrackingNo);
-                if (details != null && details.Any())
+                var url = BuildBarcodeDetailUrl(batchNo, trackingNo, _barcodeFromDate, _barcodeToDate);
+                try
                 {
-                    foreach (var d in details)
+                    var response = await Http.GetAsync(url);
+                    if (response.IsSuccessStatusCode)
                     {
-                        if (!_barcodeDetails.Any(b => b.BarcodeNo == d.BarcodeNo))
+                        var details = await response.Content.ReadFromJsonAsync<List<BarcodeDetailReportDto>>();
+                        if (details != null)
                         {
-                            _barcodeDetails.Add(d);
+                            foreach (var d in details)
+                            {
+                                if (!_barcodeDetails.Any(b => b.BarcodeNo == d.BarcodeNo))
+                                    _barcodeDetails.Add(d);
+                            }
                         }
                     }
                 }
+                catch { /* skip individual fetch failure */ }
             }
         }
         catch (Exception ex)
@@ -275,116 +480,30 @@
         }
     }
 
-    private async Task<List<BarcodeDetailReportDto>> LoadBarcodeDetailsAsync(string? batchNo, string? trackingNo)
+    private static string BuildBarcodeDetailUrl(string batchNo, string trackingNo, DateTime? fromDate, DateTime? toDate)
     {
-        try
-        {
-            var response = await Http.GetAsync($"api/reports/barcodes/detail?batchNo={Uri.EscapeDataString(batchNo ?? "")}&trackingNo={Uri.EscapeDataString(trackingNo ?? "")}");
-            if (response.IsSuccessStatusCode)
-            {
-                var details = await response.Content.ReadFromJsonAsync<List<BarcodeDetailReportDto>>();
-                if (details != null)
-                {
-                    foreach (var d in details)
-                    {
-                        if (!string.IsNullOrEmpty(d.ImageUrl))
-                        {
-                            var capturedD = d;
-                            _ = Task.Run(async () => {
-                                var base64 = await ImageLoader.LoadImageAsBase64Async(capturedD.ImageUrl);
-                                if (!string.IsNullOrEmpty(base64))
-                                {
-                                    capturedD.ImageUrl = base64;
-                                    await InvokeAsync(StateHasChanged);
-                                }
-                            });
-                        }
-                    }
-                    return details;
-                }
-            }
-        }
-        catch
-        {
-            // Fallback
-        }
-
-        try
-        {
-            var code = !string.IsNullOrEmpty(trackingNo) ? trackingNo : batchNo;
-            if (!string.IsNullOrEmpty(code))
-            {
-                var response = await Http.GetAsync($"api/reports/barcode-tracking/{Uri.EscapeDataString(code)}");
-                if (response.IsSuccessStatusCode)
-                {
-                    var tracking = await response.Content.ReadFromJsonAsync<BarcodeTrackingReportDto>();
-                    if (tracking != null)
-                    {
-                        var list = new List<BarcodeDetailReportDto>();
-                        foreach (var bc in tracking.RegisteredBarcodes)
-                        {
-                            var isUnique = tracking.RegisteredBarcodes.Count > 1;
-                            var issue = tracking.Issues.FirstOrDefault();
-                            
-                            var item = new BarcodeDetailReportDto
-                            {
-                                ItemName = tracking.ItemName,
-                                BarcodeNo = bc,
-                                BatchNo = tracking.BatchNo,
-                                TrackingNo = tracking.TrackingNo,
-                                Type = isUnique ? "Unique" : "Batch",
-                                InwardDate = tracking.InwardDate,
-                                OutwardDate = issue?.OutwardDate,
-                                Status = issue != null ? "Issued" : "In Stock",
-                                ImageUrl = tracking.PhotoUrl
-                            };
-                            
-                            if (!string.IsNullOrEmpty(item.ImageUrl))
-                            {
-                                var capturedItem = item;
-                                _ = Task.Run(async () => {
-                                    var base64 = await ImageLoader.LoadImageAsBase64Async(capturedItem.ImageUrl);
-                                    if (!string.IsNullOrEmpty(base64))
-                                    {
-                                        capturedItem.ImageUrl = base64;
-                                        await InvokeAsync(StateHasChanged);
-                                    }
-                                });
-                            }
-                            
-                            list.Add(item);
-                        }
-                        return list;
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Error loading barcode fallback: {ex.Message}", Severity.Warning);
-        }
-
-        return new List<BarcodeDetailReportDto>();
+        var sb = new System.Text.StringBuilder("api/reports/barcodes/detail?");
+        sb.Append($"batchNo={Uri.EscapeDataString(batchNo ?? "")}");
+        sb.Append($"&trackingNo={Uri.EscapeDataString(trackingNo ?? "")}");
+        if (fromDate.HasValue)
+            sb.Append($"&fromDate={Uri.EscapeDataString(fromDate.Value.ToString("yyyy-MM-dd"))}");
+        if (toDate.HasValue)
+            sb.Append($"&toDate={Uri.EscapeDataString(toDate.Value.ToString("yyyy-MM-dd"))}");
+        return sb.ToString();
     }
 
-    private bool FilterFunc(SupplierStockReportDto element) =>
-        string.IsNullOrWhiteSpace(_searchString) ||
-        element.ItemName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
-        element.ItemCode.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
-        element.SupplierName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
-        element.BatchNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
-        element.TrackingNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
-
+    // ── Image helpers ─────────────────────────────────────────────
     private string GetAbsoluteImageUrl(string? url)
     {
         if (string.IsNullOrEmpty(url)) return string.Empty;
-        
+        if (url.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)) return url;
+
         if (url.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
         {
             var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
             return $"{baseAddress}/api/storage/image?url={Uri.EscapeDataString(url)}";
         }
-        
+
         var uploadsIndex = url.IndexOf("/uploads/", StringComparison.OrdinalIgnoreCase);
         if (uploadsIndex >= 0)
         {
@@ -392,7 +511,7 @@
             var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
             return $"{baseAddress}{relativePath}";
         }
-        
+
         if (url.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
         {
             var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
@@ -402,51 +521,43 @@
         if (url.StartsWith("http://localhost") || url.StartsWith("https://localhost"))
         {
             var uri = new Uri(url);
-            var relativePath = uri.PathAndQuery;
             var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
-            return $"{baseAddress}{relativePath}";
+            return $"{baseAddress}{uri.PathAndQuery}";
         }
 
         if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-        {
             return "https://" + url.Substring(7);
-        }
 
         return url;
     }
 
-    private async Task PreviewLoadedImage(string? alreadyLoadedUrl)
-    {
-        if (string.IsNullOrEmpty(alreadyLoadedUrl)) return;
-        // Image is already base64 data URL from background loading
-        var parameters = new DialogParameters { ["imageUrl"] = alreadyLoadedUrl };
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
-        await DialogService.ShowAsync<ImagePreviewDialog>("Item Photo", parameters, options);
-    }
-
     private async Task PreviewImage(string url)
     {
-        var resolvedUrl = await ImageLoader.LoadImageAsBase64Async(url);
-        var absoluteUrl = GetAbsoluteImageUrl(resolvedUrl);
+        var absoluteUrl = GetAbsoluteImageUrl(url);
         var parameters = new DialogParameters { ["imageUrl"] = absoluteUrl };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
         await DialogService.ShowAsync<ImagePreviewDialog>("Item Photo", parameters, options);
     }
 
+    // ── Export main table ─────────────────────────────────────────
     private async Task ExportFile(string format)
     {
         try
         {
-            var fileName = $"SupplierStockReport_{_valuationMethod}_{DateTime.Now:yyyyMMddHHmmss}.{(format == "csv" ? "csv" : "xlsx")}";
-            var contentType = format == "csv" ? "text/csv" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-            
-            var response = await Http.GetAsync($"api/reports/export/supplier-stock?format={format}&valuationMethod={_valuationMethod}");
+            var fileName = $"SupplierStock_{_valuationMethod}_{DateTime.Now:yyyyMMddHHmmss}.{(format == "csv" ? "csv" : "xlsx")}";
+            var contentType = format == "csv"
+                ? "text/csv"
+                : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+            var url = $"api/reports/export/supplier-stock?format={format}&valuationMethod={_valuationMethod}";
+            if (_upToDate.HasValue)
+                url += $"&upToDate={Uri.EscapeDataString(_upToDate.Value.ToString("yyyy-MM-dd"))}";
+
+            var response = await Http.GetAsync(url);
             if (response.IsSuccessStatusCode)
             {
                 var fileBytes = await response.Content.ReadAsByteArrayAsync();
-                var base64 = Convert.ToBase64String(fileBytes);
-                
-                await JSRuntime.InvokeVoidAsync("webcamInterop.downloadFile", fileName, contentType, base64);
+                await JSRuntime.InvokeVoidAsync("webcamInterop.downloadFile", fileName, contentType, Convert.ToBase64String(fileBytes));
                 Snackbar.Add("Report exported successfully!", Severity.Success);
             }
             else
@@ -460,50 +571,39 @@
         }
     }
 
+    // ── Export barcodes ───────────────────────────────────────────
     private async Task ExportBarcodesExcel() => await ExportBarcodes("excel");
-    private async Task ExportBarcodesCsv() => await ExportBarcodes("csv");
-    private async Task ExportBarcodesPdf() => await ExportBarcodes("pdf");
+    private async Task ExportBarcodesCsv()   => await ExportBarcodes("csv");
+    private async Task ExportBarcodesPdf()   => await ExportBarcodes("pdf");
 
     private async Task ExportBarcodes(string format)
     {
-        if (!_barcodeDetails.Any())
-        {
-            Snackbar.Add("No barcode details to export.", Severity.Warning);
-            return;
-        }
-
+        if (!_barcodeDetails.Any()) { Snackbar.Add("No barcode details to export.", Severity.Warning); return; }
         try
         {
             if (format == "pdf")
             {
                 await JSRuntime.InvokeVoidAsync("webcamInterop.printElement", "barcode-table-container", "Detailed Barcode In/Out Logs");
-                Snackbar.Add("Print preview opened for PDF export.", Severity.Info);
+                Snackbar.Add("Print preview opened.", Severity.Info);
                 return;
             }
 
             if (format == "csv")
             {
-                var csvContent = GenerateBarcodesCsv();
-                var bytes = System.Text.Encoding.UTF8.GetBytes(csvContent);
-                var base64 = Convert.ToBase64String(bytes);
-                var fileName = $"BarcodeLogs_{DateTime.Now:yyyyMMddHHmmss}.csv";
-                await JSRuntime.InvokeVoidAsync("webcamInterop.downloadFile", fileName, "text/csv", base64);
-                Snackbar.Add("Barcodes CSV exported successfully!", Severity.Success);
+                var bytes = System.Text.Encoding.UTF8.GetBytes(GenerateBarcodesCsv());
+                await JSRuntime.InvokeVoidAsync("webcamInterop.downloadFile",
+                    $"BarcodeLogs_{DateTime.Now:yyyyMMddHHmmss}.csv", "text/csv", Convert.ToBase64String(bytes));
+                Snackbar.Add("Barcodes CSV exported!", Severity.Success);
             }
-            else // Excel (.xlsx / .xls)
+            else
             {
-                var excelContent = GenerateBarcodesExcelHtml();
-                var bytes = System.Text.Encoding.UTF8.GetBytes(excelContent);
-                var base64 = Convert.ToBase64String(bytes);
-                var fileName = $"BarcodeLogs_{DateTime.Now:yyyyMMddHHmmss}.xls";
-                await JSRuntime.InvokeVoidAsync("webcamInterop.downloadFile", fileName, "application/vnd.ms-excel", base64);
-                Snackbar.Add("Barcodes Excel exported successfully!", Severity.Success);
+                var bytes = System.Text.Encoding.UTF8.GetBytes(GenerateBarcodesExcelHtml());
+                await JSRuntime.InvokeVoidAsync("webcamInterop.downloadFile",
+                    $"BarcodeLogs_{DateTime.Now:yyyyMMddHHmmss}.xls", "application/vnd.ms-excel", Convert.ToBase64String(bytes));
+                Snackbar.Add("Barcodes Excel exported!", Severity.Success);
             }
         }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Error exporting barcodes: {ex.Message}", Severity.Error);
-        }
+        catch (Exception ex) { Snackbar.Add($"Error exporting: {ex.Message}", Severity.Error); }
     }
 
     private string GenerateBarcodesCsv()
@@ -512,49 +612,44 @@
         sb.AppendLine("Item Name,Barcode No,Batch No,Tracking No,Type,Inward Date,Outward Date,Status");
         foreach (var item in _barcodeDetails)
         {
-            sb.Append(EscapedCsv(item.ItemName)).Append(",")
-              .Append(EscapedCsv(item.BarcodeNo)).Append(",")
-              .Append(EscapedCsv(item.BatchNo)).Append(",")
-              .Append(EscapedCsv(item.TrackingNo)).Append(",")
-              .Append(EscapedCsv(item.Type)).Append(",")
-              .Append(EscapedCsv(item.InwardDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm"))).Append(",")
-              .Append(EscapedCsv(item.OutwardDate.HasValue ? item.OutwardDate.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm") : "-")).Append(",")
-              .Append(EscapedCsv(item.Status)).Append("\n");
+            sb.Append(Csv(item.ItemName)).Append(",")
+              .Append(Csv(item.BarcodeNo)).Append(",")
+              .Append(Csv(item.BatchNo)).Append(",")
+              .Append(Csv(item.TrackingNo)).Append(",")
+              .Append(Csv(item.Type)).Append(",")
+              .Append(item.InwardDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm")).Append(",")
+              .Append(item.OutwardDate.HasValue ? item.OutwardDate.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm") : "-").Append(",")
+              .Append(Csv(item.Status)).AppendLine();
         }
         return sb.ToString();
-    }
-
-    private string EscapedCsv(string val)
-    {
-        if (string.IsNullOrEmpty(val)) return "";
-        if (val.Contains(",") || val.Contains("\"") || val.Contains("\n") || val.Contains("\r"))
-        {
-            return "\"" + val.Replace("\"", "\"\"") + "\"";
-        }
-        return val;
     }
 
     private string GenerateBarcodesExcelHtml()
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("<html><head><meta charset=\"utf-8\"><style>table { border-collapse: collapse; } th, td { border: 1px solid #000; padding: 5px; }</style></head><body>");
-        sb.AppendLine("<table border=\"1\">");
-        sb.AppendLine("<thead><tr><th>Item Name</th><th>Barcode No</th><th>Batch No</th><th>Tracking No</th><th>Type</th><th>Inward Date</th><th>Outward Date</th><th>Status</th></tr></thead>");
-        sb.AppendLine("<tbody>");
+        sb.AppendLine("<html><head><meta charset=\"utf-8\"><style>table{border-collapse:collapse;}th,td{border:1px solid #000;padding:5px;}</style></head><body><table><thead><tr><th>Item Name</th><th>Barcode No</th><th>Batch No</th><th>Tracking No</th><th>Type</th><th>Inward Date</th><th>Outward Date</th><th>Status</th></tr></thead><tbody>");
         foreach (var item in _barcodeDetails)
         {
-            sb.Append("<tr>");
-            sb.Append("<td>").Append(System.Net.WebUtility.HtmlEncode(item.ItemName)).Append("</td>");
-            sb.Append("<td>").Append(System.Net.WebUtility.HtmlEncode(item.BarcodeNo)).Append("</td>");
-            sb.Append("<td>").Append(System.Net.WebUtility.HtmlEncode(item.BatchNo)).Append("</td>");
-            sb.Append("<td>").Append(System.Net.WebUtility.HtmlEncode(item.TrackingNo)).Append("</td>");
-            sb.Append("<td>").Append(System.Net.WebUtility.HtmlEncode(item.Type)).Append("</td>");
-            sb.Append("<td>").Append(item.InwardDate.LocalDateTime.ToString("yyyy-MM-dd HH:mm")).Append("</td>");
-            sb.Append("<td>").Append(item.OutwardDate.HasValue ? item.OutwardDate.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm") : "-").Append("</td>");
-            sb.Append("<td>").Append(System.Net.WebUtility.HtmlEncode(item.Status)).Append("</td>");
-            sb.Append("</tr>");
+            sb.Append("<tr>")
+              .Append($"<td>{System.Net.WebUtility.HtmlEncode(item.ItemName)}</td>")
+              .Append($"<td>{System.Net.WebUtility.HtmlEncode(item.BarcodeNo)}</td>")
+              .Append($"<td>{System.Net.WebUtility.HtmlEncode(item.BatchNo)}</td>")
+              .Append($"<td>{System.Net.WebUtility.HtmlEncode(item.TrackingNo)}</td>")
+              .Append($"<td>{System.Net.WebUtility.HtmlEncode(item.Type)}</td>")
+              .Append($"<td>{item.InwardDate.LocalDateTime:yyyy-MM-dd HH:mm}</td>")
+              .Append($"<td>{(item.OutwardDate.HasValue ? item.OutwardDate.Value.LocalDateTime.ToString("yyyy-MM-dd HH:mm") : "-")}</td>")
+              .Append($"<td>{System.Net.WebUtility.HtmlEncode(item.Status)}</td>")
+              .Append("</tr>");
         }
-        sb.AppendLine("</tbody></table></body></html>");
+        sb.Append("</tbody></table></body></html>");
         return sb.ToString();
+    }
+
+    private static string Csv(string val)
+    {
+        if (string.IsNullOrEmpty(val)) return "";
+        if (val.Contains(',') || val.Contains('"') || val.Contains('\n') || val.Contains('\r'))
+            return "\"" + val.Replace("\"", "\"\"") + "\"";
+        return val;
     }
 }
