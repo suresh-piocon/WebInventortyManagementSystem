@@ -3,6 +3,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
+@inject InventoryManagement.Client.Services.ImageLoaderService ImageLoader
 
 <PageTitle>Stock Outward Entry - AG Inventory</PageTitle>
 
@@ -16,170 +17,212 @@
         </MudText>
     </div>
 
-    <EditForm Model="@_outwardHeader" OnValidSubmit="SaveOutward">
-        <DataAnnotationsValidator />
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" Color="Color.Primary" ActivePanelIndexChanged="OnTabChanged" Class="mud-width-full">
+        <MudTabPanel Text="Stock Outward Data Entry" Icon="@Icons.Material.Filled.Add">
+            <EditForm Model="@_outwardHeader" OnValidSubmit="SaveOutward">
+                <DataAnnotationsValidator />
 
-        <MudGrid>
-            <!-- Outward Header Details -->
-            <MudItem xs="12" md="4">
-                <MudPaper Class="glass-panel pa-6 mb-4">
-                    <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
-                        <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Class="mr-2" /> Outward Header
-                    </MudText>
-
-                    <MudDatePicker Label="Outward Date" 
-                                   @bind-Date="_outwardDate" 
-                                   Required="true" 
-                                   Variant="Variant.Outlined" 
-                                   Class="mb-4 text-slate-200" />
-
-                    <MudTextField T="string" 
-                                  Label="Customer Name" 
-                                  @bind-Value="_outwardHeader.CustomerName" 
-                                  Variant="Variant.Outlined" 
-                                  Class="mb-4 text-slate-200" />
-
-                    <MudTextField T="string" 
-                                  Label="Reference Number (e.g. Sales Order)" 
-                                  @bind-Value="_outwardHeader.ReferenceNo" 
-                                  Variant="Variant.Outlined" 
-                                  Class="mb-4 text-slate-200" />
-                </MudPaper>
-
-                <!-- Scanner Simulator Panel -->
-                <MudPaper Class="glass-panel pa-6 mb-4" Style="border: 1px solid rgba(0,229,255,0.15) !important;">
-                    <MudText Typo="Typo.h6" Class="text-slate-200 mb-2" Style="font-family: 'Outfit';">
-                        <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Class="mr-2 text-cyan" /> Scan Barcode / QR Code
-                    </MudText>
-                    <MudText Typo="Typo.caption" Class="text-slate-400 d-block mb-4">
-                        Press Enter after scanning or type manually to resolve item
-                    </MudText>
-
-                    <div class="d-flex align-center w-100">
-                        <MudTextField @bind-Value="_scanInput" 
-                                      Label="Scan Code" 
-                                      Variant="Variant.Outlined" 
-                                      Adornment="Adornment.End" 
-                                      AdornmentIcon="@Icons.Material.Filled.QrCode" 
-                                      OnKeyDown="HandleScanKeyPress" 
-                                      Disabled="_resolving"
-                                      Immediate="true"
-                                      HelperText="e.g. ITEM000001, BATCH000001"
-                                      Class="text-slate-100 flex-grow-1" />
-                    </div>
-                </MudPaper>
-
-                <!-- Save Actions -->
-                <MudPaper Class="glass-panel pa-4 d-flex justify-between">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="ResetForm">
-                        Reset
-                    </MudButton>
-                    <MudButton ButtonType="ButtonType.Submit" 
-                               Variant="Variant.Filled" 
-                               Color="Color.Success"
-                               StartIcon="@Icons.Material.Filled.Save"
-                               Disabled="@(!_lineItems.Any() || _saving)"
-                               Style="font-family: 'Outfit'; font-weight: 600;">
-                        @if (_saving)
-                        {
-                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
-                        }
-                        else
-                        {
-                            <MudText>Submit Issue</MudText>
-                        }
-                    </MudButton>
-                </MudPaper>
-            </MudItem>
-
-            <!-- Line Items Grid -->
-            <MudItem xs="12" md="8">
-                <MudPaper Class="glass-panel pa-6">
-                    <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
-                        <MudIcon Icon="@Icons.Material.Filled.ListAlt" Class="mr-2" /> Items to Issue
-                    </MudText>
-
-                    @if (!_lineItems.Any())
-                    {
-                        <div class="d-flex flex-column align-center justify-center py-12 text-center text-slate-500">
-                            <MudIcon Icon="@Icons.Material.Filled.CropFree" Size="Size.Large" Class="mb-3" />
-                            <MudText Typo="Typo.body1">Scan a Barcode or QR Code to begin adding items</MudText>
-                            <div class="mt-4 p-2 rounded border border-slate-700 bg-slate-800 text-slate-300 font-mono" style="font-size: 11px;">
-                                Tips: Copy-paste any barcode from the Inward entries to simulate scanning
-                            </div>
-                        </div>
-                    }
-                    else
-                    {
-                        <div style="overflow-x: auto;">
-                            <table class="mud-table" style="width: 100%; min-width: 800px; border-collapse: collapse;">
-                                <thead>
-                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
-                                        <th style="color: #94A3B8; padding: 10px; text-align: left; width: 60px;">Photo</th>
-                                        <th style="color: #94A3B8; padding: 10px; text-align: left;">Item Details</th>
-                                        <th style="color: #94A3B8; padding: 10px; text-align: left;">Batch / Tracking</th>
-                                        <th style="color: #94A3B8; padding: 10px; text-align: right; width: 100px;">Available</th>
-                                        <th style="color: #94A3B8; padding: 10px; text-align: right; width: 90px;">Qty Out</th>
-                                        <th style="color: #94A3B8; padding: 10px; text-align: right; width: 140px;">Rate</th>
-                                        <th style="color: #94A3B8; padding: 10px; text-align: right; width: 100px;">Amount</th>
-                                        <th style="color: #94A3B8; padding: 10px; text-align: center; width: 50px;"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @for (int i = 0; i < _lineItems.Count; i++)
-                                    {
-                                        var index = i;
-                                        var line = _lineItems[index];
-                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle;">
-                                            <td style="padding: 10px; text-align: center;">
-                                                @if (!string.IsNullOrEmpty(line.ImageUrl))
-                                                {
-                                                    <img src="@GetAbsoluteImageUrl(line.ImageUrl)" style="width: 45px; height: 45px; border-radius: 6px; object-fit: cover; border: 1px solid #00E5FF; cursor: pointer;" @onclick="@(() => PreviewImage(line.ImageUrl))" />
-                                                }
-                                                else
-                                                {
-                                                    <MudIcon Icon="@Icons.Material.Filled.Image" Color="Color.Dark" Size="Size.Large" />
-                                                }
-                                            </td>
-                                            <td style="padding: 10px;">
-                                                <MudText Typo="Typo.body2" Class="text-slate-100 font-weight-bold">@line.ItemName</MudText>
-                                                <MudText Typo="Typo.caption" Class="text-slate-400 font-mono">@line.ItemCode</MudText>
-                                            </td>
-                                            <td style="padding: 10px;">
-                                                <div class="text-slate-300" style="font-size: 13px;">Batch: <span class="font-weight-bold text-slate-200">@line.BatchNo</span></div>
-                                                <div class="text-slate-400 font-mono" style="font-size: 11px;">@line.TrackingNo</div>
-                                            </td>
-                                            <td style="padding: 10px; text-align: right;" class="text-yellow-500 font-weight-bold">
-                                                @line.AvailableQuantity.ToString("N2") @line.UnitCode
-                                            </td>
-                                            <td style="padding: 10px;">
-                                                <MudNumericField T="decimal" @bind-Value="line.Quantity" Min="0.01M" Max="@line.AvailableQuantity" Disabled="@(line.Type == "Unique")" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 75px;" />
-                                            </td>
-                                            <td style="padding: 10px;">
-                                                <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" HideSpinButtons="true" Format="F2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 140px;" />
-                                            </td>
-                                            <td style="padding: 10px; text-align: right;" class="text-slate-100 font-weight-bold">
-                                                ₹@((line.Quantity * line.Rate).ToString("N2"))
-                                            </td>
-                                            <td style="padding: 10px; text-align: center;">
-                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveLineItem(index))" />
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="d-flex justify-end mt-6">
-                            <MudText Typo="Typo.subtitle1" Class="font-weight-bold text-slate-100">
-                                Total Issue Value: <span class="animated-gradient-text" style="font-size: 20px;">₹@(_lineItems.Sum(l => l.Quantity * l.Rate).ToString("N2"))</span>
+                <MudGrid>
+                    <!-- Outward Header Details -->
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="glass-panel pa-6 mb-4">
+                            <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                                <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Class="mr-2" /> Outward Header
                             </MudText>
-                        </div>
-                    }
-                </MudPaper>
-            </MudItem>
-        </MudGrid>
-    </EditForm>
+
+                            <MudDatePicker Label="Outward Date" 
+                                           @bind-Date="_outwardDate" 
+                                           Required="true" 
+                                           Variant="Variant.Outlined" 
+                                           Class="mb-4 text-slate-200" />
+
+                            <MudTextField T="string" 
+                                          Label="Customer Name" 
+                                          @bind-Value="_outwardHeader.CustomerName" 
+                                          Variant="Variant.Outlined" 
+                                          Class="mb-4 text-slate-200" />
+
+                            <MudTextField T="string" 
+                                          Label="Reference Number (e.g. Sales Order)" 
+                                          @bind-Value="_outwardHeader.ReferenceNo" 
+                                          Variant="Variant.Outlined" 
+                                          Class="mb-4 text-slate-200" />
+                        </MudPaper>
+
+                        <!-- Scanner Simulator Panel -->
+                        <MudPaper Class="glass-panel pa-6 mb-4" Style="border: 1px solid rgba(0,229,255,0.15) !important;">
+                            <MudText Typo="Typo.h6" Class="text-slate-200 mb-2" Style="font-family: 'Outfit';">
+                                <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Class="mr-2 text-cyan" /> Scan Barcode / QR Code
+                            </MudText>
+                            <MudText Typo="Typo.caption" Class="text-slate-400 d-block mb-4">
+                                Press Enter after scanning or type manually to resolve item
+                            </MudText>
+
+                            <div class="d-flex align-center w-100">
+                                <MudTextField @bind-Value="_scanInput" 
+                                              Label="Scan Code" 
+                                              Variant="Variant.Outlined" 
+                                              Adornment="Adornment.End" 
+                                              AdornmentIcon="@Icons.Material.Filled.QrCode" 
+                                              OnKeyDown="HandleScanKeyPress" 
+                                              Disabled="_resolving"
+                                              Immediate="true"
+                                              HelperText="e.g. ITEM000001, BATCH000001"
+                                              Class="text-slate-100 flex-grow-1" />
+                            </div>
+                        </MudPaper>
+
+                        <!-- Save Actions -->
+                        <MudPaper Class="glass-panel pa-4 d-flex justify-between">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="ResetForm">
+                                Reset
+                            </MudButton>
+                            <MudButton ButtonType="ButtonType.Submit" 
+                                       Variant="Variant.Filled" 
+                                       Color="Color.Success"
+                                       StartIcon="@Icons.Material.Filled.Save"
+                                       Disabled="@(!_lineItems.Any() || _saving)"
+                                       Style="font-family: 'Outfit'; font-weight: 600;">
+                                @if (_saving)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                }
+                                else
+                                {
+                                    <MudText>Submit Issue</MudText>
+                                }
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+
+                    <!-- Line Items Grid -->
+                    <MudItem xs="12" md="8">
+                        <MudPaper Class="glass-panel pa-6">
+                            <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                                <MudIcon Icon="@Icons.Material.Filled.ListAlt" Class="mr-2" /> Items to Issue
+                            </MudText>
+
+                            @if (!_lineItems.Any())
+                            {
+                                <div class="d-flex flex-column align-center justify-center py-12 text-center text-slate-500">
+                                    <MudIcon Icon="@Icons.Material.Filled.CropFree" Size="Size.Large" Class="mb-3" />
+                                    <MudText Typo="Typo.body1">Scan a Barcode or QR Code to begin adding items</MudText>
+                                    <div class="mt-4 p-2 rounded border border-slate-700 bg-slate-800 text-slate-300 font-mono" style="font-size: 11px;">
+                                        Tips: Copy-paste any barcode from the Inward entries to simulate scanning
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div style="overflow-x: auto;">
+                                    <table class="mud-table" style="width: 100%; min-width: 800px; border-collapse: collapse;">
+                                        <thead>
+                                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+                                                <th style="color: #94A3B8; padding: 10px; text-align: left; width: 60px;">Photo</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: left;">Item Details</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: left;">Batch / Tracking</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: right; width: 100px;">Available</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: right; width: 90px;">Qty Out</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: right; width: 140px;">Rate</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: right; width: 100px;">Amount</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: center; width: 50px;"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @for (int i = 0; i < _lineItems.Count; i++)
+                                            {
+                                                var index = i;
+                                                var line = _lineItems[index];
+                                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle;">
+                                                    <td style="padding: 10px; text-align: center;">
+                                                        @if (!string.IsNullOrEmpty(line.ImageUrl))
+                                                        {
+                                                            <img src="@GetAbsoluteImageUrl(line.ImageUrl)" style="width: 45px; height: 45px; border-radius: 6px; object-fit: cover; border: 1px solid #00E5FF; cursor: pointer;" @onclick="@(() => PreviewImage(line.ImageUrl))" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <MudIcon Icon="@Icons.Material.Filled.Image" Color="Color.Dark" Size="Size.Large" />
+                                                        }
+                                                    </td>
+                                                    <td style="padding: 10px;">
+                                                        <MudText Typo="Typo.body2" Class="text-slate-100 font-weight-bold">@line.ItemName</MudText>
+                                                        <MudText Typo="Typo.caption" Class="text-slate-400 font-mono">@line.ItemCode</MudText>
+                                                    </td>
+                                                    <td style="padding: 10px;">
+                                                        <div class="text-slate-300" style="font-size: 13px;">Batch: <span class="font-weight-bold text-slate-200">@line.BatchNo</span></div>
+                                                        <div class="text-slate-400 font-mono" style="font-size: 11px;">@line.TrackingNo</div>
+                                                    </td>
+                                                    <td style="padding: 10px; text-align: right;" class="text-yellow-500 font-weight-bold">
+                                                        @line.AvailableQuantity.ToString("N2") @line.UnitCode
+                                                    </td>
+                                                    <td style="padding: 10px;">
+                                                        <MudNumericField T="decimal" @bind-Value="line.Quantity" Min="0.01M" Max="@line.AvailableQuantity" Disabled="@(line.Type == "Unique")" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 75px;" />
+                                                    </td>
+                                                    <td style="padding: 10px;">
+                                                        <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" HideSpinButtons="true" Format="F2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 140px;" />
+                                                    </td>
+                                                    <td style="padding: 10px; text-align: right;" class="text-slate-100 font-weight-bold">
+                                                        ₹@((line.Quantity * line.Rate).ToString("N2"))
+                                                    </td>
+                                                    <td style="padding: 10px; text-align: center;">
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveLineItem(index))" />
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="d-flex justify-end mt-6">
+                                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold text-slate-100">
+                                        Total Issue Value: <span class="animated-gradient-text" style="font-size: 20px;">₹@(_lineItems.Sum(l => l.Quantity * l.Rate).ToString("N2"))</span>
+                                    </MudText>
+                                </div>
+                            }
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </EditForm>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Stock Outward List" Icon="@Icons.Material.Filled.List">
+            <MudTable Items="@FilteredOutwards" Hover="true" Loading="@_loadingList" Dense="true" Striped="true" Class="glass-panel text-slate-200">
+                <ToolBarContent>
+                    <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">
+                        Stock Outward Issue List
+                    </MudText>
+                    <MudSpacer />
+                    <MudTextField @bind-Value="_searchString" Placeholder="Search by Customer, Reference, Outward No..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0 text-slate-200" Immediate="true"></MudTextField>
+                </ToolBarContent>
+                <HeaderContent>
+                    <MudTh Style="color:#94A3B8;">Date</MudTh>
+                    <MudTh Style="color:#94A3B8;">Outward No</MudTh>
+                    <MudTh Style="color:#94A3B8;">Customer Name</MudTh>
+                    <MudTh Style="color:#94A3B8;">Reference No</MudTh>
+                    <MudTh Style="color:#94A3B8;text-align:right;">Tot Qty Issued</MudTh>
+                    <MudTh Style="color:#94A3B8;text-align:right;">Tot. Amount</MudTh>
+                    <MudTh Style="color:#94A3B8;text-align:center;width:80px;">Action</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Date" Class="text-slate-300">@context.OutwardDate.LocalDateTime.ToString("dd-MM-yyyy HH:mm")</MudTd>
+                    <MudTh DataLabel="Outward No" Class="text-slate-200 font-mono">@context.OutwardNo</MudTh>
+                    <MudTd DataLabel="Customer Name" Class="text-slate-200 font-weight-bold">@(string.IsNullOrEmpty(context.CustomerName) ? "N/A" : context.CustomerName)</MudTd>
+                    <MudTd DataLabel="Reference No" Class="text-slate-300">@(string.IsNullOrEmpty(context.ReferenceNo) ? "N/A" : context.ReferenceNo)</MudTd>
+                    <MudTd DataLabel="Tot Qty Issued" Style="text-align:right;" Class="text-yellow-500 font-weight-bold">@context.Details.Sum(d => d.Quantity).ToString("N2")</MudTd>
+                    <MudTd DataLabel="Tot. Amount" Style="text-align:right;" Class="text-slate-100 font-weight-bold">₹@context.Details.Sum(d => d.Amount).ToString("N2")</MudTd>
+                    <MudTd DataLabel="Action" Style="text-align:center;">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteOutward(context.Id))" />
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+                <NoRecordsContent>
+                    <MudText Class="text-slate-400 pa-4">No outward transactions found.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudTabPanel>
+    </MudTabs>
 </MudContainer>
 
 @code {
@@ -191,9 +234,77 @@
     private bool _resolving = false;
     private bool _saving = false;
 
+    // List properties
+    private List<StockOutward> _outwards = new();
+    private bool _loadingList = false;
+    private string _searchString = "";
+
+    private IEnumerable<StockOutward> FilteredOutwards =>
+        _outwards.Where(o => 
+            (o.OutwardNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) ||
+            (o.CustomerName?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (o.ReferenceNo?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false));
+
     protected override void OnInitialized()
     {
         ResetForm();
+    }
+
+    private async Task OnTabChanged(int index)
+    {
+        if (index == 1)
+        {
+            await LoadOutwardsList();
+        }
+    }
+
+    private async Task LoadOutwardsList()
+    {
+        _loadingList = true;
+        StateHasChanged();
+        try
+        {
+            _outwards = await Http.GetFromJsonAsync<List<StockOutward>>("api/stockoutward") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading outward list: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingList = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteOutward(Guid outwardId)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Confirm Delete",
+            "Are you sure you want to delete this stock outward entry? This will restore the stock levels, make the unique barcodes available again, and delete all associated outward records.",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/stockoutward/invoice/{outwardId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Stock outward entry deleted successfully.", Severity.Success);
+                    await LoadOutwardsList();
+                }
+                else
+                {
+                    var err = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Failed to delete: {err}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting stock outward: {ex.Message}", Severity.Error);
+            }
+        }
     }
 
     private void ResetForm()
@@ -398,7 +509,7 @@
             var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
             return $"{baseAddress}/{url}";
         }
-
+        
         if (url.StartsWith("http://localhost") || url.StartsWith("https://localhost"))
         {
             var uri = new Uri(url);

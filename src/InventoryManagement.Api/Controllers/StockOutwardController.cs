@@ -341,5 +341,56 @@ namespace InventoryManagement.Api.Controllers
             }
             return $"{prefix}{nextNum:D6}";
         }
+
+        [HttpDelete("invoice/{outwardId}")]
+        public async Task<IActionResult> DeleteOutwardInvoice(Guid outwardId)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var outward = await _context.StockOutwards
+                    .Include(so => so.Details)
+                    .FirstOrDefaultAsync(so => so.Id == outwardId);
+
+                if (outward == null)
+                {
+                    return NotFound("Stock outward record not found.");
+                }
+
+                var outwardNo = outward.OutwardNo;
+
+                // 1. Reset IsUsed flag to false in BarcodeMaster for any barcodes issued in this outward
+                var barcodes = outward.Details.Select(d => d.Barcode).Where(b => !string.IsNullOrEmpty(b)).ToList();
+                if (barcodes.Any())
+                {
+                    var barcodeMasters = await _context.BarcodeMasters
+                        .Where(bm => barcodes.Contains(bm.Barcode))
+                        .ToListAsync();
+                    foreach (var bm in barcodeMasters)
+                    {
+                        bm.IsUsed = false;
+                    }
+                    _context.BarcodeMasters.UpdateRange(barcodeMasters);
+                }
+
+                // 2. Delete associated StockLedger records
+                var ledgers = await _context.StockLedgers
+                    .Where(l => l.ReferenceNo == outwardNo)
+                    .ToListAsync();
+                _context.StockLedgers.RemoveRange(ledgers);
+
+                // 3. Delete StockOutward (cascades to StockOutwardDetails)
+                _context.StockOutwards.Remove(outward);
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return Ok(new { message = "Stock outward invoice and corresponding barcode tracking data deleted successfully." });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, $"An error occurred while deleting stock outward invoice: {ex.Message}");
+            }
+        }
     }
 }
