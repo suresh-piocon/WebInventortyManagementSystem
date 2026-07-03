@@ -528,16 +528,31 @@ namespace InventoryManagement.Api.Controllers
             var barcodeList = barcodes.Select(b => b.Barcode).ToList();
 
             // Fetch outward details for these barcodes
+            // For Unique barcodes: each barcode maps 1:1 with a StockOutwardDetail.Barcode entry.
+            // For Batch barcodes: the barcode scanned during outward is stored in StockOutwardDetail.Barcode;
+            //   only that specific barcode record should be "Issued".
+            // We intentionally do NOT use IsUsed here because IsUsed may have been set broadly
+            // during outward processing and does not accurately reflect per-barcode issued count.
             var outwardDetails = await _context.StockOutwardDetails
                 .Include(od => od.StockOutward)
                 .Where(od => barcodeList.Contains(od.Barcode))
                 .ToListAsync();
 
+            // Also fetch outward qty per batch/tracking from the ledger so we can correctly
+            // identify how many batch barcodes are issued (in order of barcode number).
+            // For batch-type items the outward detail barcode field holds the batch-level barcode
+            // that was scanned – the qty tells us how many units were taken from that batch.
+            // Build a lookup: barcode -> outward detail (first occurrence only)
+            var outwardByBarcode = outwardDetails
+                .GroupBy(od => od.Barcode)
+                .ToDictionary(g => g.Key, g => g.First());
+
             var result = barcodes.Select(b => {
-                var outward = outwardDetails.FirstOrDefault(od => od.Barcode == b.Barcode);
-                // Use IsUsed flag as source of truth for Unique barcodes;
-                // For batch items also cross-check outward records
-                bool isIssued = b.IsUsed == true || outward != null;
+                outwardByBarcode.TryGetValue(b.Barcode, out var outward);
+                // A barcode is "Issued" only when there is a matching StockOutwardDetail record
+                // for that exact barcode value. This is accurate for both Unique and Batch types
+                // and ensures the Issued count matches the Stock Ledger outward qty.
+                bool isIssued = outward != null;
                 return new BarcodeDetailReportDto
                 {
                     ItemName = b.Item?.Name ?? "Unknown Item",

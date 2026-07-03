@@ -73,7 +73,7 @@
                             <MudItem xs="12" sm="5" Class="d-flex flex-column align-center justify-center">
                                 @if (!string.IsNullOrEmpty(_history.PhotoUrl))
                                 {
-                                    <img src="@_history.PhotoUrl" style="width: 100%; max-width: 160px; aspect-ratio: 1; border-radius: 8px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewLoadedImage(_history.PhotoUrl))" />
+                                    <img src="@GetAbsoluteImageUrl(_history.PhotoUrl)" style="width: 100%; max-width: 160px; aspect-ratio: 1; border-radius: 8px; object-fit: cover; border: 1px solid #5C5CFF; cursor: pointer;" @onclick="@(() => PreviewImage(_history.PhotoUrl))" />
                                     <MudText Typo="Typo.caption" Class="text-slate-400 mt-2">Captured Photo</MudText>
                                 }
                                 else
