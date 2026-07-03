@@ -630,6 +630,7 @@ namespace InventoryManagement.Shared
 
     public class BarcodeDetailReportDto
     {
+        public string SupplierName { get; set; } = string.Empty;
         public string ItemName { get; set; } = string.Empty;
         public string BarcodeNo { get; set; } = string.Empty;
         public string BatchNo { get; set; } = string.Empty;

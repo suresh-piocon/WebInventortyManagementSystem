@@ -29,105 +29,117 @@ namespace InventoryManagement.Api.Controllers
             _context = context;
         }
 
+        // ─────────────────────────────────────────────────────────────────────────
+        // Checks whether a Supabase key value is a placeholder / invalid JWT
+        // ─────────────────────────────────────────────────────────────────────────
+        private static bool IsPlaceholder(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return true;
+            var v = value.ToLowerInvariant();
+            if (v.Contains("your-anon-key") || v.Contains("your-service-role-key") ||
+                v.Contains("your-jwt-secret") || v.Contains("your-project"))
+                return true;
+
+            // Supabase JWTs have exactly 3 dot-separated parts
+            return value.Split('.').Length != 3;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // Resolve the Supabase service key from config
+        // ─────────────────────────────────────────────────────────────────────────
+        private string? GetSupabaseServiceKey()
+        {
+            var serviceRoleKey = _config["Supabase:ServiceRoleKey"];
+            var anonKey        = _config["Supabase:AnonKey"];
+
+            if (!IsPlaceholder(serviceRoleKey)) return serviceRoleKey;
+            if (!IsPlaceholder(anonKey))        return anonKey;
+            return null;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // POST /api/storage/upload?barcodeNo=ITEM000001
+        //
+        // Uploads an image to Supabase Storage "inventory-images" bucket.
+        // When barcodeNo is supplied the file is named {barcodeNo}.jpg so that
+        // the same barcode always overwrites (updates) its own photo.
+        // Local-folder fallback has been REMOVED — Supabase must be configured.
+        // ─────────────────────────────────────────────────────────────────────────
         [HttpPost("upload")]
-        public async Task<IActionResult> UploadImage(IFormFile file)
+        public async Task<IActionResult> UploadImage(IFormFile file, [FromQuery] string? barcodeNo = null)
         {
             if (file == null || file.Length == 0)
-            {
                 return BadRequest("No file uploaded.");
-            }
-
-            var extension = Path.GetExtension(file.FileName);
-            var uniqueFileName = $"{Guid.NewGuid()}{extension}";
 
             var supabaseUrl = _config["Supabase:Url"];
-            var serviceRoleKey = _config["Supabase:ServiceRoleKey"];
-            var anonKey = _config["Supabase:AnonKey"];
+            var serviceKey  = GetSupabaseServiceKey();
 
-            // Helper function to check if a value is a placeholder or invalid key
-            bool IsPlaceholder(string? value)
-            {
-                if (string.IsNullOrWhiteSpace(value)) return true;
-                var v = value.ToLowerInvariant();
-                if (v.Contains("your-anon-key") || v.Contains("your-service-role-key") || v.Contains("your-jwt-secret") || v.Contains("your-project"))
-                {
-                    return true;
-                }
-                
-                // Supabase service keys and anon keys are JWTs (3 parts separated by dots).
-                // If it doesn't have 3 parts, it's not a valid Supabase key and upload would fail with 403.
-                var parts = value.Split('.');
-                if (parts.Length != 3)
-                {
-                    return true;
-                }
-
-                return false;
-            }
-
-            if (IsPlaceholder(serviceRoleKey)) serviceRoleKey = null;
-            if (IsPlaceholder(anonKey)) anonKey = null;
-
-            var serviceKey = serviceRoleKey ?? anonKey;
-
-            // If Supabase is not configured, fall back to local file storage
             if (string.IsNullOrEmpty(supabaseUrl) || IsPlaceholder(supabaseUrl) || string.IsNullOrEmpty(serviceKey))
             {
-                var uploadsFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "uploads");
-                if (!Directory.Exists(uploadsFolder))
-                {
-                    Directory.CreateDirectory(uploadsFolder);
-                }
-
-                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-                using (var stream = new FileStream(filePath, FileMode.Create))
-                {
-                    await file.CopyToAsync(stream);
-                }
-
-                // Return local server URL
-                var localUrl = $"{Request.Scheme}://{Request.Host}/uploads/{uniqueFileName}";
-                return Ok(new { url = localUrl });
+                return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                    "Supabase Storage is not configured on this server. " +
+                    "Please set a valid Supabase:Url and Supabase:ServiceRoleKey in appsettings.json.");
             }
 
-            // Supabase is configured - upload to Supabase Storage REST API
+            // ── Determine filename ────────────────────────────────────────────
+            // If a barcodeNo is provided, use it as the filename so the barcode
+            // number is the stable key for retrieving the photo later.
+            string fileName;
+            if (!string.IsNullOrWhiteSpace(barcodeNo))
+            {
+                // Sanitise barcode — keep alphanumerics and hyphens only
+                var safe = System.Text.RegularExpressions.Regex.Replace(barcodeNo.Trim(), @"[^A-Za-z0-9\-_]", "");
+                fileName = $"{safe}.jpg";
+            }
+            else
+            {
+                fileName = $"{Guid.NewGuid()}.jpg";
+            }
+
+            // ── Upload to Supabase Storage ────────────────────────────────────
             try
             {
+                var bucketName = "inventory-images";
+                var uploadUrl  = $"{supabaseUrl.TrimEnd('/')}/storage/v1/object/{bucketName}/{fileName}";
+
                 using var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", serviceKey);
+                httpClient.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", serviceKey);
                 httpClient.DefaultRequestHeaders.Add("apikey", serviceKey);
 
-                // Supabase Storage Upload URL: POST /storage/v1/object/{bucket}/{path}
-                // We use a default bucket name 'inventory-images'
-                var bucketName = "inventory-images";
-                var uploadUrl = $"{supabaseUrl.TrimEnd('/')}/storage/v1/object/{bucketName}/{uniqueFileName}";
-
-                using var stream = file.OpenReadStream();
+                using var stream  = file.OpenReadStream();
                 using var content = new StreamContent(stream);
-                content.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType ?? "image/jpeg");
+                // Force image/jpeg so Supabase accepts the content-type
+                content.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+                // x-upsert: true → overwrite if same filename already exists (photo update)
                 content.Headers.Add("x-upsert", "true");
 
                 var response = await httpClient.PostAsync(uploadUrl, content);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    // Construct public URL
-                    // Public URL format: {supabaseUrl}/storage/v1/object/public/{bucket}/{path}
-                    var publicUrl = $"{supabaseUrl.TrimEnd('/')}/storage/v1/object/public/{bucketName}/{uniqueFileName}";
+                    // Public URL — no auth token required to view
+                    var publicUrl = $"{supabaseUrl.TrimEnd('/')}/storage/v1/object/public/{bucketName}/{fileName}";
                     return Ok(new { url = publicUrl });
                 }
                 else
                 {
-                    var errorResponse = await response.Content.ReadAsStringAsync();
-                    return StatusCode((int)response.StatusCode, $"Supabase Storage upload failed: {errorResponse}");
+                    var errorBody = await response.Content.ReadAsStringAsync();
+                    return StatusCode((int)response.StatusCode,
+                        $"Supabase Storage upload failed: {errorBody}");
                 }
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, $"Error uploading to Supabase: {ex.Message}");
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    $"Error uploading to Supabase: {ex.Message}");
             }
         }
 
+        // ─────────────────────────────────────────────────────────────────────────
+        // GET /api/storage/lookup/{code}
+        // Used by CapturePhotos page to resolve a barcode or batch to item details
+        // ─────────────────────────────────────────────────────────────────────────
         [HttpGet("lookup/{code}")]
         public async Task<IActionResult> LookupItem(string code)
         {
@@ -140,12 +152,12 @@ namespace InventoryManagement.Api.Controllers
             {
                 return Ok(new
                 {
-                    itemName = barcode.Item?.Name ?? "Unknown Item",
-                    itemCode = barcode.Item?.Code ?? "Unknown Code",
-                    isBarcode = true,
-                    selectedBarcode = barcode.Barcode,
+                    itemName         = barcode.Item?.Name ?? "Unknown Item",
+                    itemCode         = barcode.Item?.Code ?? "Unknown Code",
+                    isBarcode        = true,
+                    selectedBarcode  = barcode.Barcode,
                     existingImageUrl = barcode.ImageUrl,
-                    barcodes = new[] { new { barcodeNo = barcode.Barcode, imageUrl = barcode.ImageUrl } }
+                    barcodes         = new[] { new { barcodeNo = barcode.Barcode, imageUrl = barcode.ImageUrl } }
                 });
             }
 
@@ -160,64 +172,53 @@ namespace InventoryManagement.Api.Controllers
                 var first = barcodesInBatch.First();
                 return Ok(new
                 {
-                    itemName = first.Item?.Name ?? "Unknown Item",
-                    itemCode = first.Item?.Code ?? "Unknown Code",
-                    isBarcode = false,
-                    selectedBarcode = (string?)null,
+                    itemName         = first.Item?.Name ?? "Unknown Item",
+                    itemCode         = first.Item?.Code ?? "Unknown Code",
+                    isBarcode        = false,
+                    selectedBarcode  = (string?)null,
                     existingImageUrl = (string?)null,
-                    barcodes = barcodesInBatch.Select(b => new { barcodeNo = b.Barcode, imageUrl = b.ImageUrl }).ToList()
+                    barcodes         = barcodesInBatch
+                        .Select(b => new { barcodeNo = b.Barcode, imageUrl = b.ImageUrl })
+                        .ToList()
                 });
             }
 
             return NotFound("Barcode or Batch number not found in system.");
         }
 
+        // ─────────────────────────────────────────────────────────────────────────
+        // GET /api/storage/image?url={supabaseUrl}
+        //
+        // Proxy endpoint — fetches an image from Supabase Storage using the
+        // service-role key (server-side only) and streams it back to the browser.
+        // This keeps the service key completely server-side.
+        // ─────────────────────────────────────────────────────────────────────────
         [HttpGet("image")]
         public async Task<IActionResult> GetImage([FromQuery] string url)
         {
             if (string.IsNullOrEmpty(url))
-            {
                 return BadRequest("URL is required.");
-            }
+
+            // If it's a base64 data URL, return it directly
+            if (url.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
+                return BadRequest("Base64 data URLs should not be proxied.");
 
             var supabaseUrl = _config["Supabase:Url"];
-            if (string.IsNullOrEmpty(supabaseUrl) || !url.Contains(supabaseUrl, StringComparison.OrdinalIgnoreCase))
+            var serviceKey  = GetSupabaseServiceKey();
+
+            // For Supabase URLs — fetch with auth header
+            bool isSupabaseUrl = !string.IsNullOrEmpty(supabaseUrl) &&
+                                 url.Contains(supabaseUrl, StringComparison.OrdinalIgnoreCase);
+
+            if (isSupabaseUrl && !string.IsNullOrEmpty(serviceKey))
             {
-                // If not a Supabase URL, redirect to local or external target
-                return Redirect(url);
-            }
-
-            var serviceRoleKey = _config["Supabase:ServiceRoleKey"];
-            var anonKey = _config["Supabase:AnonKey"];
-            
-            bool IsPlaceholder(string? value)
-            {
-                if (string.IsNullOrWhiteSpace(value)) return true;
-                var v = value.ToLowerInvariant();
-                if (v.Contains("your-anon-key") || v.Contains("your-service-role-key") || v.Contains("your-jwt-secret") || v.Contains("your-project"))
-                {
-                    return true;
-                }
-                var parts = value.Split('.');
-                if (parts.Length != 3)
-                {
-                    return true;
-                }
-                return false;
-            }
-
-            // Check placeholders
-            if (IsPlaceholder(serviceRoleKey)) serviceRoleKey = null;
-            if (IsPlaceholder(anonKey)) anonKey = null;
-
-            var serviceKey = serviceRoleKey ?? anonKey;
-
-            if (string.IsNullOrEmpty(serviceKey))
-            {
-                // Fallback to anonymous fetch if no keys are configured
                 try
                 {
                     using var httpClient = new HttpClient();
+                    httpClient.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", serviceKey);
+                    httpClient.DefaultRequestHeaders.Add("apikey", serviceKey);
+
                     var response = await httpClient.GetAsync(url);
                     if (response.IsSuccessStatusCode)
                     {
@@ -225,48 +226,61 @@ namespace InventoryManagement.Api.Controllers
                         var stream = await response.Content.ReadAsStreamAsync();
                         return File(stream, contentType);
                     }
-                    return StatusCode((int)response.StatusCode, "Failed to retrieve image anonymously.");
+
+                    // Fallback: try public (no-auth) fetch for public bucket objects
+                    var pubResponse = await new HttpClient().GetAsync(url);
+                    if (pubResponse.IsSuccessStatusCode)
+                    {
+                        var ct = pubResponse.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
+                        return File(await pubResponse.Content.ReadAsStreamAsync(), ct);
+                    }
+
+                    var err = await response.Content.ReadAsStringAsync();
+                    return StatusCode((int)response.StatusCode,
+                        $"Failed to retrieve image from Supabase: {err}");
                 }
                 catch (Exception ex)
                 {
-                    return StatusCode(StatusCodes.Status500InternalServerError, $"Error: {ex.Message}");
+                    return StatusCode(StatusCodes.Status500InternalServerError,
+                        $"Error fetching from Supabase: {ex.Message}");
                 }
             }
 
-            // Supabase is configured - download from Supabase Storage REST API
-            try
+            // For non-Supabase URLs (e.g. old local /uploads/ paths) → redirect
+            if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
-                using var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", serviceKey);
-                httpClient.DefaultRequestHeaders.Add("apikey", serviceKey);
+                return Redirect(url);
+            }
 
-                // Try the public URL with authorization headers
-                var response = await httpClient.GetAsync(url);
-                if (response.IsSuccessStatusCode)
-                {
-                    var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
-                    var stream = await response.Content.ReadAsStreamAsync();
-                    return File(stream, contentType);
-                }
-                else
-                {
-                    var errorResponse = await response.Content.ReadAsStringAsync();
-                    return StatusCode((int)response.StatusCode, $"Failed to retrieve image from Supabase storage: {errorResponse}");
-                }
-            }
-            catch (Exception ex)
+            // Relative /uploads/ path → serve from wwwroot
+            var uploadsIndex = url.IndexOf("/uploads/", StringComparison.OrdinalIgnoreCase);
+            if (uploadsIndex >= 0)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, $"Error fetching from Supabase: {ex.Message}");
+                var relativePath = url.Substring(uploadsIndex);
+                var filePath = Path.Combine(
+                    _env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"),
+                    relativePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+
+                if (System.IO.File.Exists(filePath))
+                {
+                    var bytes = await System.IO.File.ReadAllBytesAsync(filePath);
+                    return File(bytes, "image/jpeg");
+                }
             }
+
+            return NotFound("Image not found.");
         }
 
+        // ─────────────────────────────────────────────────────────────────────────
+        // POST /api/storage/update-photo
+        // Associates (or clears) a Supabase image URL with a specific barcode
+        // ─────────────────────────────────────────────────────────────────────────
         [HttpPost("update-photo")]
         public async Task<IActionResult> UpdatePhoto([FromBody] UpdatePhotoRequest request)
         {
             if (string.IsNullOrEmpty(request.Code))
-            {
                 return BadRequest("Code is required.");
-            }
 
             var barcode = await _context.BarcodeMasters
                 .FirstOrDefaultAsync(b => b.Barcode == request.Code);
@@ -276,15 +290,13 @@ namespace InventoryManagement.Api.Controllers
                 barcode.ImageUrl = request.ImageUrl;
                 _context.BarcodeMasters.Update(barcode);
                 await _context.SaveChangesAsync();
-                return Ok(new { message = $"Photo updated successfully for barcode {barcode.Barcode}." });
+                return Ok(new { message = $"Photo updated for barcode {barcode.Barcode}." });
             }
 
-            // Check if they tried to update by batch number instead of barcode
+            // Prevent accidental batch-wide update
             var existsAsBatch = await _context.BarcodeMasters.AnyAsync(b => b.BatchNo == request.Code);
             if (existsAsBatch)
-            {
-                return BadRequest("You must select a specific barcode number to update the image. Batch-wide updates are disabled.");
-            }
+                return BadRequest("Select a specific barcode number to update the image. Batch-wide updates are disabled.");
 
             return NotFound("No barcode found matching the code.");
         }
@@ -292,7 +304,7 @@ namespace InventoryManagement.Api.Controllers
 
     public class UpdatePhotoRequest
     {
-        public string Code { get; set; } = string.Empty;
+        public string Code      { get; set; } = string.Empty;
         public string? ImageUrl { get; set; }
     }
 }

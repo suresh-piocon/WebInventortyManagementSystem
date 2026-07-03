@@ -21,3 +21,10 @@
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# ── Secrets — NEVER commit these ──────────────────────────────────────────────
+# launchSettings.json contains dev environment variables (API keys etc.)
+**/Properties/launchSettings.json
+
+# Override appsettings with environment-specific secrets
+appsettings.*.json

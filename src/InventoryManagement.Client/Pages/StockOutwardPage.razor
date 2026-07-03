@@ -348,7 +348,8 @@
 
     private void PreloadImageAndShowPopup(OutwardLineItem line, string url)
     {
-        if (url.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+        // Route ALL non-base64 URLs through the proxy (Supabase + local uploads)
+        if (!url.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
         {
             _ = Task.Run(async () => {
                 try

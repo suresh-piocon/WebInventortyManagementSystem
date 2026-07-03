@@ -21,7 +21,9 @@
         {
             <div class="d-flex flex-column align-items-center justify-content-center py-4">
                 <MudProgressCircular Color="Color.Primary" Indeterminate="true" Class="mb-2" />
-                <MudText Typo="Typo.body2">Uploading photo to inventory server...</MudText>
+                <MudText Typo="Typo.body2">
+                    Uploading photo to Supabase Storage@(string.IsNullOrEmpty(BarcodeNo) ? "" : $" as {BarcodeNo}.jpg")...
+                </MudText>
             </div>
         }
         else
@@ -79,8 +81,16 @@
 </MudCard>
 
 @code {
+    /// <summary>Callback fired with the Supabase public URL after a successful upload.</summary>
     [Parameter]
     public EventCallback<string> OnPhotoCaptured { get; set; }
+
+    /// <summary>
+    /// When set, the uploaded file will be named {BarcodeNo}.jpg in Supabase Storage.
+    /// This makes the image deterministically retrievable by barcode number.
+    /// </summary>
+    [Parameter]
+    public string? BarcodeNo { get; set; }
 
     private string _captureMode = "Webcam";
     private string? _capturedImageBase64;
@@ -199,7 +209,12 @@
             fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
             content.Add(fileContent, "file", "photo.jpg");
 
-            var response = await Http.PostAsync("api/storage/upload", content);
+            // Include the barcodeNo so Supabase stores the file as {barcodeNo}.jpg
+            var uploadUrl = string.IsNullOrWhiteSpace(BarcodeNo)
+                ? "api/storage/upload"
+                : $"api/storage/upload?barcodeNo={Uri.EscapeDataString(BarcodeNo)}";
+
+            var response = await Http.PostAsync(uploadUrl, content);
             if (response.IsSuccessStatusCode)
             {
                 var responseContent = await response.Content.ReadFromJsonAsync<UploadResponse>();

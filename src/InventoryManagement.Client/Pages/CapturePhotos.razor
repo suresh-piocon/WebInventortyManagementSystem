@@ -140,7 +140,7 @@
                         <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
                             <MudIcon Icon="@Icons.Material.Filled.CameraAlt" Class="mr-2" /> Capture / Upload Image for @_selectedBarcode
                         </MudText>
-                        <CameraCapture OnPhotoCaptured="OnPhotoUploaded" />
+                        <CameraCapture OnPhotoCaptured="OnPhotoUploaded" BarcodeNo="@_selectedBarcode" />
                     }
                 </MudPaper>
             </MudItem>
@@ -257,24 +257,30 @@
 
     private void TriggerImagePreload()
     {
-        if (!string.IsNullOrEmpty(_existingImageUrl) && _existingImageUrl.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrEmpty(_existingImageUrl)) return;
+
+        // Already a base64 data URL — nothing to load
+        if (_existingImageUrl.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)) return;
+
+        // Route ALL external/local URLs through the backend proxy so the
+        // service-role key is never exposed to the browser
+        _ = Task.Run(async () =>
         {
-            _ = Task.Run(async () => {
-                try
+            try
+            {
+                var base64Url = await ImageLoader.LoadImageAsBase64Async(_existingImageUrl);
+                if (!string.IsNullOrEmpty(base64Url))
                 {
-                    var base64Url = await ImageLoader.LoadImageAsBase64Async(_existingImageUrl);
-                    if (!string.IsNullOrEmpty(base64Url))
-                    {
-                        _existingImageUrl = base64Url;
-                        await InvokeAsync(StateHasChanged);
-                    }
+                    _existingImageUrl = base64Url;
+                    await InvokeAsync(StateHasChanged);
                 }
-                catch (Exception ex)
-                {
-                    await InvokeAsync(() => Snackbar.Add($"Failed to load existing image: {ex.Message}", Severity.Warning));
-                }
-            });
-        }
+            }
+            catch (Exception ex)
+            {
+                await InvokeAsync(() =>
+                    Snackbar.Add($"Failed to load existing image: {ex.Message}", Severity.Warning));
+            }
+        });
     }
 
     private async Task OnPhotoUploaded(string publicUrl)
@@ -346,13 +352,17 @@
     private string GetAbsoluteImageUrl(string? url)
     {
         if (string.IsNullOrEmpty(url)) return string.Empty;
-        
+
+        // Already a base64 data URL — return as-is, no proxy needed
+        if (url.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)) return url;
+
+        // Supabase storage URL → route through backend proxy (service key stays server-side)
         if (url.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
         {
             var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
             return $"{baseAddress}/api/storage/image?url={Uri.EscapeDataString(url)}";
         }
-        
+
         var uploadsIndex = url.IndexOf("/uploads/", StringComparison.OrdinalIgnoreCase);
         if (uploadsIndex >= 0)
         {
@@ -360,25 +370,22 @@
             var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
             return $"{baseAddress}{relativePath}";
         }
-        
+
         if (url.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
         {
             var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
             return $"{baseAddress}/{url}";
         }
-        
+
         if (url.StartsWith("http://localhost") || url.StartsWith("https://localhost"))
         {
             var uri = new Uri(url);
-            var relativePath = uri.PathAndQuery;
             var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
-            return $"{baseAddress}{relativePath}";
+            return $"{baseAddress}{uri.PathAndQuery}";
         }
 
         if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-        {
             return "https://" + url.Substring(7);
-        }
 
         return url;
     }

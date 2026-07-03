@@ -525,51 +525,128 @@ namespace InventoryManagement.Api.Controllers
             }
 
             var barcodes = await query.OrderBy(b => b.Barcode).ToListAsync();
-            var barcodeList = barcodes.Select(b => b.Barcode).ToList();
 
-            // Fetch outward details for these barcodes
-            // For Unique barcodes: each barcode maps 1:1 with a StockOutwardDetail.Barcode entry.
-            // For Batch barcodes: the barcode scanned during outward is stored in StockOutwardDetail.Barcode;
-            //   only that specific barcode record should be "Issued".
-            // We intentionally do NOT use IsUsed here because IsUsed may have been set broadly
-            // during outward processing and does not accurately reflect per-barcode issued count.
-            var outwardDetails = await _context.StockOutwardDetails
+            // Resolve supplier name via StockInwardDetails → StockInward → Supplier
+            // (use the first matching inward detail for this batch/tracking)
+            var supplierName = "N/A";
+            if (!string.IsNullOrEmpty(trackingNo) || !string.IsNullOrEmpty(batchNo))
+            {
+                var inwardDetail = await _context.StockInwardDetails
+                    .Include(d => d.StockInward)
+                        .ThenInclude(si => si!.Supplier)
+                    .Where(d =>
+                        (string.IsNullOrEmpty(trackingNo) || d.TrackingNo == trackingNo) &&
+                        (string.IsNullOrEmpty(batchNo) || d.BatchNo == batchNo))
+                    .FirstOrDefaultAsync();
+                supplierName = inwardDetail?.StockInward?.Supplier?.Name ?? "N/A";
+            }
+
+            // ──────────────────────────────────────────────────────────────────────
+            // Determine Issued / In Stock status correctly for BOTH barcode types:
+            //
+            // UNIQUE barcodes: each barcode has a 1:1 relationship with a
+            //   StockOutwardDetail.Barcode entry — exact match determines status.
+            //
+            // BATCH barcodes: during outward, only ONE barcode value is stored in
+            //   StockOutwardDetail.Barcode (the batch barcode that was scanned),
+            //   but Quantity can be > 1.  We must NOT mark all barcodes with that
+            //   same barcode value as "Issued" — instead we:
+            //     1. Sum total OutwardQty from StockLedger for this batch/tracking.
+            //     2. Mark the first [outwardQty] barcodes (sorted ascending) as Issued
+            //        and the remaining as In Stock.
+            //
+            // This guarantees that Issued count == Stock Ledger outward qty.
+            // ──────────────────────────────────────────────────────────────────────
+
+            // Build a lookup of outward details by exact barcode value (for Unique type)
+            var barcodeValues = barcodes.Select(b => b.Barcode).ToList();
+            var outwardDetailsByBarcode = await _context.StockOutwardDetails
                 .Include(od => od.StockOutward)
-                .Where(od => barcodeList.Contains(od.Barcode))
-                .ToListAsync();
-
-            // Also fetch outward qty per batch/tracking from the ledger so we can correctly
-            // identify how many batch barcodes are issued (in order of barcode number).
-            // For batch-type items the outward detail barcode field holds the batch-level barcode
-            // that was scanned – the qty tells us how many units were taken from that batch.
-            // Build a lookup: barcode -> outward detail (first occurrence only)
-            var outwardByBarcode = outwardDetails
+                .Where(od => barcodeValues.Contains(od.Barcode))
                 .GroupBy(od => od.Barcode)
-                .ToDictionary(g => g.Key, g => g.First());
+                .ToDictionaryAsync(g => g.Key, g => g.OrderBy(od => od.StockOutward!.OutwardDate).First());
 
-            var result = barcodes.Select(b => {
-                outwardByBarcode.TryGetValue(b.Barcode, out var outward);
-                // A barcode is "Issued" only when there is a matching StockOutwardDetail record
-                // for that exact barcode value. This is accurate for both Unique and Batch types
-                // and ensures the Issued count matches the Stock Ledger outward qty.
-                bool isIssued = outward != null;
-                return new BarcodeDetailReportDto
+            // For batch-type groups: compute total outward qty from the ledger per (trackingNo, batchNo)
+            // We group barcodes by (TrackingNo, BatchNo) then apply qty-based assignment.
+            var groupedBarcodes = barcodes
+                .GroupBy(b => (b.TrackingNo, b.BatchNo))
+                .ToList();
+
+            var result = new List<BarcodeDetailReportDto>();
+
+            foreach (var group in groupedBarcodes)
+            {
+                var groupTrackingNo = group.Key.TrackingNo;
+                var groupBatchNo = group.Key.BatchNo;
+                var groupBarcodes = group.OrderBy(b => b.Barcode).ToList();
+
+                // Is this group using Unique barcodes?
+                bool isUniqueGroup = groupBarcodes.Any(b => b.Type == "Unique");
+
+                if (isUniqueGroup)
                 {
-                    ItemName = b.Item?.Name ?? "Unknown Item",
-                    BarcodeNo = b.Barcode,
-                    BatchNo = b.BatchNo,
-                    TrackingNo = b.TrackingNo,
-                    Type = b.Type,
-                    InwardDate = b.CreatedAt,
-                    OutwardDate = outward?.StockOutward?.OutwardDate,
-                    Status = isIssued ? "Issued" : "In Stock",
-                    ImageUrl = b.ImageUrl
-                };
-            }).ToList();
+                    // Unique barcodes: exact match per barcode value
+                    foreach (var b in groupBarcodes)
+                    {
+                        outwardDetailsByBarcode.TryGetValue(b.Barcode, out var outward);
+                        bool isIssued = outward != null;
+                        result.Add(new BarcodeDetailReportDto
+                        {
+                            SupplierName = supplierName,
+                            ItemName = b.Item?.Name ?? "Unknown Item",
+                            BarcodeNo = b.Barcode,
+                            BatchNo = b.BatchNo,
+                            TrackingNo = b.TrackingNo,
+                            Type = b.Type,
+                            InwardDate = b.CreatedAt,
+                            OutwardDate = outward?.StockOutward?.OutwardDate,
+                            Status = isIssued ? "Issued" : "In Stock",
+                            ImageUrl = b.ImageUrl
+                        });
+                    }
+                }
+                else
+                {
+                    // Batch barcodes: use total OutwardQty from StockLedger
+                    // to determine how many barcodes are "Issued"
+                    var totalOutwardQty = await _context.StockLedgers
+                        .Where(l => l.TrackingNo == groupTrackingNo && l.BatchNo == groupBatchNo)
+                        .SumAsync(l => l.OutwardQty);
 
+                    // Fetch the first outward event for the date column
+                    var firstOutwardDetail = await _context.StockOutwardDetails
+                        .Include(od => od.StockOutward)
+                        .Where(od => od.TrackingNo == groupTrackingNo && od.BatchNo == groupBatchNo)
+                        .OrderBy(od => od.StockOutward!.OutwardDate)
+                        .FirstOrDefaultAsync();
+
+                    int issuedCount = (int)Math.Round(totalOutwardQty, MidpointRounding.AwayFromZero);
+                    int barcodeIndex = 0;
+
+                    foreach (var b in groupBarcodes)
+                    {
+                        bool isIssued = barcodeIndex < issuedCount;
+                        result.Add(new BarcodeDetailReportDto
+                        {
+                            SupplierName = supplierName,
+                            ItemName = b.Item?.Name ?? "Unknown Item",
+                            BarcodeNo = b.Barcode,
+                            BatchNo = b.BatchNo,
+                            TrackingNo = b.TrackingNo,
+                            Type = b.Type,
+                            InwardDate = b.CreatedAt,
+                            OutwardDate = isIssued ? firstOutwardDetail?.StockOutward?.OutwardDate : null,
+                            Status = isIssued ? "Issued" : "In Stock",
+                            ImageUrl = b.ImageUrl
+                        });
+                        barcodeIndex++;
+                    }
+                }
+            }
 
             return Ok(result);
         }
+
 
         // ==========================================
         // AUDIT LOG REPORT

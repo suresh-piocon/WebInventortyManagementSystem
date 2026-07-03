@@ -1,4 +1,4 @@
-﻿{
+{
   "$schema": "https://json.schemastore.org/launchsettings.json",
   "profiles": {
     "http": {
@@ -7,7 +7,8 @@
       "launchBrowser": false,
       "applicationUrl": "http://localhost:5223",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Supabase__ServiceRoleKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRwbWd1ampseXVlY25wZ3l6c29yIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjczNTQ3OCwiZXhwIjoyMDk4MzExNDc4fQ.4YqF1sTLrd-UhX23bsmW-awcHv9-1wbilP5i3RlzBjk"
       }
     },
     "https": {
@@ -16,7 +17,8 @@
       "launchBrowser": false,
       "applicationUrl": "https://localhost:7051;http://localhost:5223",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Supabase__ServiceRoleKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRwbWd1ampseXVlY25wZ3l6c29yIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjczNTQ3OCwiZXhwIjoyMDk4MzExNDc4fQ.4YqF1sTLrd-UhX23bsmW-awcHv9-1wbilP5i3RlzBjk"
       }
     }
   }

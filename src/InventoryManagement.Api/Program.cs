@@ -48,8 +48,9 @@ if (!string.IsNullOrEmpty(envAnonKey))
     builder.Configuration["Supabase:AnonKey"] = envAnonKey;
 }
 
-var envServiceRoleKey = Environment.GetEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY") 
-                     ?? Environment.GetEnvironmentVariable("SUPABASE_SERVICEROLEKEY");
+var envServiceRoleKey = Environment.GetEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY")
+                     ?? Environment.GetEnvironmentVariable("SUPABASE_SERVICEROLEKEY")
+                     ?? Environment.GetEnvironmentVariable("Supabase__ServiceRoleKey");
 if (!string.IsNullOrEmpty(envServiceRoleKey))
 {
     builder.Configuration["Supabase:ServiceRoleKey"] = envServiceRoleKey;
