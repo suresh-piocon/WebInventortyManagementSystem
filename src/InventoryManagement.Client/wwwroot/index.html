@@ -87,39 +87,52 @@
                 const element = document.getElementById(elementId);
                 if (!element) return;
                 
+                // Find actual table or print raw element
+                const tableElement = element.querySelector('table');
+                let contentHtml = tableElement ? tableElement.outerHTML : element.outerHTML;
+
                 const printWindow = window.open('', '_blank');
-                printWindow.document.write('<html><head><title>' + title + '</title>');
-                // Copy styles
-                for (const sheet of document.styleSheets) {
-                    try {
-                        if (sheet.cssRules) {
-                            printWindow.document.write('<style>');
-                            for (const rule of sheet.cssRules) {
-                                printWindow.document.write(rule.cssText);
-                            }
-                            printWindow.document.write('</style>');
-                        }
-                    } catch (e) {
-                        // Ignore cross-origin stylesheet errors
-                    }
+                if (!printWindow) {
+                    alert("Please allow popups to print reports.");
+                    return;
                 }
-                 // Add overrides for printing (force black text on white background and hide pager/menu elements)
-                 printWindow.document.write('<style>');
-                 printWindow.document.write('body { background-color: white !important; color: black !important; font-family: sans-serif; }');
-                 printWindow.document.write('#' + elementId + ', #' + elementId + ' * { background: transparent !important; background-color: transparent !important; color: black !important; border-color: #cbd5e1 !important; text-shadow: none !important; box-shadow: none !important; }');
-                 printWindow.document.write('th, td { color: black !important; border: 1px solid #cbd5e1 !important; padding: 10px !important; text-align: left !important; }');
-                 printWindow.document.write('th { font-weight: bold !important; background-color: #f1f5f9 !important; }');
-                 printWindow.document.write('img { max-width: 50px !important; max-height: 50px !important; object-fit: cover !important; border-radius: 4px !important; }');
-                 printWindow.document.write('.mud-table-pager, .mud-menu, button, .mud-button-root { display: none !important; }');
-                 printWindow.document.write('</style>');
-                 
-                 printWindow.document.write('</head><body style="background-color: white; color: black; padding: 20px;">');
-                 printWindow.document.write('<h2 style="margin-bottom: 20px; font-family: sans-serif; border-bottom: 2px solid #334155; padding-bottom: 10px; color: #1e293b;">' + title + '</h2>');
-                 printWindow.document.write(element.outerHTML);
-                 printWindow.document.write('</body></html>');
-                 printWindow.document.close();
+
+                printWindow.document.write('<!DOCTYPE html><html><head>');
+                printWindow.document.write('<title>' + title + '</title>');
+                printWindow.document.write('<style>');
+                printWindow.document.write('body { font-family: "Segoe UI", Arial, sans-serif; background-color: white !important; color: black !important; padding: 30px; margin: 0; }');
+                printWindow.document.write('h2 { color: #1e293b; border-bottom: 2px solid #334155; padding-bottom: 10px; margin-top: 0; margin-bottom: 20px; font-size: 24px; font-family: "Segoe UI", Arial, sans-serif; }');
+                printWindow.document.write('table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; color: black !important; }');
+                printWindow.document.write('th, td { border: 1px solid #cbd5e1 !important; padding: 10px !important; text-align: left !important; color: black !important; background: transparent !important; }');
+                printWindow.document.write('th { font-weight: bold !important; background-color: #f1f5f9 !important; }');
+                printWindow.document.write('tr:nth-child(even) { background-color: #f8fafc !important; }');
+                printWindow.document.write('img { max-width: 60px !important; max-height: 60px !important; object-fit: cover !important; border-radius: 4px !important; display: inline-block; vertical-align: middle; }');
+                printWindow.document.write('.mud-table-pager, .mud-menu, button, .mud-button-root, .mud-table-pagination, .mud-table-pager-inner { display: none !important; }');
                 
-                // Wait for rendering before printing
+                // Styles for Barcode Stock Image Report grid printout (supports 4 columns on printed A4 portrait page)
+                printWindow.document.write('.image-report-grid { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 15px !important; margin-top: 15px !important; width: 100% !important; }');
+                printWindow.document.write('.image-report-card { background: white !important; border: 1px solid #cbd5e1 !important; border-radius: 8px !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; box-shadow: none !important; page-break-inside: avoid; }');
+                printWindow.document.write('.image-container { position: relative !important; width: 100% !important; aspect-ratio: 4/3 !important; background: #f1f5f9 !important; overflow: hidden !important; border-bottom: 1px solid #cbd5e1 !important; }');
+                printWindow.document.write('.card-img { width: 100% !important; height: 100% !important; object-fit: cover !important; }');
+                printWindow.document.write('.card-img-placeholder { width: 100% !important; height: 100% !important; display: flex !important; align-items: center !important; justify-content: center !important; background: #e2e8f0 !important; color: #64748b !important; }');
+                printWindow.document.write('.age-badge { position: absolute !important; top: 5px !important; right: 5px !important; padding: 2px 6px !important; border-radius: 10px !important; font-size: 9px !important; font-weight: bold !important; color: white !important; }');
+                printWindow.document.write('.age-normal { background: #10b981 !important; }');
+                printWindow.document.write('.age-slow { background: #ef4444 !important; }');
+                printWindow.document.write('.card-details { padding: 8px !important; display: flex !important; flex-direction: column !important; flex-grow: 1 !important; font-size: 11px !important; color: black !important; }');
+                printWindow.document.write('.barcode-text { font-family: monospace !important; font-weight: bold !important; font-size: 12px !important; color: #1e293b !important; }');
+                printWindow.document.write('.item-name-text { font-weight: 500 !important; font-size: 11px !important; color: #475569 !important; margin-bottom: 4px !important; }');
+                printWindow.document.write('.detail-row { display: flex !important; justify-content: space-between !important; margin-bottom: 1px !important; }');
+                printWindow.document.write('.detail-label { color: #64748b !important; }');
+                printWindow.document.write('.detail-value { color: #0f172a !important; font-weight: 600 !important; }');
+                printWindow.document.write('.mud-divider { margin: 8px 0 !important; border-top: 1px solid #cbd5e1 !important; height: 0 !important; border-bottom: none !important; }');
+                
+                printWindow.document.write('</style>');
+                printWindow.document.write('</head><body>');
+                printWindow.document.write('<h2>' + title + '</h2>');
+                printWindow.document.write(contentHtml);
+                printWindow.document.write('</body></html>');
+                printWindow.document.close();
+                
                 setTimeout(function() {
                     printWindow.print();
                     printWindow.close();

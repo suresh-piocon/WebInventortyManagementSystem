@@ -4,6 +4,7 @@
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
 @inject InventoryManagement.Client.Services.ImageLoaderService ImageLoader
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Barcode Stock Image Report - AG Inventory</PageTitle>
 
@@ -31,7 +32,7 @@
                                Class="text-slate-200" 
                                Color="Color.Primary" />
             </MudItem>
-            <MudItem xs="12" sm="5" md="6">
+            <MudItem xs="12" sm="4" md="6">
                 <MudTextField @bind-Value="_searchString" 
                               Placeholder="Search by Barcode, Item Name, Supplier..." 
                               Adornment="Adornment.Start" 
@@ -41,15 +42,24 @@
                               Class="text-slate-200" 
                               Immediate="true" />
             </MudItem>
-            <MudItem xs="12" sm="3" md="3" Class="d-flex justify-end">
+            <MudItem xs="12" sm="4" md="3" Class="d-flex gap-2 justify-end">
                 <MudButton Variant="Variant.Filled" 
                            Color="Color.Secondary" 
                            StartIcon="@Icons.Material.Filled.Refresh" 
                            OnClick="RefreshData"
                            Disabled="_loading"
-                           Class="w-100 py-3"
-                           Style="font-family: 'Outfit'; font-weight: 600;">
+                           Class="w-50 py-3"
+                           Style="font-family: 'Outfit'; font-weight: 600; min-height: 56px;">
                     Refresh
+                </MudButton>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Error" 
+                           StartIcon="@Icons.Material.Filled.PictureAsPdf" 
+                           OnClick="PrintPdf"
+                           Disabled="_loading || !FilteredReportItems.Any()"
+                           Class="w-50 py-3"
+                           Style="font-family: 'Outfit'; font-weight: 600; min-height: 56px;">
+                    PDF Print
                 </MudButton>
             </MudItem>
         </MudGrid>
@@ -123,7 +133,7 @@
     }
     else
     {
-        <div class="image-report-grid">
+        <div id="barcode-image-report-container" class="image-report-grid">
             @foreach (var item in FilteredReportItems)
             {
                 <div class="image-report-card">
@@ -408,5 +418,18 @@
         var parameters = new DialogParameters { ["imageUrl"] = absoluteUrl };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
         await DialogService.ShowAsync<ImagePreviewDialog>("Photo View", parameters, options);
+    }
+
+    private async Task PrintPdf()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("webcamInterop.printElement", "barcode-image-report-container", "Barcode Stock Image Report");
+            Snackbar.Add("Print preview opened.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error printing PDF: {ex.Message}", Severity.Error);
+        }
     }
 }
