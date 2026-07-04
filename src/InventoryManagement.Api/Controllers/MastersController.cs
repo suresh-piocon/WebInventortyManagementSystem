@@ -263,6 +263,7 @@ namespace InventoryManagement.Api.Controllers
             entity.UnitId = item.UnitId;
             entity.Brand = item.Brand;
             entity.HSNCode = item.HSNCode;
+            entity.GSTPercent = item.GSTPercent;
             entity.MinimumStock = item.MinimumStock;
             entity.ReorderLevel = item.ReorderLevel;
             entity.BarcodeType = item.BarcodeType;

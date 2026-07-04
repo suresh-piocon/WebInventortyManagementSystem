@@ -1,0 +1,1231 @@
+@page "/proforma-invoice"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject InventoryManagement.Client.Services.ImageLoaderService ImageLoader
+
+<PageTitle>Stock Outward Proforma Invoice - AG Inventory</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="mb-6">
+        <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+            Stock Outward Proforma Invoice
+        </MudText>
+        <MudText Typo="Typo.body2" Class="text-slate-400">
+            Create proforma invoices, scan barcodes, group items by price, and issue stock immediately on submission.
+        </MudText>
+    </div>
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" Color="Color.Primary" ActivePanelIndexChanged="OnTabChanged" Class="mud-width-full">
+        <MudTabPanel Text="Create Proforma Invoice" Icon="@Icons.Material.Filled.Add">
+            <EditForm Model="@_proformaHeader" OnValidSubmit="SaveProforma">
+                <DataAnnotationsValidator />
+
+                <MudGrid>
+                    <!-- Proforma Header Details -->
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="glass-panel pa-6 mb-4">
+                            <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                                <MudIcon Icon="@Icons.Material.Filled.Description" Class="mr-2" /> Invoice Header
+                            </MudText>
+
+                            <MudDatePicker Label="Proforma Date" 
+                                           @bind-Date="_proformaDate" 
+                                           Required="true" 
+                                           Variant="Variant.Outlined" 
+                                           Class="mb-4 text-slate-200" />
+
+                            <MudTextField T="string" 
+                                           Label="Customer Name" 
+                                           @bind-Value="_proformaHeader.CustomerName" 
+                                           Required="true"
+                                           RequiredError="Customer name is required"
+                                           Variant="Variant.Outlined" 
+                                           Class="mb-4 text-slate-200" />
+
+                            <MudTextField T="string" 
+                                           Label="Mobile No" 
+                                           @bind-Value="_proformaHeader.MobileNo" 
+                                           Variant="Variant.Outlined" 
+                                           Class="mb-4 text-slate-200" />
+
+                            <MudTextField T="string" 
+                                           Label="Address" 
+                                           @bind-Value="_proformaHeader.Address" 
+                                           Lines="3"
+                                           Variant="Variant.Outlined" 
+                                           Class="mb-4 text-slate-200" />
+
+                            <MudSelect T="string" 
+                                       Label="Tax Transaction Type" 
+                                       @bind-Value="_taxType" 
+                                       @bind-Value:after="CalculateFooter"
+                                       Variant="Variant.Outlined"
+                                       Class="mb-4 text-slate-200">
+                                <MudSelectItem Value="@("Intra-State")">Intra-State (CGST + SGST)</MudSelectItem>
+                                <MudSelectItem Value="@("Inter-State")">Inter-State (IGST)</MudSelectItem>
+                            </MudSelect>
+                        </MudPaper>
+
+                        <!-- Company Profile Settings Panel (Collapsible) -->
+                        <MudExpansionPanels Class="mb-4" Style="background: transparent !important;">
+                            <MudExpansionPanel Text="Print Header Settings" Class="glass-panel text-slate-200" Style="border: 1px solid rgba(255,255,255,0.08) !important;">
+                                <MudTextField T="string" Label="Company Name" @bind-Value="_companyName" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                                <MudTextField T="string" Label="Company Address" @bind-Value="_companyAddress" Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                                <MudTextField T="string" Label="Company GSTIN" @bind-Value="_companyGstin" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                                <MudTextField T="string" Label="Company Mobile" @bind-Value="_companyMobile" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            </MudExpansionPanel>
+                        </MudExpansionPanels>
+
+                        <!-- Scanner Simulator Panel -->
+                        <MudPaper Class="glass-panel pa-6 mb-4" Style="border: 1px solid rgba(0,229,255,0.15) !important;">
+                            <MudText Typo="Typo.h6" Class="text-slate-200 mb-2" Style="font-family: 'Outfit';">
+                                <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Class="mr-2 text-cyan" /> Scan Barcode / QR Code
+                            </MudText>
+                            <MudText Typo="Typo.caption" Class="text-slate-400 d-block mb-4">
+                                Press Enter after scanning or type manually to resolve item
+                            </MudText>
+
+                            <div class="d-flex align-center w-100">
+                                <MudTextField @bind-Value="_scanInput" 
+                                               Label="Scan Code" 
+                                               Variant="Variant.Outlined" 
+                                               Adornment="Adornment.End" 
+                                               AdornmentIcon="@Icons.Material.Filled.QrCode" 
+                                               OnKeyDown="HandleScanKeyPress" 
+                                               Disabled="_resolving"
+                                               Immediate="true"
+                                               HelperText="e.g. ITEM000001, BC001"
+                                               Class="text-slate-100 flex-grow-1" />
+                            </div>
+                        </MudPaper>
+
+                        <!-- Save Actions -->
+                        <MudPaper Class="glass-panel pa-4 d-flex justify-between">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="ResetForm">
+                                Reset
+                            </MudButton>
+                            <MudButton ButtonType="ButtonType.Submit" 
+                                       Variant="Variant.Filled" 
+                                       Color="Color.Success"
+                                       StartIcon="@Icons.Material.Filled.Save"
+                                       Disabled="@(!_lineItems.Any() || _saving)"
+                                       Style="font-family: 'Outfit'; font-weight: 600;">
+                                @if (_saving)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                }
+                                else
+                                {
+                                    <MudText>Submit & Deduct Stock</MudText>
+                                }
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+
+                    <!-- Line Items Grid -->
+                    <MudItem xs="12" md="8">
+                        <MudPaper Class="glass-panel pa-6">
+                            <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                                <MudIcon Icon="@Icons.Material.Filled.ListAlt" Class="mr-2" /> Items Table
+                            </MudText>
+
+                            @if (!_lineItems.Any())
+                            {
+                                <div class="d-flex flex-column align-center justify-center py-12 text-center text-slate-500">
+                                    <MudIcon Icon="@Icons.Material.Filled.CropFree" Size="Size.Large" Class="mb-3" />
+                                    <MudText Typo="Typo.body1">Scan a Barcode or QR Code to begin adding items</MudText>
+                                    <div class="mt-4 p-2 rounded border border-slate-700 bg-slate-800 text-slate-300 font-mono" style="font-size: 11px;">
+                                        Tips: Copy-paste any barcode from the Inward entries to simulate scanning
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div style="overflow-x: auto;">
+                                    <table class="mud-table" style="width: 100%; min-width: 900px; border-collapse: collapse;">
+                                        <thead>
+                                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+                                                <th style="color: #94A3B8; padding: 10px; text-align: center; width: 45px;">S.No</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: left; width: 60px;">Photo</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: left;">Particulars</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: left; width: 100px;">HSN</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: right; width: 90px;">Qty</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: right; width: 100px;">Rate</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: right; width: 80px;">Disc %</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: right; width: 90px;">Disc Amt</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: right; width: 100px;">Taxable Value</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: right; width: 70px;">GST %</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: right; width: 90px;">GST Amt</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: right; width: 110px;">Line Total</th>
+                                                <th style="color: #94A3B8; padding: 10px; text-align: center; width: 45px;"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @for (int i = 0; i < _lineItems.Count; i++)
+                                            {
+                                                var index = i;
+                                                var line = _lineItems[index];
+                                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle;">
+                                                    <td style="padding: 10px; text-align: center;" class="text-slate-300">
+                                                        @(index + 1)
+                                                    </td>
+                                                    <td style="padding: 10px; text-align: center;">
+                                                        @if (!string.IsNullOrEmpty(line.ImageUrl))
+                                                        {
+                                                            <img src="@GetAbsoluteImageUrl(line.ImageUrl)" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover; border: 1px solid #00E5FF; cursor: pointer;" @onclick="@(() => PreviewImage(line.ImageUrl))" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <MudIcon Icon="@Icons.Material.Filled.Image" Color="Color.Dark" Size="Size.Medium" />
+                                                        }
+                                                    </td>
+                                                    <td style="padding: 10px;">
+                                                        <MudText Typo="Typo.body2" Class="text-slate-100 font-weight-bold">@line.Particulars</MudText>
+                                                        <MudText Typo="Typo.caption" Class="text-slate-400 font-mono" Style="font-size: 10px;">
+                                                            Codes: @(string.Join(", ", line.ScannedBarcodes.Select(b => b.Barcode)))
+                                                        </MudText>
+                                                    </td>
+                                                    <td style="padding: 10px;" class="text-slate-300 font-mono">
+                                                        @(string.IsNullOrEmpty(line.HSNCode) ? "N/A" : line.HSNCode)
+                                                    </td>
+                                                    <td style="padding: 10px;">
+                                                        <MudNumericField T="decimal" 
+                                                                         Value="line.Quantity" 
+                                                                         ValueChanged="@((val) => OnQuantityChanged(line, val))" 
+                                                                         Min="0.01M" 
+                                                                         Max="@line.ScannedBarcodes.Sum(b => b.AvailableQuantity)" 
+                                                                         Disabled="@(line.BarcodeType == "Unique")" 
+                                                                         HideSpinButtons="true" 
+                                                                         Margin="Margin.Dense" 
+                                                                         Variant="Variant.Outlined" 
+                                                                         Style="color: white; text-align: right; min-width: 60px;" />
+                                                    </td>
+                                                    <td style="padding: 10px;">
+                                                        <MudNumericField T="decimal" 
+                                                                         Value="line.Rate" 
+                                                                         ValueChanged="@((val) => OnRateChanged(line, val))" 
+                                                                         Min="0" 
+                                                                         HideSpinButtons="true" 
+                                                                         Format="F2" 
+                                                                         Margin="Margin.Dense" 
+                                                                         Variant="Variant.Outlined" 
+                                                                         Style="color: white; text-align: right; min-width: 80px;" />
+                                                    </td>
+                                                    <td style="padding: 10px;">
+                                                        <MudNumericField T="decimal" 
+                                                                         Value="line.DiscountPercent" 
+                                                                         ValueChanged="@((val) => OnDiscountPercentChanged(line, val))" 
+                                                                         Min="0" 
+                                                                         Max="100" 
+                                                                         HideSpinButtons="true" 
+                                                                         Format="F2" 
+                                                                         Margin="Margin.Dense" 
+                                                                         Variant="Variant.Outlined" 
+                                                                         Style="color: white; text-align: right; min-width: 50px;" />
+                                                    </td>
+                                                    <td style="padding: 10px;">
+                                                        <MudNumericField T="decimal" 
+                                                                         Value="line.DiscountAmount" 
+                                                                         ValueChanged="@((val) => OnDiscountAmountChanged(line, val))" 
+                                                                         Min="0" 
+                                                                         HideSpinButtons="true" 
+                                                                         Format="F2" 
+                                                                         Margin="Margin.Dense" 
+                                                                         Variant="Variant.Outlined" 
+                                                                         Style="color: white; text-align: right; min-width: 70px;" />
+                                                    </td>
+                                                    <td style="padding: 10px; text-align: right;" class="text-slate-200">
+                                                        ₹@line.TaxableValue.ToString("N2")
+                                                    </td>
+                                                    <td style="padding: 10px; text-align: right;" class="text-slate-300">
+                                                        @line.GSTPercent.ToString("N0")%
+                                                    </td>
+                                                    <td style="padding: 10px; text-align: right;" class="text-slate-300">
+                                                        ₹@line.GSTAmount.ToString("N2")
+                                                    </td>
+                                                    <td style="padding: 10px; text-align: right;" class="text-slate-100 font-weight-bold">
+                                                        ₹@line.LineTotal.ToString("N2")
+                                                    </td>
+                                                    <td style="padding: 10px; text-align: center;">
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveLineItem(index))" />
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Summary Cards Grid -->
+                                <MudGrid Class="mt-6">
+                                    <MudItem xs="12" md="6">
+                                        <!-- GST Tax Breakdown -->
+                                        <MudPaper Class="pa-4" Style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px;">
+                                            <MudText Typo="Typo.subtitle2" Class="font-weight-bold text-slate-300 mb-2">GST Rate-wise Breakdown</MudText>
+                                            <table style="width: 100%; font-size: 12px; color: #CBD5E1;">
+                                                <thead>
+                                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: bold;">
+                                                        <th style="padding: 4px; text-align: left;">GST Slab</th>
+                                                        <th style="padding: 4px; text-align: right;">Taxable Val</th>
+                                                        @if (_taxType == "Intra-State")
+                                                        {
+                                                            <th style="padding: 4px; text-align: right;">CGST</th>
+                                                            <th style="padding: 4px; text-align: right;">SGST</th>
+                                                        }
+                                                        else
+                                                        {
+                                                            <th style="padding: 4px; text-align: right;">IGST</th>
+                                                        }
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var slab in GetGstBreakdown())
+                                                    {
+                                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                                            <td style="padding: 4px; text-align: left;">GST @slab.GstRate.ToString("N0")%</td>
+                                                            <td style="padding: 4px; text-align: right;">₹@slab.TaxableValue.ToString("N2")</td>
+                                                            @if (_taxType == "Intra-State")
+                                                            {
+                                                                <td style="padding: 4px; text-align: right;">₹@slab.CGST.ToString("N2")</td>
+                                                                <td style="padding: 4px; text-align: right;">₹@slab.SGST.ToString("N2")</td>
+                                                            }
+                                                            else
+                                                            {
+                                                                <td style="padding: 4px; text-align: right;">₹@slab.IGST.ToString("N2")</td>
+                                                            }
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </MudPaper>
+                                    </MudItem>
+                                    
+                                    <MudItem xs="12" md="6">
+                                        <!-- Footer Totals -->
+                                        <MudPaper Class="pa-6" Style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px;">
+                                            <div class="d-flex justify-between mb-2">
+                                                <MudText Typo="Typo.body2" Class="text-slate-400">Total Quantity:</MudText>
+                                                <MudText Typo="Typo.body2" Class="text-slate-200 font-weight-bold">@_totalQty.ToString("N2")</MudText>
+                                            </div>
+                                            <div class="d-flex justify-between mb-2">
+                                                <MudText Typo="Typo.body2" Class="text-slate-400">Total Taxable Value:</MudText>
+                                                <MudText Typo="Typo.body2" Class="text-slate-200 font-weight-bold">₹@_totalTaxableValue.ToString("N2")</MudText>
+                                            </div>
+                                            @if (_taxType == "Intra-State")
+                                            {
+                                                <div class="d-flex justify-between mb-2">
+                                                    <MudText Typo="Typo.body2" Class="text-slate-400">Total CGST:</MudText>
+                                                    <MudText Typo="Typo.body2" Class="text-slate-200 font-weight-bold">₹@_totalCGST.ToString("N2")</MudText>
+                                                </div>
+                                                <div class="d-flex justify-between mb-2">
+                                                    <MudText Typo="Typo.body2" Class="text-slate-400">Total SGST:</MudText>
+                                                    <MudText Typo="Typo.body2" Class="text-slate-200 font-weight-bold">₹@_totalSGST.ToString("N2")</MudText>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="d-flex justify-between mb-2">
+                                                    <MudText Typo="Typo.body2" Class="text-slate-400">Total IGST:</MudText>
+                                                    <MudText Typo="Typo.body2" Class="text-slate-200 font-weight-bold">₹@_totalIGST.ToString("N2")</MudText>
+                                                </div>
+                                            }
+                                            <div class="d-flex justify-between mb-2">
+                                                <MudText Typo="Typo.body2" Class="text-slate-400">Grand Total:</MudText>
+                                                <MudText Typo="Typo.body2" Class="text-slate-200 font-weight-bold">₹@_grandTotal.ToString("N2")</MudText>
+                                            </div>
+                                            <div class="d-flex justify-between mb-2 border-bottom border-slate-700 pb-2">
+                                                <MudText Typo="Typo.body2" Class="text-slate-400">Round Off:</MudText>
+                                                <MudText Typo="Typo.body2" Class="text-slate-200 font-weight-bold">₹@_roundOff.ToString("N2")</MudText>
+                                            </div>
+                                            <div class="d-flex justify-between mt-2 pt-2">
+                                                <MudText Typo="Typo.subtitle1" Class="font-weight-bold text-slate-100">Net Amount Payable:</MudText>
+                                                <MudText Typo="Typo.subtitle1" Class="font-weight-bold animated-gradient-text" Style="font-size: 20px;">₹@_netAmount.ToString("N2")</MudText>
+                                            </div>
+                                            <div class="mt-4 p-2 bg-slate-800 rounded text-slate-300 font-italic" style="font-size: 11px; border: 1px solid rgba(255,255,255,0.05);">
+                                                In Words: @ConvertNumberToWords(_netAmount)
+                                            </div>
+                                        </MudPaper>
+                                    </MudItem>
+                                </MudGrid>
+                            }
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </EditForm>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Proforma Invoice List" Icon="@Icons.Material.Filled.List">
+            <MudTable Items="@FilteredProformas" Hover="true" Loading="@_loadingList" Dense="true" Striped="true" Class="glass-panel text-slate-200">
+                <ToolBarContent>
+                    <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">
+                        Proforma Invoices
+                    </MudText>
+                    <MudSpacer />
+                    <MudTextField @bind-Value="_searchString" Placeholder="Search by Customer, Mobile, Proforma No..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0 text-slate-200" Immediate="true"></MudTextField>
+                </ToolBarContent>
+                <HeaderContent>
+                    <MudTh Style="color:#94A3B8;">Date</MudTh>
+                    <MudTh Style="color:#94A3B8;">Proforma No</MudTh>
+                    <MudTh Style="color:#94A3B8;">Customer Details</MudTh>
+                    <MudTh Style="color:#94A3B8;text-align:right;">Tot Qty</MudTh>
+                    <MudTh Style="color:#94A3B8;text-align:right;">Taxable Value</MudTh>
+                    <MudTh Style="color:#94A3B8;text-align:right;">Net Amount</MudTh>
+                    <MudTh Style="color:#94A3B8;text-align:center;width:150px;">Action</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Date" Class="text-slate-300">@context.ProformaDate.LocalDateTime.ToString("dd-MM-yyyy HH:mm")</MudTd>
+                    <MudTh DataLabel="Proforma No" Class="text-slate-200 font-mono">@context.ProformaNo</MudTh>
+                    <MudTd DataLabel="Customer Details" Class="text-slate-200">
+                        <div class="font-weight-bold">@context.CustomerName</div>
+                        <div class="text-slate-400 font-mono" style="font-size: 11px;">@context.MobileNo</div>
+                    </MudTd>
+                    <MudTd DataLabel="Tot Qty" Style="text-align:right;" Class="text-yellow-500 font-weight-bold">@context.TotalQty.ToString("N2")</MudTd>
+                    <MudTd DataLabel="Taxable Value" Style="text-align:right;" Class="text-slate-300">₹@context.TotalTaxableValue.ToString("N2")</MudTd>
+                    <MudTd DataLabel="Net Amount" Style="text-align:right;" Class="text-slate-100 font-weight-bold">₹@context.NetAmount.ToString("N2")</MudTd>
+                    <MudTd DataLabel="Action" Style="text-align:center;">
+                        <MudIconButton Icon="@Icons.Material.Filled.Print" Color="Color.Info" Size="Size.Small" OnClick="@(() => LoadAndPrintProforma(context.Id))" Tooltip="Print A4 PDF" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteProforma(context.Id))" Tooltip="Delete & Restore Stock" />
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+                <NoRecordsContent>
+                    <MudText Class="text-slate-400 pa-4">No proforma invoice entries found.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@code {
+    private ProformaInvoicePostDto _proformaHeader = new();
+    private DateTime? _proformaDate = DateTime.Today;
+    private string _taxType = "Intra-State";
+    private List<ProformaLineItem> _lineItems = new();
+    
+    private string _scanInput = "";
+    private bool _resolving = false;
+    private bool _saving = false;
+
+    // List properties
+    private List<ProformaInvoice> _proformas = new();
+    private bool _loadingList = false;
+    private string _searchString = "";
+
+    // Company Settings defaults
+    private string _companyName = "Kannan Silks";
+    private string _companyAddress = "123 Main Street, Gandhipuram, Coimbatore - 641012";
+    private string _companyGstin = "33AAAAA1111A1Z1";
+    private string _companyMobile = "+91 98765 43210";
+
+    private IEnumerable<ProformaInvoice> FilteredProformas =>
+        _proformas.Where(p => 
+            (p.ProformaNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) ||
+            (p.CustomerName.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) ||
+            (p.MobileNo?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    // Footer Totals
+    private decimal _totalQty;
+    private decimal _totalTaxableValue;
+    private decimal _totalCGST;
+    private decimal _totalSGST;
+    private decimal _totalIGST;
+    private decimal _grandTotal;
+    private decimal _roundOff;
+    private decimal _netAmount;
+
+    protected override void OnInitialized()
+    {
+        ResetForm();
+    }
+
+    private async Task OnTabChanged(int index)
+    {
+        if (index == 1)
+        {
+            await LoadProformasList();
+        }
+    }
+
+    private async Task LoadProformasList()
+    {
+        _loadingList = true;
+        StateHasChanged();
+        try
+        {
+            _proformas = await Http.GetFromJsonAsync<List<ProformaInvoice>>("api/proformainvoice") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading proforma list: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingList = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteProforma(Guid proformaId)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Confirm Delete",
+            "Are you sure you want to delete this proforma invoice? This will restore the stock levels, make unique barcodes available again, and delete all associated records.",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/proformainvoice/{proformaId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Proforma invoice deleted successfully. Stock levels restored.", Severity.Success);
+                    await LoadProformasList();
+                }
+                else
+                {
+                    var err = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Failed to delete: {err}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting proforma invoice: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private void ResetForm()
+    {
+        _proformaHeader = new ProformaInvoicePostDto
+        {
+            ProformaDate = DateTimeOffset.UtcNow
+        };
+        _proformaDate = DateTime.Today;
+        _lineItems.Clear();
+        _scanInput = "";
+        _taxType = "Intra-State";
+        CalculateFooter();
+    }
+
+    private async Task HandleScanKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ResolveCode();
+        }
+    }
+
+    private async Task ResolveCode()
+    {
+        if (string.IsNullOrWhiteSpace(_scanInput)) return;
+
+        _resolving = true;
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.GetAsync($"api/proformainvoice/resolve/{Uri.EscapeDataString(_scanInput.Trim())}");
+            if (response.IsSuccessStatusCode)
+            {
+                var resolved = await response.Content.ReadFromJsonAsync<ScannedItemDto>();
+                if (resolved != null)
+                {
+                    // Check if this specific barcode has already been scanned in any group
+                    var barcodeAlreadyAdded = _lineItems.SelectMany(l => l.ScannedBarcodes).Any(b => b.Barcode == resolved.Barcode);
+                    if (barcodeAlreadyAdded)
+                    {
+                        Snackbar.Add($"Barcode '{resolved.Barcode}' has already been scanned.", Severity.Warning);
+                        _scanInput = "";
+                        return;
+                    }
+
+                    if (resolved.Type == "Unique" && resolved.AvailableQuantity <= 0)
+                    {
+                        Snackbar.Add($"Unique item '{resolved.ItemName}' (Barcode: {resolved.Barcode}) is out of stock.", Severity.Warning);
+                        _scanInput = "";
+                        return;
+                    }
+
+                    if (resolved.Type == "Batch" && resolved.AvailableQuantity <= 0)
+                    {
+                        Snackbar.Add($"Batch item '{resolved.ItemName}' (Batch: {resolved.BatchNo}) has 0 stock remaining.", Severity.Warning);
+                        _scanInput = "";
+                        return;
+                    }
+
+                    // Auto Grouping Logic: Group using Item Name, HSN Code, Rate
+                    var existing = _lineItems.FirstOrDefault(l => 
+                        l.Particulars == resolved.ItemName && 
+                        l.HSNCode == (resolved.HSNCode ?? "") && 
+                        l.Rate == resolved.Rate);
+
+                    if (existing != null)
+                    {
+                        // Check if we exceed stock of batch
+                        if (resolved.Type == "Batch")
+                        {
+                            var scannedBarDetail = existing.ScannedBarcodes.FirstOrDefault(b => b.Barcode == resolved.Barcode);
+                            if (scannedBarDetail != null)
+                            {
+                                if (scannedBarDetail.Quantity < scannedBarDetail.AvailableQuantity)
+                                {
+                                    scannedBarDetail.Quantity += 1;
+                                    existing.Quantity += 1;
+                                    RecalculateLine(existing);
+                                    Snackbar.Add($"Incremented quantity for '{resolved.ItemName}' in grid group.", Severity.Info);
+                                }
+                                else
+                                {
+                                    Snackbar.Add($"Cannot issue more than available stock ({scannedBarDetail.AvailableQuantity}) for barcode '{resolved.Barcode}'", Severity.Warning);
+                                }
+                            }
+                            else
+                            {
+                                existing.ScannedBarcodes.Add(new ScannedBarcodeDetail
+                                {
+                                    Barcode = resolved.Barcode,
+                                    BatchNo = resolved.BatchNo,
+                                    TrackingNo = resolved.TrackingNo,
+                                    Quantity = 1,
+                                    AvailableQuantity = resolved.AvailableQuantity
+                                });
+                                existing.Quantity += 1;
+                                RecalculateLine(existing);
+                                Snackbar.Add($"Added barcode '{resolved.Barcode}' to grid group.", Severity.Success);
+                            }
+                        }
+                        else
+                        {
+                            // Unique barcode
+                            existing.ScannedBarcodes.Add(new ScannedBarcodeDetail
+                            {
+                                Barcode = resolved.Barcode,
+                                BatchNo = resolved.BatchNo,
+                                TrackingNo = resolved.TrackingNo,
+                                Quantity = 1,
+                                AvailableQuantity = 1
+                            });
+                            existing.Quantity += 1;
+                            RecalculateLine(existing);
+                            Snackbar.Add($"Added unique barcode '{resolved.Barcode}' to grid group.", Severity.Success);
+                        }
+                        
+                        if (!string.IsNullOrEmpty(resolved.ImageUrl))
+                        {
+                            PreloadImageAndShowPopup(existing, resolved.ImageUrl);
+                        }
+                    }
+                    else
+                    {
+                        // Create new grouped line item
+                        var line = new ProformaLineItem
+                        {
+                            ItemId = resolved.ItemId,
+                            Particulars = resolved.ItemName,
+                            HSNCode = resolved.HSNCode ?? string.Empty,
+                            Rate = resolved.Rate,
+                            GSTPercent = resolved.GSTPercent,
+                            BarcodeType = resolved.Type,
+                            ImageUrl = resolved.ImageUrl,
+                            Quantity = 1,
+                            ScannedBarcodes = new List<ScannedBarcodeDetail>
+                            {
+                                new ScannedBarcodeDetail
+                                {
+                                    Barcode = resolved.Barcode,
+                                    BatchNo = resolved.BatchNo,
+                                    TrackingNo = resolved.TrackingNo,
+                                    Quantity = 1,
+                                    AvailableQuantity = resolved.Type == "Unique" ? 1 : resolved.AvailableQuantity
+                                }
+                            }
+                        };
+                        
+                        RecalculateLine(line);
+                        _lineItems.Add(line);
+                        CalculateFooter();
+                        Snackbar.Add($"Added '{resolved.ItemName}' to grid.", Severity.Success);
+
+                        if (!string.IsNullOrEmpty(resolved.ImageUrl))
+                        {
+                            PreloadImageAndShowPopup(line, resolved.ImageUrl);
+                        }
+                    }
+
+                    _scanInput = ""; // Clear input
+                }
+            }
+            else
+            {
+                var errorMsg = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Resolve failed: {errorMsg}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error resolving barcode: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _resolving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void PreloadImageAndShowPopup(ProformaLineItem line, string url)
+    {
+        if (!url.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = Task.Run(async () => {
+                try
+                {
+                    var base64Url = await ImageLoader.LoadImageAsBase64Async(url);
+                    if (!string.IsNullOrEmpty(base64Url))
+                    {
+                        line.ImageUrl = base64Url;
+                        await InvokeAsync(StateHasChanged);
+                    }
+                }
+                catch { }
+            });
+        }
+        _ = ShowPhotoPopupTemporarily(url);
+    }
+
+    private async Task ShowPhotoPopupTemporarily(string url)
+    {
+        var resolvedUrl = await ImageLoader.LoadImageAsBase64Async(url);
+        var absoluteUrl = GetAbsoluteImageUrl(resolvedUrl);
+        if (string.IsNullOrEmpty(absoluteUrl)) return;
+
+        var parameters = new DialogParameters { ["imageUrl"] = absoluteUrl };
+        var options = new DialogOptions { NoHeader = true, CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium };
+        var dialogRef = await DialogService.ShowAsync<ImagePreviewDialog>("Item Photo", parameters, options);
+        
+        await Task.Delay(1000);
+        dialogRef.Close();
+    }
+
+    private async Task PreviewImage(string url)
+    {
+        var resolvedUrl = await ImageLoader.LoadImageAsBase64Async(url);
+        var absoluteUrl = GetAbsoluteImageUrl(resolvedUrl);
+        var parameters = new DialogParameters { ["imageUrl"] = absoluteUrl };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
+        await DialogService.ShowAsync<ImagePreviewDialog>("Photo View", parameters, options);
+    }
+
+    private string GetAbsoluteImageUrl(string? url)
+    {
+        if (string.IsNullOrEmpty(url)) return string.Empty;
+        
+        if (url.Contains(".supabase.co/storage/v1/", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}/api/storage/image?url={Uri.EscapeDataString(url)}";
+        }
+        
+        var uploadsIndex = url.IndexOf("/uploads/", StringComparison.OrdinalIgnoreCase);
+        if (uploadsIndex >= 0)
+        {
+            var relativePath = url.Substring(uploadsIndex);
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}{relativePath}";
+        }
+        
+        if (url.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseAddress = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            return $"{baseAddress}/{url}";
+        }
+
+        return url;
+    }
+
+    private void RemoveLineItem(int index)
+    {
+        if (index >= 0 && index < _lineItems.Count)
+        {
+            _lineItems.RemoveAt(index);
+            CalculateFooter();
+        }
+    }
+
+    // Inline Calculations
+    private void OnQuantityChanged(ProformaLineItem line, decimal value)
+    {
+        line.Quantity = value;
+        // Distribute the quantity across the scanned batch barcodes
+        if (line.ScannedBarcodes.Any())
+        {
+            // If only one barcode exists, set its quantity directly
+            if (line.ScannedBarcodes.Count == 1)
+            {
+                line.ScannedBarcodes[0].Quantity = value;
+            }
+            else
+            {
+                // Distribute or assign to the first barcode (fallback)
+                line.ScannedBarcodes[0].Quantity = value;
+            }
+        }
+        RecalculateLine(line);
+        CalculateFooter();
+    }
+
+    private void OnRateChanged(ProformaLineItem line, decimal value)
+    {
+        line.Rate = value;
+        RecalculateLine(line);
+        CalculateFooter();
+    }
+
+    private void OnDiscountPercentChanged(ProformaLineItem line, decimal value)
+    {
+        line.DiscountPercent = value;
+        var grossAmount = line.Quantity * line.Rate;
+        line.DiscountAmount = Math.Round(grossAmount * (value / 100), 2);
+        
+        line.TaxableValue = grossAmount - line.DiscountAmount;
+        line.GSTAmount = Math.Round(line.TaxableValue * (line.GSTPercent / 100), 2);
+        line.LineTotal = line.TaxableValue + line.GSTAmount;
+        CalculateFooter();
+    }
+
+    private void OnDiscountAmountChanged(ProformaLineItem line, decimal value)
+    {
+        line.DiscountAmount = value;
+        var grossAmount = line.Quantity * line.Rate;
+        if (grossAmount > 0)
+        {
+            line.DiscountPercent = Math.Round((value / grossAmount) * 100, 2);
+        }
+        else
+        {
+            line.DiscountPercent = 0;
+        }
+        
+        line.TaxableValue = grossAmount - line.DiscountAmount;
+        line.GSTAmount = Math.Round(line.TaxableValue * (line.GSTPercent / 100), 2);
+        line.LineTotal = line.TaxableValue + line.GSTAmount;
+        CalculateFooter();
+    }
+
+    private void RecalculateLine(ProformaLineItem line)
+    {
+        var grossAmount = line.Quantity * line.Rate;
+        line.DiscountAmount = Math.Round(grossAmount * (line.DiscountPercent / 100), 2);
+        line.TaxableValue = grossAmount - line.DiscountAmount;
+        line.GSTAmount = Math.Round(line.TaxableValue * (line.GSTPercent / 100), 2);
+        line.LineTotal = line.TaxableValue + line.GSTAmount;
+    }
+
+    private void CalculateFooter()
+    {
+        _totalQty = _lineItems.Sum(l => l.Quantity);
+        _totalTaxableValue = _lineItems.Sum(l => l.TaxableValue);
+        
+        var totalGst = _lineItems.Sum(l => l.GSTAmount);
+        
+        if (_taxType == "Intra-State")
+        {
+            _totalCGST = Math.Round(totalGst / 2, 2);
+            _totalSGST = totalGst - _totalCGST;
+            _totalIGST = 0;
+        }
+        else
+        {
+            _totalCGST = 0;
+            _totalSGST = 0;
+            _totalIGST = totalGst;
+        }
+
+        _grandTotal = _totalTaxableValue + _totalCGST + _totalSGST + _totalIGST;
+        _netAmount = Math.Round(_grandTotal, 0);
+        _roundOff = _netAmount - _grandTotal;
+    }
+
+    private List<GstSlabBreakdown> GetGstBreakdown()
+    {
+        var groups = _lineItems.GroupBy(l => l.GSTPercent);
+        var list = new List<GstSlabBreakdown>();
+        foreach (var g in groups)
+        {
+            var slab = new GstSlabBreakdown
+            {
+                GstRate = g.Key,
+                TaxableValue = g.Sum(l => l.TaxableValue)
+            };
+            var totalGst = g.Sum(l => l.GSTAmount);
+            if (_taxType == "Intra-State")
+            {
+                slab.CGST = Math.Round(totalGst / 2, 2);
+                slab.SGST = totalGst - slab.CGST;
+            }
+            else
+            {
+                slab.IGST = totalGst;
+            }
+            list.Add(slab);
+        }
+        return list.OrderBy(s => s.GstRate).ToList();
+    }
+
+    private async Task SaveProforma()
+    {
+        if (!_lineItems.Any()) return;
+
+        // Stock quantity validations before posting
+        foreach (var line in _lineItems)
+        {
+            var maxAvailable = line.ScannedBarcodes.Sum(b => b.AvailableQuantity);
+            if (line.Quantity > maxAvailable)
+            {
+                Snackbar.Add($"Quantity for '{line.Particulars}' ({line.Quantity}) exceeds available stock ({maxAvailable}).", Severity.Error);
+                return;
+            }
+        }
+
+        _saving = true;
+        try
+        {
+            _proformaHeader.ProformaDate = _proformaDate ?? DateTimeOffset.UtcNow;
+            _proformaHeader.TaxType = _taxType;
+            _proformaHeader.Details = _lineItems.Select(l => new ProformaInvoiceDetailPostDto
+            {
+                ItemId = l.ItemId,
+                Particulars = l.Particulars,
+                HSNCode = l.HSNCode,
+                Quantity = l.Quantity,
+                Rate = l.Rate,
+                DiscountPercent = l.DiscountPercent,
+                DiscountAmount = l.DiscountAmount,
+                TaxableValue = l.TaxableValue,
+                GSTPercent = l.GSTPercent,
+                GSTAmount = l.GSTAmount,
+                LineTotal = l.LineTotal,
+                ScannedBarcodes = l.ScannedBarcodes.Select(b => new ProformaInvoiceBarcodePostDto
+                {
+                    Barcode = b.Barcode,
+                    BatchNo = b.BatchNo,
+                    TrackingNo = b.TrackingNo,
+                    Quantity = b.Quantity
+                }).ToList()
+            }).ToList();
+
+            var response = await Http.PostAsJsonAsync("api/proformainvoice", _proformaHeader);
+            if (response.IsSuccessStatusCode)
+            {
+                var saved = await response.Content.ReadFromJsonAsync<ProformaInvoice>();
+                Snackbar.Add("Proforma invoice saved and stock deducted successfully!", Severity.Success);
+                
+                if (saved != null)
+                {
+                    // Print invoice immediately
+                    await LoadAndPrintProforma(saved.Id);
+                }
+                
+                ResetForm();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Submitting proforma failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving proforma: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task LoadAndPrintProforma(Guid proformaId)
+    {
+        try
+        {
+            var p = await Http.GetFromJsonAsync<ProformaInvoice>($"api/proformainvoice/{proformaId}");
+            if (p == null)
+            {
+                Snackbar.Add("Could not load proforma details for printing.", Severity.Error);
+                return;
+            }
+            
+            // Build the HTML print layout dynamically
+            var html = GeneratePrintHtml(p);
+            await JSRuntime.InvokeVoidAsync("webcamInterop.printInvoice", html, $"Proforma_{p.ProformaNo}");
+            Snackbar.Add("Print preview opened.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error launching print: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private string GeneratePrintHtml(ProformaInvoice p)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<div class=\"invoice-container\">");
+        
+        // Header
+        sb.Append("  <div class=\"invoice-header\">");
+        sb.Append("    <div class=\"company-details\">");
+        sb.Append($"      <h3 style=\"margin:0; font-size:18px;\">{_companyName}</h3>");
+        sb.Append($"      <p style=\"margin:4px 0; font-size:11px;\">{_companyAddress}</p>");
+        sb.Append($"      <p style=\"margin:4px 0; font-size:11px;\"><strong>GSTIN:</strong> {_companyGstin} | <strong>Mobile:</strong> {_companyMobile}</p>");
+        sb.Append("    </div>");
+        sb.Append("    <div class=\"invoice-title-sec\">");
+        sb.Append("      <h3 style=\"margin:0; font-size:16px; color:#475569;\">PROFORMA INVOICE</h3>");
+        sb.Append($"      <p style=\"margin:4px 0; font-size:11px;\"><strong>Proforma No:</strong> {p.ProformaNo}</p>");
+        sb.Append($"      <p style=\"margin:4px 0; font-size:11px;\"><strong>Date:</strong> {p.ProformaDate.LocalDateTime.ToString("dd-MM-yyyy HH:mm")}</p>");
+        sb.Append("    </div>");
+        sb.Append("  </div>");
+
+        // Customer Details Grid
+        sb.Append("  <div class=\"section-title\">CUSTOMER DETAILS</div>");
+        sb.Append("  <div class=\"grid-details\">");
+        sb.Append("    <div class=\"grid-col\">");
+        sb.Append($"      <strong>Name:</strong> {p.CustomerName}<br/>");
+        sb.Append($"      <strong>Mobile:</strong> {p.MobileNo ?? "N/A"}<br/>");
+        sb.Append($"      <strong>Address:</strong> {p.Address ?? "N/A"}");
+        sb.Append("    </div>");
+        sb.Append("    <div class=\"grid-col\" style=\"text-align: right;\">");
+        sb.Append($"      <strong>Tax State:</strong> {p.TaxType}<br/>");
+        sb.Append($"      <strong>Status:</strong> Submitted & Stock Outwarded");
+        sb.Append("    </div>");
+        sb.Append("  </div>");
+
+        // Items Table
+        sb.Append("  <table>");
+        sb.Append("    <thead>");
+        sb.Append("      <tr>");
+        sb.Append("        <th style=\"width:30px;\">S.No</th>");
+        sb.Append("        <th>Particulars</th>");
+        sb.Append("        <th style=\"width:60px;\">HSN Code</th>");
+        sb.Append("        <th style=\"width:40px;\" class=\"text-right\">Qty</th>");
+        sb.Append("        <th style=\"width:70px;\" class=\"text-right\">Rate</th>");
+        sb.Append("        <th style=\"width:45px;\" class=\"text-right\">Disc %</th>");
+        sb.Append("        <th style=\"width:60px;\" class=\"text-right\">Disc Amt</th>");
+        sb.Append("        <th style=\"width:80px;\" class=\"text-right\">Taxable Val</th>");
+        sb.Append("        <th style=\"width:45px;\" class=\"text-right\">GST %</th>");
+        sb.Append("        <th style=\"width:60px;\" class=\"text-right\">GST Amt</th>");
+        sb.Append("        <th style=\"width:90px;\" class=\"text-right\">Line Total</th>");
+        sb.Append("      </tr>");
+        sb.Append("    </thead>");
+        sb.Append("    <tbody>");
+        
+        int sNo = 1;
+        foreach (var det in p.Details)
+        {
+            sb.Append("      <tr>");
+            sb.Append($"        <td style=\"text-align:center;\">{sNo++}</td>");
+            sb.Append($"        <td>{det.Particulars}</td>");
+            sb.Append($"        <td style=\"text-align:center;\">{det.HSNCode ?? "N/A"}</td>");
+            sb.Append($"        <td class=\"text-right\">{det.Quantity.ToString("N2")}</td>");
+            sb.Append($"        <td class=\"text-right\">{det.Rate.ToString("N2")}</td>");
+            sb.Append($"        <td class=\"text-right\">{det.DiscountPercent.ToString("N2")}</td>");
+            sb.Append($"        <td class=\"text-right\">{det.DiscountAmount.ToString("N2")}</td>");
+            sb.Append($"        <td class=\"text-right\">{det.TaxableValue.ToString("N2")}</td>");
+            sb.Append($"        <td class=\"text-right\">{det.GSTPercent.ToString("N0")}%</td>");
+            sb.Append($"        <td class=\"text-right\">{det.GSTAmount.ToString("N2")}</td>");
+            sb.Append($"        <td class=\"text-right\"><strong>{det.LineTotal.ToString("N2")}</strong></td>");
+            sb.Append("      </tr>");
+        }
+        
+        sb.Append("    </tbody>");
+        sb.Append("  </table>");
+
+        // Footer Section
+        sb.Append("  <div class=\"invoice-footer\">");
+        
+        // Tax Break-up Summary
+        sb.Append("    <div class=\"tax-summary\">");
+        sb.Append("      <div style=\"font-weight:bold; margin-bottom:5px;\">GST Slab Wise Break-up:</div>");
+        sb.Append("      <table style=\"font-size:10px; width:100%; border-collapse:collapse;\">");
+        sb.Append("        <thead>");
+        sb.Append("          <tr style=\"background:#eaeaea;\">");
+        sb.Append("            <th style=\"padding:3px; border:1px solid #aaa !important;\">GST Slab</th>");
+        sb.Append("            <th style=\"padding:3px; border:1px solid #aaa !important;\" class=\"text-right\">Taxable Val</th>");
+        if (p.TaxType == "Intra-State")
+        {
+            sb.Append("            <th style=\"padding:3px; border:1px solid #aaa !important;\" class=\"text-right\">CGST</th>");
+            sb.Append("            <th style=\"padding:3px; border:1px solid #aaa !important;\" class=\"text-right\">SGST</th>");
+        }
+        else
+        {
+            sb.Append("            <th style=\"padding:3px; border:1px solid #aaa !important;\" class=\"text-right\">IGST</th>");
+        }
+        sb.Append("          </tr>");
+        sb.Append("        </thead>");
+        sb.Append("        <tbody>");
+
+        var groups = p.Details.GroupBy(d => d.GSTPercent);
+        foreach (var g in groups)
+        {
+            var taxable = g.Sum(d => d.TaxableValue);
+            var gst = g.Sum(d => d.GSTAmount);
+            
+            sb.Append("          <tr>");
+            sb.Append($"            <td style=\"padding:3px; border:1px solid #aaa !important;\">GST {g.Key.ToString("N0")}%</td>");
+            sb.Append($"            <td style=\"padding:3px; border:1px solid #aaa !important;\" class=\"text-right\">{taxable.ToString("N2")}</td>");
+            if (p.TaxType == "Intra-State")
+            {
+                var cgst = Math.Round(gst / 2, 2);
+                var sgst = gst - cgst;
+                sb.Append($"            <td style=\"padding:3px; border:1px solid #aaa !important;\" class=\"text-right\">{cgst.ToString("N2")}</td>");
+                sb.Append($"            <td style=\"padding:3px; border:1px solid #aaa !important;\" class=\"text-right\">{sgst.ToString("N2")}</td>");
+            }
+            else
+            {
+                sb.Append($"            <td style=\"padding:3px; border:1px solid #aaa !important;\" class=\"text-right\">{gst.ToString("N2")}</td>");
+            }
+            sb.Append("          </tr>");
+        }
+
+        sb.Append("        </tbody>");
+        sb.Append("      </table>");
+        
+        // Amount in Words
+        sb.Append("      <div class=\"amount-words\">");
+        sb.Append($"        <strong>Amount In Words:</strong><br/>{ConvertNumberToWords(p.NetAmount)}");
+        sb.Append("      </div>");
+        sb.Append("    </div>");
+
+        // Totals Summaries
+        sb.Append("    <div>");
+        sb.Append("      <table class=\"totals-table\">");
+        sb.Append($"        <tr><td>Total Quantity:</td><td class=\"text-right\">{p.TotalQty.ToString("N2")}</td></tr>");
+        sb.Append($"        <tr><td>Total Taxable Value:</td><td class=\"text-right\">{p.TotalTaxableValue.ToString("N2")}</td></tr>");
+        
+        if (p.TaxType == "Intra-State")
+        {
+            sb.Append($"        <tr><td>Total CGST:</td><td class=\"text-right\">{p.TotalCGST.ToString("N2")}</td></tr>");
+            sb.Append($"        <tr><td>Total SGST:</td><td class=\"text-right\">{p.TotalSGST.ToString("N2")}</td></tr>");
+        }
+        else
+        {
+            sb.Append($"        <tr><td>Total IGST:</td><td class=\"text-right\">{p.TotalIGST.ToString("N2")}</td></tr>");
+        }
+        
+        sb.Append($"        <tr><td>Round Off:</td><td class=\"text-right\">{p.RoundOff.ToString("N2")}</td></tr>");
+        sb.Append($"        <tr class=\"grand-total\"><td>Net Amount Payable:</td><td class=\"text-right\">₹{p.NetAmount.ToString("N2")}</td></tr>");
+        sb.Append("      </table>");
+        sb.Append("    </div>");
+
+        sb.Append("  </div>");
+        sb.Append("</div>");
+        
+        return sb.ToString();
+    }
+
+    // Number to words converter
+    public static string ConvertNumberToWords(decimal number)
+    {
+        long amount = (long)Math.Floor(number);
+        long paise = (long)Math.Round((number - amount) * 100);
+
+        string amountStr = ConvertNumberToWordsHelper(amount) + " Rupees";
+        if (paise > 0)
+        {
+            amountStr += " and " + ConvertNumberToWordsHelper(paise) + " Paise";
+        }
+        return amountStr + " Only";
+    }
+
+    private static string ConvertNumberToWordsHelper(long number)
+    {
+        if (number == 0) return "Zero";
+        if (number < 0) return "Minus " + ConvertNumberToWordsHelper(Math.Abs(number));
+
+        string words = "";
+
+        if ((number / 10000000) > 0)
+        {
+            words += ConvertNumberToWordsHelper(number / 10000000) + " Crore ";
+            number %= 10000000;
+        }
+
+        if ((number / 100000) > 0)
+        {
+            words += ConvertNumberToWordsHelper(number / 100000) + " Lakh ";
+            number %= 100000;
+        }
+
+        if ((number / 1000) > 0)
+        {
+            words += ConvertNumberToWordsHelper(number / 1000) + " Thousand ";
+            number %= 1000;
+        }
+
+        if ((number / 100) > 0)
+        {
+            words += ConvertNumberToWordsHelper(number / 100) + " Hundred ";
+            number %= 100;
+        }
+
+        if (number > 0)
+        {
+            if (words != "") words += "and ";
+
+            var unitsMap = new[] { "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen" };
+            var tensMap = new[] { "Zero", "Ten", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety" };
+
+            if (number < 20)
+                words += unitsMap[number];
+            else
+            {
+                words += tensMap[number / 10];
+                if ((number % 10) > 0)
+                    words += "-" + unitsMap[number % 10];
+            }
+        }
+
+        return words.Trim();
+    }
+
+    public class ProformaLineItem
+    {
+        public Guid ItemId { get; set; }
+        public string Particulars { get; set; } = string.Empty;
+        public string HSNCode { get; set; } = string.Empty;
+        public decimal Quantity { get; set; }
+        public decimal Rate { get; set; }
+        public decimal DiscountPercent { get; set; }
+        public decimal DiscountAmount { get; set; }
+        public decimal TaxableValue { get; set; }
+        public decimal GSTPercent { get; set; }
+        public decimal GSTAmount { get; set; }
+        public decimal LineTotal { get; set; }
+        
+        public string? ImageUrl { get; set; }
+        public string BarcodeType { get; set; } = "Batch";
+
+        public List<ScannedBarcodeDetail> ScannedBarcodes { get; set; } = new();
+    }
+
+    public class ScannedBarcodeDetail
+    {
+        public string Barcode { get; set; } = string.Empty;
+        public string BatchNo { get; set; } = string.Empty;
+        public string TrackingNo { get; set; } = string.Empty;
+        public decimal Quantity { get; set; }
+        public decimal AvailableQuantity { get; set; }
+    }
+
+    public class GstSlabBreakdown
+    {
+        public decimal GstRate { get; set; }
+        public decimal TaxableValue { get; set; }
+        public decimal CGST { get; set; }
+        public decimal SGST { get; set; }
+        public decimal IGST { get; set; }
+    }
+}

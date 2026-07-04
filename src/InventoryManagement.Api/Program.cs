@@ -222,6 +222,135 @@ using (var scope = app.Services.CreateScope())
         {
             Console.WriteLine($"Warning: Failed to adjust database unique index constraints: {indexEx.Message}");
         }
+        // Run raw SQL migrations for Proforma Invoices and GSTPercent column
+        try
+        {
+            var isSqlite = context.Database.ProviderName?.Contains("Sqlite") == true;
+            if (isSqlite)
+            {
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""ProformaInvoices"" (
+                        ""Id"" TEXT NOT NULL PRIMARY KEY,
+                        ""ProformaNo"" TEXT NOT NULL,
+                        ""ProformaDate"" TEXT NOT NULL,
+                        ""CustomerName"" TEXT NOT NULL,
+                        ""MobileNo"" TEXT NULL,
+                        ""Address"" TEXT NULL,
+                        ""TaxType"" TEXT NOT NULL DEFAULT 'Intra-State',
+                        ""TotalQty"" TEXT NOT NULL,
+                        ""TotalTaxableValue"" TEXT NOT NULL,
+                        ""TotalCGST"" TEXT NOT NULL,
+                        ""TotalSGST"" TEXT NOT NULL,
+                        ""TotalIGST"" TEXT NOT NULL,
+                        ""GrandTotal"" TEXT NOT NULL,
+                        ""RoundOff"" TEXT NOT NULL,
+                        ""NetAmount"" TEXT NOT NULL,
+                        ""IsConverted"" INTEGER NOT NULL DEFAULT 0,
+                        ""ConvertedDate"" TEXT NULL,
+                        ""ConvertedStockOutwardId"" TEXT NULL,
+                        ""CreatedBy"" TEXT NOT NULL,
+                        ""CreatedAt"" TEXT NOT NULL
+                    );
+                ");
+
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""ProformaInvoiceDetails"" (
+                        ""Id"" TEXT NOT NULL PRIMARY KEY,
+                        ""ProformaInvoiceId"" TEXT NOT NULL REFERENCES ""ProformaInvoices""(""Id"") ON DELETE CASCADE,
+                        ""ItemId"" TEXT NOT NULL REFERENCES ""Items""(""Id""),
+                        ""Particulars"" TEXT NOT NULL,
+                        ""HSNCode"" TEXT NULL,
+                        ""Quantity"" TEXT NOT NULL,
+                        ""Rate"" TEXT NOT NULL,
+                        ""DiscountPercent"" TEXT NOT NULL,
+                        ""DiscountAmount"" TEXT NOT NULL,
+                        ""TaxableValue"" TEXT NOT NULL,
+                        ""GSTPercent"" TEXT NOT NULL,
+                        ""GSTAmount"" TEXT NOT NULL,
+                        ""LineTotal"" TEXT NOT NULL,
+                        ""BarcodeList"" TEXT NOT NULL DEFAULT ''
+                    );
+                ");
+
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""ProformaInvoiceDetailBarcodes"" (
+                        ""Id"" TEXT NOT NULL PRIMARY KEY,
+                        ""ProformaInvoiceDetailId"" TEXT NOT NULL REFERENCES ""ProformaInvoiceDetails""(""Id"") ON DELETE CASCADE,
+                        ""Barcode"" TEXT NOT NULL,
+                        ""BatchNo"" TEXT NOT NULL,
+                        ""TrackingNo"" TEXT NOT NULL,
+                        ""Quantity"" TEXT NOT NULL
+                    );
+                ");
+
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""GSTPercent"" numeric(5,2) NOT NULL DEFAULT 18.00;"); } catch {}
+            }
+            else
+            {
+                // PostgreSQL
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""ProformaInvoices"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""ProformaNo"" varchar(30) NOT NULL,
+                        ""ProformaDate"" timestamptz NOT NULL,
+                        ""CustomerName"" varchar(150) NOT NULL,
+                        ""MobileNo"" varchar(20) NULL,
+                        ""Address"" text NULL,
+                        ""TaxType"" varchar(20) NOT NULL DEFAULT 'Intra-State',
+                        ""TotalQty"" numeric(12,2) NOT NULL,
+                        ""TotalTaxableValue"" numeric(12,2) NOT NULL,
+                        ""TotalCGST"" numeric(12,2) NOT NULL,
+                        ""TotalSGST"" numeric(12,2) NOT NULL,
+                        ""TotalIGST"" numeric(12,2) NOT NULL,
+                        ""GrandTotal"" numeric(12,2) NOT NULL,
+                        ""RoundOff"" numeric(12,2) NOT NULL,
+                        ""NetAmount"" numeric(12,2) NOT NULL,
+                        ""IsConverted"" boolean NOT NULL DEFAULT false,
+                        ""ConvertedDate"" timestamptz NULL,
+                        ""ConvertedStockOutwardId"" uuid NULL,
+                        ""CreatedBy"" uuid NOT NULL,
+                        ""CreatedAt"" timestamptz NOT NULL
+                    );
+                ");
+
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""ProformaInvoiceDetails"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""ProformaInvoiceId"" uuid NOT NULL REFERENCES ""ProformaInvoices""(""Id"") ON DELETE CASCADE,
+                        ""ItemId"" uuid NOT NULL REFERENCES ""Items""(""Id""),
+                        ""Particulars"" varchar(150) NOT NULL,
+                        ""HSNCode"" varchar(20) NULL,
+                        ""Quantity"" numeric(12,2) NOT NULL,
+                        ""Rate"" numeric(12,4) NOT NULL,
+                        ""DiscountPercent"" numeric(5,2) NOT NULL,
+                        ""DiscountAmount"" numeric(12,2) NOT NULL,
+                        ""TaxableValue"" numeric(12,2) NOT NULL,
+                        ""GSTPercent"" numeric(5,2) NOT NULL,
+                        ""GSTAmount"" numeric(12,2) NOT NULL,
+                        ""LineTotal"" numeric(12,2) NOT NULL,
+                        ""BarcodeList"" text NOT NULL DEFAULT ''
+                    );
+                ");
+
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""ProformaInvoiceDetailBarcodes"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""ProformaInvoiceDetailId"" uuid NOT NULL REFERENCES ""ProformaInvoiceDetails""(""Id"") ON DELETE CASCADE,
+                        ""Barcode"" varchar(50) NOT NULL,
+                        ""BatchNo"" varchar(50) NOT NULL,
+                        ""TrackingNo"" varchar(30) NOT NULL,
+                        ""Quantity"" numeric(12,2) NOT NULL
+                    );
+                ");
+
+                context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN IF NOT EXISTS ""GSTPercent"" numeric(5,2) NOT NULL DEFAULT 18.00;");
+            }
+            Console.WriteLine("Proforma Invoice tables and GSTPercent column verified successfully.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Failed to run custom Proforma migrations: {ex.Message}");
+        }
 
         DbInitializer.Initialize(context);
     }

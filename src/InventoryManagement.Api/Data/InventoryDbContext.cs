@@ -38,6 +38,9 @@ namespace InventoryManagement.Api.Data
         public DbSet<StockLedger> StockLedgers => Set<StockLedger>();
         public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+        public DbSet<ProformaInvoice> ProformaInvoices => Set<ProformaInvoice>();
+        public DbSet<ProformaInvoiceDetail> ProformaInvoiceDetails => Set<ProformaInvoiceDetail>();
+        public DbSet<ProformaInvoiceDetailBarcode> ProformaInvoiceDetailBarcodes => Set<ProformaInvoiceDetailBarcode>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -66,6 +69,18 @@ namespace InventoryManagement.Api.Data
                 .HasOne(d => d.StockOutward)
                 .WithMany(m => m.Details)
                 .HasForeignKey(d => d.StockOutwardId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProformaInvoiceDetail>()
+                .HasOne(d => d.ProformaInvoice)
+                .WithMany(m => m.Details)
+                .HasForeignKey(d => d.ProformaInvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProformaInvoiceDetailBarcode>()
+                .HasOne(b => b.ProformaInvoiceDetail)
+                .WithMany(d => d.Barcodes)
+                .HasForeignKey(b => b.ProformaInvoiceDetailId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Precision for decimals
@@ -99,6 +114,26 @@ namespace InventoryManagement.Api.Data
                 .Property(sl => sl.BalanceQty).HasPrecision(12, 2);
             modelBuilder.Entity<StockLedger>()
                 .Property(sl => sl.UnitPrice).HasPrecision(12, 4);
+
+            modelBuilder.Entity<ProformaInvoiceDetail>()
+                .Property(d => d.Quantity).HasPrecision(12, 2);
+            modelBuilder.Entity<ProformaInvoiceDetail>()
+                .Property(d => d.Rate).HasPrecision(12, 4);
+            modelBuilder.Entity<ProformaInvoiceDetail>()
+                .Property(d => d.DiscountPercent).HasPrecision(5, 2);
+            modelBuilder.Entity<ProformaInvoiceDetail>()
+                .Property(d => d.DiscountAmount).HasPrecision(12, 2);
+            modelBuilder.Entity<ProformaInvoiceDetail>()
+                .Property(d => d.TaxableValue).HasPrecision(12, 2);
+            modelBuilder.Entity<ProformaInvoiceDetail>()
+                .Property(d => d.GSTPercent).HasPrecision(5, 2);
+            modelBuilder.Entity<ProformaInvoiceDetail>()
+                .Property(d => d.GSTAmount).HasPrecision(12, 2);
+            modelBuilder.Entity<ProformaInvoiceDetail>()
+                .Property(d => d.LineTotal).HasPrecision(12, 2);
+
+            modelBuilder.Entity<ProformaInvoiceDetailBarcode>()
+                .Property(b => b.Quantity).HasPrecision(12, 2);
         }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

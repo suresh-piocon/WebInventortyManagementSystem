@@ -49,6 +49,7 @@
             <MudTh Style="color: #94A3B8;">Unit</MudTh>
             <MudTh Style="color: #94A3B8;">Min Stock</MudTh>
             <MudTh Style="color: #94A3B8;">Reorder Level</MudTh>
+            <MudTh Style="color: #94A3B8;">GST %</MudTh>
             <MudTh Style="color: #94A3B8;">Tracking Type</MudTh>
             <MudTh Style="color: #94A3B8; text-align: right;">Actions</MudTh>
         </HeaderContent>
@@ -60,6 +61,7 @@
             <MudTd DataLabel="Unit" Class="text-slate-300">@context.Unit?.Code</MudTd>
             <MudTd DataLabel="Min Stock" Class="text-slate-300">@context.MinimumStock.ToString("N2")</MudTd>
             <MudTd DataLabel="Reorder Level" Class="text-slate-300">@context.ReorderLevel.ToString("N2")</MudTd>
+            <MudTd DataLabel="GST %" Class="text-slate-300">@context.GSTPercent.ToString("N2")%</MudTd>
             <MudTd DataLabel="Tracking Type">
                 @if (context.BarcodeType == "Unique")
                 {
@@ -118,6 +120,9 @@
                 </MudItem>
                 <MudItem xs="12" sm="6">
                     <MudTextField T="string" Label="HSN Code" @bind-Value="_editItem.HSNCode" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal" Label="GST %" @bind-Value="_editItem.GSTPercent" Min="0" Max="100" Class="text-slate-200" />
                 </MudItem>
                 <MudItem xs="12" sm="4">
                     <MudNumericField T="decimal" Label="Minimum Stock" @bind-Value="_editItem.MinimumStock" Min="0" Class="text-slate-200" />
@@ -213,6 +218,7 @@
         {
             Id = Guid.Empty,
             BarcodeType = "Batch",
+            GSTPercent = 18.00M,
             CategoryId = _categories.FirstOrDefault()?.Id ?? Guid.Empty,
             UnitId = _units.FirstOrDefault()?.Id ?? Guid.Empty
         };
@@ -230,6 +236,7 @@
             UnitId = item.UnitId,
             Brand = item.Brand,
             HSNCode = item.HSNCode,
+            GSTPercent = item.GSTPercent,
             MinimumStock = item.MinimumStock,
             ReorderLevel = item.ReorderLevel,
             BarcodeType = item.BarcodeType,

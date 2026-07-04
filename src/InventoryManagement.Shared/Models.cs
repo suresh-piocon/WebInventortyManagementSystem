@@ -134,6 +134,9 @@ namespace InventoryManagement.Shared
         [StringLength(20)]
         public string BarcodeType { get; set; } = "Batch";
 
+        [Column(TypeName = "decimal(5, 2)")]
+        public decimal GSTPercent { get; set; } = 18.00M;
+
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 
@@ -505,6 +508,8 @@ namespace InventoryManagement.Shared
         public decimal Rate { get; set; }
         public string? ImageUrl { get; set; }
         public string Type { get; set; } = "Batch";
+        public decimal GSTPercent { get; set; }
+        public string? HSNCode { get; set; }
     }
 
     public class StockOutwardPostDto
@@ -667,5 +672,186 @@ namespace InventoryManagement.Shared
         public decimal OutwardQty { get; set; }
         public decimal BalanceQty { get; set; }
         public decimal UnitPrice { get; set; }
+    }
+
+    [Table("ProformaInvoices")]
+    public class ProformaInvoice
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        [StringLength(30)]
+        public string ProformaNo { get; set; } = string.Empty;
+
+        [Required]
+        public DateTimeOffset ProformaDate { get; set; } = DateTimeOffset.UtcNow;
+
+        [Required]
+        [StringLength(150)]
+        public string CustomerName { get; set; } = string.Empty;
+
+        [StringLength(20)]
+        public string? MobileNo { get; set; }
+
+        public string? Address { get; set; }
+
+        [Required]
+        [StringLength(20)]
+        public string TaxType { get; set; } = "Intra-State"; // "Intra-State" or "Inter-State"
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal TotalQty { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal TotalTaxableValue { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal TotalCGST { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal TotalSGST { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal TotalIGST { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal GrandTotal { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal RoundOff { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal NetAmount { get; set; }
+
+        public bool IsConverted { get; set; } = false;
+
+        public DateTimeOffset? ConvertedDate { get; set; }
+
+        public Guid? ConvertedStockOutwardId { get; set; }
+
+        [Required]
+        public Guid CreatedBy { get; set; }
+
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+        public List<ProformaInvoiceDetail> Details { get; set; } = new();
+    }
+
+    [Table("ProformaInvoiceDetails")]
+    public class ProformaInvoiceDetail
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        public Guid ProformaInvoiceId { get; set; }
+
+        [ForeignKey(nameof(ProformaInvoiceId))]
+        public ProformaInvoice? ProformaInvoice { get; set; }
+
+        [Required]
+        public Guid ItemId { get; set; }
+
+        [ForeignKey(nameof(ItemId))]
+        public Item? Item { get; set; }
+
+        [Required]
+        [StringLength(150)]
+        public string Particulars { get; set; } = string.Empty;
+
+        [StringLength(20)]
+        public string? HSNCode { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal Quantity { get; set; }
+
+        [Column(TypeName = "decimal(12, 4)")]
+        public decimal Rate { get; set; }
+
+        [Column(TypeName = "decimal(5, 2)")]
+        public decimal DiscountPercent { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal DiscountAmount { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal TaxableValue { get; set; }
+
+        [Column(TypeName = "decimal(5, 2)")]
+        public decimal GSTPercent { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal GSTAmount { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal LineTotal { get; set; }
+
+        [Required]
+        public string BarcodeList { get; set; } = string.Empty;
+
+        public List<ProformaInvoiceDetailBarcode> Barcodes { get; set; } = new();
+    }
+
+    [Table("ProformaInvoiceDetailBarcodes")]
+    public class ProformaInvoiceDetailBarcode
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        public Guid ProformaInvoiceDetailId { get; set; }
+
+        [ForeignKey(nameof(ProformaInvoiceDetailId))]
+        public ProformaInvoiceDetail? ProformaInvoiceDetail { get; set; }
+
+        [Required]
+        [StringLength(50)]
+        public string Barcode { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(50)]
+        public string BatchNo { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(30)]
+        public string TrackingNo { get; set; } = string.Empty;
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal Quantity { get; set; }
+    }
+
+    public class ProformaInvoicePostDto
+    {
+        public DateTimeOffset ProformaDate { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
+        public string? MobileNo { get; set; }
+        public string? Address { get; set; }
+        public string TaxType { get; set; } = "Intra-State";
+        public List<ProformaInvoiceDetailPostDto> Details { get; set; } = new();
+    }
+
+    public class ProformaInvoiceDetailPostDto
+    {
+        public Guid ItemId { get; set; }
+        public string Particulars { get; set; } = string.Empty;
+        public string? HSNCode { get; set; }
+        public decimal Quantity { get; set; }
+        public decimal Rate { get; set; }
+        public decimal DiscountPercent { get; set; }
+        public decimal DiscountAmount { get; set; }
+        public decimal TaxableValue { get; set; }
+        public decimal GSTPercent { get; set; }
+        public decimal GSTAmount { get; set; }
+        public decimal LineTotal { get; set; }
+        public List<ProformaInvoiceBarcodePostDto> ScannedBarcodes { get; set; } = new();
+    }
+
+    public class ProformaInvoiceBarcodePostDto
+    {
+        public string Barcode { get; set; } = string.Empty;
+        public string BatchNo { get; set; } = string.Empty;
+        public string TrackingNo { get; set; } = string.Empty;
+        public decimal Quantity { get; set; }
     }
 }
