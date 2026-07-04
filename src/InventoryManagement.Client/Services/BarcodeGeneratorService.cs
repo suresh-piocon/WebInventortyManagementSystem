@@ -35,7 +35,7 @@ namespace InventoryManagement.Client.Services
                         Width = 250,
                         Height = 70,
                         Margin = 1,
-                        PureBarcode = false // Include text underneath barcode
+                        PureBarcode = true // Only barcode lines, no text underneath
                     }
                 };
 
