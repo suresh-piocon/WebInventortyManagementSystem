@@ -44,6 +44,13 @@ namespace InventoryManagement.Client
             // Register Image Loader Service
             builder.Services.AddScoped<InventoryManagement.Client.Services.ImageLoaderService>();
 
+            // Set global culture to enforce dd/MM/yyyy date format globally
+            var cultureInfo = new System.Globalization.CultureInfo("en-IN");
+            cultureInfo.DateTimeFormat.ShortDatePattern = "dd/MM/yyyy";
+            cultureInfo.DateTimeFormat.LongDatePattern = "dd MMMM yyyy";
+            System.Globalization.CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
+            System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
+
             await builder.Build().RunAsync();
         }
     }
