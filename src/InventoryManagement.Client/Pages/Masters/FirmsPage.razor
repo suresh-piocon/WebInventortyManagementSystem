@@ -1,0 +1,516 @@
+@page "/masters/firms"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Firm Master - Inventory Management</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="d-flex justify-between align-center mb-6">
+        <div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+                Firm Master
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-slate-400">
+                Maintain and manage business entities under which customers are registered.
+            </MudText>
+        </div>
+        <div class="d-flex gap-2">
+            <MudButton Variant="Variant.Outlined" 
+                       Color="Color.Info" 
+                       StartIcon="@Icons.Custom.FileFormats.FileExcel"
+                       OnClick="ExportFirmsExcel"
+                       Style="font-family: 'Outfit';">
+                Export Excel
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" 
+                       Color="Color.Warning" 
+                       StartIcon="@Icons.Material.Filled.Print"
+                       OnClick="PrintFirms"
+                       Style="font-family: 'Outfit';">
+                Print List
+            </MudButton>
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog"
+                       Style="background: linear-gradient(135deg, #5C5CFF 0%, #00E5FF 100%); font-family: 'Outfit'; font-weight: 600;">
+                Add Firm
+            </MudButton>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <MudPaper Class="glass-panel pa-4 mb-4">
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_searchString" 
+                              Placeholder="Search by Firm Name, Code, GSTIN..." 
+                              Adornment="Adornment.Start" 
+                              AdornmentIcon="@Icons.Material.Filled.Search" 
+                              IconSize="Size.Medium" 
+                              Class="text-slate-200" 
+                              Immediate="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" Label="Filter by Status" @bind-Value="_filterStatus" Clearable="true" Class="text-slate-200">
+                    <MudSelectItem Value="@("Active")">Active</MudSelectItem>
+                    <MudSelectItem Value="@("Inactive")">Inactive</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <!-- Table Grid -->
+    <MudTable Items="@FilteredFirms" 
+              Hover="true" 
+              Loading="@_loading" 
+              Class="glass-panel text-slate-200">
+        <HeaderContent>
+            <MudTh Style="color: #94A3B8;">Firm Code</MudTh>
+            <MudTh Style="color: #94A3B8;">Firm Name</MudTh>
+            <MudTh Style="color: #94A3B8;">GSTIN</MudTh>
+            <MudTh Style="color: #94A3B8;">Mobile No</MudTh>
+            <MudTh Style="color: #94A3B8;">City</MudTh>
+            <MudTh Style="color: #94A3B8;">State</MudTh>
+            <MudTh Style="color: #94A3B8;">Status</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right; width: 140px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Code" Class="text-slate-100 font-mono font-weight-bold">@context.FirmCode</MudTd>
+            <MudTd DataLabel="Firm Name" Class="text-slate-200 font-weight-bold">@context.FirmName</MudTd>
+            <MudTd DataLabel="GSTIN" Class="text-slate-300 font-mono">@(string.IsNullOrEmpty(context.GSTIN) ? "N/A" : context.GSTIN)</MudTd>
+            <MudTd DataLabel="Mobile No" Class="text-slate-300">@(string.IsNullOrEmpty(context.MobileNo) ? "N/A" : context.MobileNo)</MudTd>
+            <MudTd DataLabel="City" Class="text-slate-300">@(string.IsNullOrEmpty(context.City) ? "N/A" : context.City)</MudTd>
+            <MudTd DataLabel="State" Class="text-slate-300">@(string.IsNullOrEmpty(context.State) ? "N/A" : context.State)</MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.Status == "Active")
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">Active</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Text">Inactive</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Actions" Style="text-align: right;">
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenViewDialog(context))" Tooltip="View Profile" />
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" Tooltip="Edit Firm" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => ConfirmDelete(context))" Tooltip="Delete Firm" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+        <NoRecordsContent>
+            <MudText Class="text-slate-400 pa-4">No firms found.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudContainer>
+
+<!-- Dialog for Add/Edit -->
+<MudDialog @bind-Visible="_dialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
+            @(_editFirm.FirmId == Guid.Empty ? "Create New Firm" : "Edit Firm Details")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isFormValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Firm Name" @bind-Value="_editFirm.FirmName" Required="true" RequiredError="Firm Name is required" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Proprietor / Contact Person" @bind-Value="_editFirm.ContactPerson" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Mobile Number" @bind-Value="_editFirm.MobileNo" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Email ID" @bind-Value="_editFirm.Email" Class="text-slate-200" HelperText="e.g. contact@firm.com" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="GSTIN" @bind-Value="_editFirm.GSTIN" Class="text-slate-200" HelperText="15-character GSTIN format" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="PAN Number" @bind-Value="_editFirm.PANNo" Class="text-slate-200" MaxLength="10" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Address Line 1" @bind-Value="_editFirm.Address1" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Address Line 2" @bind-Value="_editFirm.Address2" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="City" @bind-Value="_editFirm.City" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="State" @bind-Value="_editFirm.State" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Pincode" @bind-Value="_editFirm.Pincode" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Country" @bind-Value="_editFirm.Country" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" Label="Status" @bind-Value="_editFirm.Status" Required="true" Class="text-slate-200">
+                        <MudSelectItem Value="@("Active")">Active</MudSelectItem>
+                        <MudSelectItem Value="@("Inactive")">Inactive</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField T="string" Label="Remarks" @bind-Value="_editFirm.Remarks" Lines="2" Class="text-slate-200" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog" Variant="Variant.Text" Color="Color.Secondary">Cancel</MudButton>
+        <MudButton OnClick="SaveFirm" Variant="Variant.Filled" Color="Color.Primary" Disabled="@_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Dialog for View Details -->
+<MudDialog @bind-Visible="_viewDialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
+            Firm Profile: @_viewFirm.FirmCode
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <div style="color: #E2E8F0; line-height: 1.8;">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <div><strong>Firm Name:</strong> @_viewFirm.FirmName</div>
+                    <div><strong>Proprietor/Contact:</strong> @_viewFirm.ContactPerson</div>
+                    <div><strong>Mobile No:</strong> @_viewFirm.MobileNo</div>
+                    <div><strong>Email ID:</strong> @_viewFirm.Email</div>
+                    <div><strong>GSTIN:</strong> @_viewFirm.GSTIN</div>
+                    <div><strong>PAN No:</strong> @_viewFirm.PANNo</div>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <div><strong>Address Line 1:</strong> @_viewFirm.Address1</div>
+                    <div><strong>Address Line 2:</strong> @_viewFirm.Address2</div>
+                    <div><strong>City:</strong> @_viewFirm.City</div>
+                    <div><strong>State:</strong> @_viewFirm.State</div>
+                    <div><strong>Pincode:</strong> @_viewFirm.Pincode</div>
+                    <div><strong>Country:</strong> @_viewFirm.Country</div>
+                    <div><strong>Status:</strong> @_viewFirm.Status</div>
+                    <div><strong>Remarks:</strong> @_viewFirm.Remarks</div>
+                </MudItem>
+            </MudGrid>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _viewDialogOpen = false" Variant="Variant.Filled" Color="Color.Primary">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Hidden Table for A4 Printing -->
+<div id="firm-table-print-container" style="display: none;">
+    <h2>Firm Master List</h2>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 100px;">Code</th>
+                <th>Firm Name</th>
+                <th>Proprietor</th>
+                <th>GSTIN</th>
+                <th>Mobile No</th>
+                <th>City</th>
+                <th>State</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var f in FilteredFirms)
+            {
+                <tr>
+                    <td>@f.FirmCode</td>
+                    <td><strong>@f.FirmName</strong></td>
+                    <td>@(f.ContactPerson ?? "N/A")</td>
+                    <td>@(string.IsNullOrEmpty(f.GSTIN) ? "N/A" : f.GSTIN)</td>
+                    <td>@(string.IsNullOrEmpty(f.MobileNo) ? "N/A" : f.MobileNo)</td>
+                    <td>@(string.IsNullOrEmpty(f.City) ? "N/A" : f.City)</td>
+                    <td>@(string.IsNullOrEmpty(f.State) ? "N/A" : f.State)</td>
+                    <td>@f.Status</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private List<Firm> _firms = new();
+
+    private bool _loading = true;
+    private bool _saving = false;
+
+    // Filters
+    private string _searchString = "";
+    private string? _filterStatus;
+
+    // Dialog state
+    private bool _dialogOpen = false;
+    private bool _viewDialogOpen = false;
+    private bool _isFormValid = false;
+    private MudForm? _form;
+    
+    private Firm _editFirm = new();
+    private Firm _viewFirm = new();
+    private readonly DialogOptions _dialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+    private IEnumerable<Firm> FilteredFirms =>
+        _firms.Where(f =>
+            (string.IsNullOrWhiteSpace(_searchString) ||
+             f.FirmName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+             f.FirmCode.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+             (f.GSTIN?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false)) &&
+            (string.IsNullOrEmpty(_filterStatus) || f.Status == _filterStatus)
+        );
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFirms();
+    }
+
+    private async Task LoadFirms()
+    {
+        _loading = true;
+        try
+        {
+            _firms = await Http.GetFromJsonAsync<List<Firm>>("api/firms") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading firms: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OpenAddDialog()
+    {
+        _editFirm = new Firm
+        {
+            FirmId = Guid.Empty,
+            Status = "Active",
+            Country = "India"
+        };
+        _dialogOpen = true;
+    }
+
+    private void OpenEditDialog(Firm firm)
+    {
+        _editFirm = new Firm
+        {
+            FirmId = firm.FirmId,
+            FirmCode = firm.FirmCode,
+            FirmName = firm.FirmName,
+            ContactPerson = firm.ContactPerson,
+            MobileNo = firm.MobileNo,
+            Email = firm.Email,
+            GSTIN = firm.GSTIN,
+            PANNo = firm.PANNo,
+            Address1 = firm.Address1,
+            Address2 = firm.Address2,
+            City = firm.City,
+            State = firm.State,
+            Pincode = firm.Pincode,
+            Country = firm.Country,
+            Status = firm.Status,
+            Remarks = firm.Remarks,
+            CreatedDate = firm.CreatedDate
+        };
+        _dialogOpen = true;
+    }
+
+    private void OpenViewDialog(Firm firm)
+    {
+        _viewFirm = firm;
+        _viewDialogOpen = true;
+    }
+
+    private void CloseDialog()
+    {
+        _dialogOpen = false;
+    }
+
+    private async Task SaveFirm()
+    {
+        if (_form == null) return;
+        await _form.Validate();
+        if (!_form.IsValid) return;
+
+        try
+        {
+            _saving = true;
+            
+            // Check for duplicate name warning
+            var excludeIdParam = _editFirm.FirmId == Guid.Empty ? "" : $"&excludeId={_editFirm.FirmId}";
+            var isDuplicate = await Http.GetFromJsonAsync<bool>($"api/firms/check-duplicate-name?name={Uri.EscapeDataString(_editFirm.FirmName.Trim())}{excludeIdParam}");
+            
+            if (isDuplicate)
+            {
+                bool? proceed = await DialogService.ShowMessageBoxAsync(
+                    "Duplicate Firm Warning",
+                    $"A firm with the name '{_editFirm.FirmName.Trim()}' already exists. Do you still want to proceed and save this firm?",
+                    yesText: "Yes, Proceed", cancelText: "Cancel");
+                
+                if (proceed != true)
+                {
+                    _saving = false;
+                    return;
+                }
+            }
+
+            HttpResponseMessage response;
+            if (_editFirm.FirmId == Guid.Empty)
+            {
+                response = await Http.PostAsJsonAsync("api/firms", _editFirm);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"api/firms/{_editFirm.FirmId}", _editFirm);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Firm details saved successfully!", Severity.Success);
+                _dialogOpen = false;
+                await LoadFirms();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Save failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving firm: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ConfirmDelete(Firm firm)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Delete Firm",
+            $"Are you sure you want to delete firm '{firm.FirmName}'? This action cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/firms/{firm.FirmId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Firm deleted successfully!", Severity.Success);
+                    await LoadFirms();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Delete failed: {error}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting firm: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task PrintFirms()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("webcamInterop.printElement", "firm-table-print-container", "Firm Master List");
+            Snackbar.Add("Print preview opened.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error launching print: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ExportFirmsExcel()
+    {
+        try
+        {
+            var excelContent = GenerateFirmsExcelHtml();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(excelContent);
+            await JSRuntime.InvokeVoidAsync("webcamInterop.downloadFile", $"FirmMaster_{DateTime.Now:yyyyMMdd}.xls", "application/vnd.ms-excel", Convert.ToBase64String(bytes));
+            Snackbar.Add("Firm list exported to Excel successfully!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error exporting Excel: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private string GenerateFirmsExcelHtml()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<html xmlns:o=\"urn:schemas-microsoft-com:office:office\" xmlns:x=\"urn:schemas-microsoft-com:office:excel\" xmlns=\"http://www.w3.org/TR/REC-html40\">");
+        sb.Append("<head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Firms</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>");
+        sb.Append("<body>");
+        sb.Append("<table border='1'>");
+        sb.Append("<thead>");
+        sb.Append("<tr style='background-color:#f1f5f9; font-weight:bold;'>");
+        sb.Append("<th>Firm Code</th>");
+        sb.Append("<th>Firm Name</th>");
+        sb.Append("<th>Proprietor</th>");
+        sb.Append("<th>Mobile No</th>");
+        sb.Append("<th>Email ID</th>");
+        sb.Append("<th>GSTIN</th>");
+        sb.Append("<th>PAN No</th>");
+        sb.Append("<th>City</th>");
+        sb.Append("<th>State</th>");
+        sb.Append("<th>Status</th>");
+        sb.Append("</tr>");
+        sb.Append("</thead>");
+        sb.Append("<tbody>");
+
+        foreach (var f in FilteredFirms)
+        {
+            sb.Append("<tr>");
+            sb.Append($"<td>{f.FirmCode}</td>");
+            sb.Append($"<td>{f.FirmName}</td>");
+            sb.Append($"<td>{f.ContactPerson ?? ""}</td>");
+            sb.Append($"<td>{f.MobileNo ?? ""}</td>");
+            sb.Append($"<td>{f.Email ?? ""}</td>");
+            sb.Append($"<td>{f.GSTIN ?? ""}</td>");
+            sb.Append($"<td>{f.PANNo ?? ""}</td>");
+            sb.Append($"<td>{f.City ?? ""}</td>");
+            sb.Append($"<td>{f.State ?? ""}</td>");
+            sb.Append($"<td>{f.Status}</td>");
+            sb.Append("</tr>");
+        }
+
+        sb.Append("</tbody>");
+        sb.Append("</table>");
+        sb.Append("</body>");
+        sb.Append("</html>");
+        return sb.ToString();
+    }
+}

@@ -24,9 +24,14 @@ namespace InventoryManagement.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetCustomers([FromQuery] string? search, [FromQuery] string? city, [FromQuery] string? state, [FromQuery] string? type)
+        public async Task<IActionResult> GetCustomers([FromQuery] string? search, [FromQuery] string? city, [FromQuery] string? state, [FromQuery] string? type, [FromQuery] Guid? firmId)
         {
             var query = _context.Customers.AsQueryable();
+
+            if (firmId.HasValue)
+            {
+                query = query.Where(c => c.FirmId == firmId.Value);
+            }
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -83,6 +88,18 @@ namespace InventoryManagement.Api.Controllers
         {
             if (customer == null) return BadRequest("Invalid customer data.");
 
+            // Firm selection is mandatory
+            if (customer.FirmId == Guid.Empty)
+            {
+                return BadRequest("Firm selection is mandatory.");
+            }
+
+            var firm = await _context.Firms.FindAsync(customer.FirmId);
+            if (firm == null)
+            {
+                return BadRequest("Selected Firm not found.");
+            }
+
             // 1. Validations
             if (string.IsNullOrWhiteSpace(customer.CustomerName))
             {
@@ -126,6 +143,8 @@ namespace InventoryManagement.Api.Controllers
             // 2. Generate Customer Code
             customer.CustomerId = Guid.NewGuid();
             customer.CustomerCode = await GenerateCustomerCodeAsync();
+            customer.FirmCode = firm.FirmCode;
+            customer.FirmName = firm.FirmName;
             customer.CustomerName = customer.CustomerName.Trim();
             customer.MobileNo = customer.MobileNo.Trim();
             if (customer.GSTIN != null) customer.GSTIN = customer.GSTIN.Trim().ToUpper();
@@ -144,6 +163,18 @@ namespace InventoryManagement.Api.Controllers
         {
             var entity = await _context.Customers.FindAsync(id);
             if (entity == null) return NotFound();
+
+            // Firm selection is mandatory
+            if (customer.FirmId == Guid.Empty)
+            {
+                return BadRequest("Firm selection is mandatory.");
+            }
+
+            var firm = await _context.Firms.FindAsync(customer.FirmId);
+            if (firm == null)
+            {
+                return BadRequest("Selected Firm not found.");
+            }
 
             // 1. Validations
             if (string.IsNullOrWhiteSpace(customer.CustomerName))
@@ -186,6 +217,9 @@ namespace InventoryManagement.Api.Controllers
             }
 
             // 2. Update properties
+            entity.FirmId = customer.FirmId;
+            entity.FirmCode = firm.FirmCode;
+            entity.FirmName = firm.FirmName;
             entity.CustomerName = customer.CustomerName.Trim();
             entity.ContactPerson = customer.ContactPerson?.Trim();
             entity.MobileNo = customer.MobileNo.Trim();

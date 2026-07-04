@@ -680,6 +680,17 @@ namespace InventoryManagement.Shared
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();
 
+        public Guid? FirmId { get; set; }
+
+        [ForeignKey(nameof(FirmId))]
+        public Firm? Firm { get; set; }
+
+        [StringLength(30)]
+        public string? FirmCode { get; set; }
+
+        [StringLength(150)]
+        public string? FirmName { get; set; }
+
         public Guid? CustomerId { get; set; }
 
         [ForeignKey(nameof(CustomerId))]
@@ -834,6 +845,9 @@ namespace InventoryManagement.Shared
 
     public class ProformaInvoicePostDto
     {
+        public Guid? FirmId { get; set; }
+        public string? FirmCode { get; set; }
+        public string? FirmName { get; set; }
         public Guid? CustomerId { get; set; }
         public DateTimeOffset ProformaDate { get; set; }
         public string CustomerName { get; set; } = string.Empty;
@@ -874,6 +888,20 @@ namespace InventoryManagement.Shared
     {
         [Key]
         public Guid CustomerId { get; set; } = Guid.NewGuid();
+
+        [Required]
+        public Guid FirmId { get; set; }
+
+        [ForeignKey(nameof(FirmId))]
+        public Firm? Firm { get; set; }
+
+        [Required]
+        [StringLength(30)]
+        public string FirmCode { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(150)]
+        public string FirmName { get; set; } = string.Empty;
 
         [Required]
         [StringLength(30)]
@@ -934,5 +962,170 @@ namespace InventoryManagement.Shared
 
         public DateTimeOffset CreatedDate { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset ModifiedDate { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    [Table("FirmMaster")]
+    public class Firm
+    {
+        [Key]
+        public Guid FirmId { get; set; } = Guid.NewGuid();
+
+        [Required]
+        [StringLength(30)]
+        public string FirmCode { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(150)]
+        public string FirmName { get; set; } = string.Empty;
+
+        [StringLength(100)]
+        public string? ContactPerson { get; set; }
+
+        [StringLength(20)]
+        public string? MobileNo { get; set; }
+
+        [StringLength(100)]
+        public string? Email { get; set; }
+
+        [StringLength(15)]
+        public string? GSTIN { get; set; }
+
+        [StringLength(10)]
+        public string? PANNo { get; set; }
+
+        public string? Address1 { get; set; }
+        public string? Address2 { get; set; }
+
+        [StringLength(100)]
+        public string? City { get; set; }
+
+        [StringLength(100)]
+        public string? State { get; set; }
+
+        [StringLength(10)]
+        public string? Pincode { get; set; }
+
+        [StringLength(100)]
+        public string? Country { get; set; }
+
+        [Required]
+        [StringLength(20)]
+        public string Status { get; set; } = "Active"; // "Active" or "Inactive"
+
+        public string? Remarks { get; set; }
+
+        public DateTimeOffset CreatedDate { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset ModifiedDate { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    [Table("CustomerCollections")]
+    public class CustomerCollection
+    {
+        [Key]
+        public Guid CollectionId { get; set; } = Guid.NewGuid();
+
+        [Required]
+        public Guid CustomerId { get; set; }
+
+        [ForeignKey(nameof(CustomerId))]
+        public Customer? Customer { get; set; }
+
+        [Required]
+        [StringLength(150)]
+        public string CustomerName { get; set; } = string.Empty;
+
+        [Required]
+        public Guid FirmId { get; set; }
+
+        [ForeignKey(nameof(FirmId))]
+        public Firm? Firm { get; set; }
+
+        [Required]
+        [StringLength(30)]
+        public string FirmCode { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(150)]
+        public string FirmName { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(30)]
+        public string CollectionNo { get; set; } = string.Empty;
+
+        [Required]
+        public DateTimeOffset CollectionDate { get; set; } = DateTimeOffset.UtcNow;
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal Amount { get; set; }
+
+        [Required]
+        [StringLength(20)]
+        public string PaymentMode { get; set; } = "Cash"; // "Cash", "Bank", "UPI", etc.
+
+        [StringLength(50)]
+        public string? ReferenceNo { get; set; }
+
+        public string? Remarks { get; set; }
+
+        [Required]
+        public Guid CreatedBy { get; set; }
+
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    public class FirmCustomerCountDto
+    {
+        public string FirmCode { get; set; } = string.Empty;
+        public string FirmName { get; set; } = string.Empty;
+        public int TotalCustomers { get; set; }
+    }
+
+    public class FirmCustomerListDto
+    {
+        public string FirmCode { get; set; } = string.Empty;
+        public string FirmName { get; set; } = string.Empty;
+        public string CustomerCode { get; set; } = string.Empty;
+        public string CustomerName { get; set; } = string.Empty;
+        public string MobileNo { get; set; } = string.Empty;
+        public string? GSTIN { get; set; }
+        public string? City { get; set; }
+        public string? State { get; set; }
+    }
+
+    public class LedgerEntryDto
+    {
+        public DateTimeOffset Date { get; set; }
+        public string Type { get; set; } = string.Empty; // "Invoice" / "Collection"
+        public string ReferenceNo { get; set; } = string.Empty;
+        public string Particulars { get; set; } = string.Empty;
+        public decimal Debit { get; set; }
+        public decimal Credit { get; set; }
+        public decimal Balance { get; set; }
+    }
+
+    public class OutstandingReportDto
+    {
+        public string FirmCode { get; set; } = string.Empty;
+        public string FirmName { get; set; } = string.Empty;
+        public string CustomerCode { get; set; } = string.Empty;
+        public string CustomerName { get; set; } = string.Empty;
+        public string MobileNo { get; set; } = string.Empty;
+        public string? GSTIN { get; set; }
+        public decimal TotalInvoiced { get; set; }
+        public decimal TotalCollected { get; set; }
+        public decimal OutstandingBalance { get; set; }
+    }
+
+    public class ProfitReportDto
+    {
+        public string ProformaNo { get; set; } = string.Empty;
+        public DateTimeOffset ProformaDate { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
+        public string Particulars { get; set; } = string.Empty;
+        public decimal Quantity { get; set; }
+        public decimal Revenue { get; set; }
+        public decimal Cost { get; set; }
+        public decimal Profit { get; set; }
+        public decimal MarginPercent { get; set; }
     }
 }

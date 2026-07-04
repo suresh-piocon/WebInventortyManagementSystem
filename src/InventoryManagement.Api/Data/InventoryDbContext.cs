@@ -42,6 +42,8 @@ namespace InventoryManagement.Api.Data
         public DbSet<ProformaInvoiceDetail> ProformaInvoiceDetails => Set<ProformaInvoiceDetail>();
         public DbSet<ProformaInvoiceDetailBarcode> ProformaInvoiceDetailBarcodes => Set<ProformaInvoiceDetailBarcode>();
         public DbSet<Customer> Customers => Set<Customer>();
+        public DbSet<Firm> Firms => Set<Firm>();
+        public DbSet<CustomerCollection> CustomerCollections => Set<CustomerCollection>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -60,6 +62,8 @@ namespace InventoryManagement.Api.Data
             modelBuilder.Entity<QRCodeMaster>().HasIndex(qm => qm.TrackingNo);
             modelBuilder.Entity<Customer>().HasIndex(c => c.MobileNo).IsUnique();
             modelBuilder.Entity<Customer>().HasIndex(c => c.CustomerCode).IsUnique();
+            modelBuilder.Entity<Firm>().HasIndex(f => f.FirmCode).IsUnique();
+            modelBuilder.Entity<CustomerCollection>().HasIndex(cc => cc.CollectionNo).IsUnique();
 
             // Set up cascading deletes
             modelBuilder.Entity<StockInwardDetail>()
@@ -90,6 +94,30 @@ namespace InventoryManagement.Api.Data
                 .HasOne(p => p.Customer)
                 .WithMany()
                 .HasForeignKey(p => p.CustomerId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Customer>()
+                .HasOne(c => c.Firm)
+                .WithMany()
+                .HasForeignKey(c => c.FirmId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CustomerCollection>()
+                .HasOne(cc => cc.Customer)
+                .WithMany()
+                .HasForeignKey(cc => cc.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CustomerCollection>()
+                .HasOne(cc => cc.Firm)
+                .WithMany()
+                .HasForeignKey(cc => cc.FirmId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ProformaInvoice>()
+                .HasOne(p => p.Firm)
+                .WithMany()
+                .HasForeignKey(p => p.FirmId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             // Precision for decimals
@@ -146,6 +174,9 @@ namespace InventoryManagement.Api.Data
 
             modelBuilder.Entity<Customer>()
                 .Property(c => c.CreditLimit).HasPrecision(12, 2);
+
+            modelBuilder.Entity<CustomerCollection>()
+                .Property(cc => cc.Amount).HasPrecision(12, 2);
         }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

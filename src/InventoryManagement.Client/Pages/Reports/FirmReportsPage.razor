@@ -1,0 +1,475 @@
+@page "/reports/firm-wise"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Firm-wise Reports - Inventory Management</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="mb-6">
+        <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+            Firm-wise Reports
+        </MudText>
+        <MudText Typo="Typo.body2" Class="text-slate-400">
+            View ledgers, customer counts, and proforma invoice logs grouped by billing firm.
+        </MudText>
+    </div>
+
+    <!-- Global Parameters Panel -->
+    <MudPaper Class="glass-panel pa-4 mb-4">
+        <MudGrid AlignItems="AlignItems.Center">
+            <MudItem xs="12" sm="4">
+                <MudSelect T="Guid?" Label="Select Billing Firm" @bind-Value="_selectedFirmId" @bind-Value:after="OnParamsChanged" Clearable="true" Class="text-slate-200">
+                    <MudSelectItem T="Guid?" Value="null">All Firms</MudSelectItem>
+                    @foreach (var f in _firms)
+                    {
+                        <MudSelectItem T="Guid?" Value="@f.FirmId">@f.FirmName (@f.FirmCode)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudDatePicker Label="Start Date" @bind-Date="_startDate" @bind-Date:after="OnParamsChanged" Variant="Variant.Text" Class="text-slate-200" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudDatePicker Label="End Date" @bind-Date="_endDate" @bind-Date:after="OnParamsChanged" Variant="Variant.Text" Class="text-slate-200" />
+            </MudItem>
+            <MudItem xs="12" sm="2" Class="d-flex justify-end">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" OnClick="RefreshActiveTab" Style="height: 48px;">
+                    Reload
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" Color="Color.Info" ActivePanelIndexChanged="OnTabChanged" Class="mud-width-full">
+        <!-- Tab 1: Customer List & Count -->
+        <MudTabPanel Text="Customer Directory" Icon="@Icons.Material.Filled.People">
+            <div class="d-flex justify-between align-center mb-4">
+                <MudText Typo="Typo.h6" Class="text-slate-200" Style="font-family: 'Outfit';">Customer Directory & Counts</MudText>
+                <div class="d-flex gap-2">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Info" StartIcon="@Icons.Custom.FileFormats.FileExcel" OnClick="ExportCustomerListExcel">Excel</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.Print" OnClick="PrintCustomerList">Print</MudButton>
+                </div>
+            </div>
+
+            <MudGrid>
+                <!-- Summary Count table -->
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.subtitle2" Class="text-slate-300 font-weight-bold mb-2">Customer Count by Firm</MudText>
+                    <MudTable Items="@_summaryCounts" Hover="true" Class="glass-panel text-slate-200" Dense="true">
+                        <HeaderContent>
+                            <MudTh Style="color: #94A3B8;">Firm Code</MudTh>
+                            <MudTh Style="color: #94A3B8;">Firm Name</MudTh>
+                            <MudTh Style="color: #94A3B8; text-align: right;">Total Customers</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd Class="font-mono text-slate-300">@context.FirmCode</MudTd>
+                            <MudTd Class="font-weight-bold text-slate-200">@context.FirmName</MudTd>
+                            <MudTd Style="text-align: right;" Class="text-yellow-500 font-weight-bold">@context.TotalCustomers</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudItem>
+
+                <!-- Detailed List table -->
+                <MudItem xs="12" md="8">
+                    <MudText Typo="Typo.subtitle2" Class="text-slate-300 font-weight-bold mb-2">Firm-wise Customer List</MudText>
+                    <MudTable Items="@_customerList" Hover="true" Class="glass-panel text-slate-200" Dense="true" PagerContentClass="text-slate-200">
+                        <HeaderContent>
+                            <MudTh Style="color: #94A3B8;">Firm Name</MudTh>
+                            <MudTh Style="color: #94A3B8;">Customer Code</MudTh>
+                            <MudTh Style="color: #94A3B8;">Customer Name</MudTh>
+                            <MudTh Style="color: #94A3B8;">Mobile No</MudTh>
+                            <MudTh Style="color: #94A3B8;">City</MudTh>
+                            <MudTh Style="color: #94A3B8;">State</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd Class="text-slate-300 font-weight-bold">@context.FirmName</MudTd>
+                            <MudTd Class="font-mono text-slate-200">@context.CustomerCode</MudTd>
+                            <MudTd Class="text-slate-100 font-weight-bold">@context.CustomerName</MudTd>
+                            <MudTd Class="text-slate-300">@context.MobileNo</MudTd>
+                            <MudTd Class="text-slate-300">@(context.City ?? "N/A")</MudTd>
+                            <MudTd Class="text-slate-300">@(context.State ?? "N/A")</MudTd>
+                        </RowTemplate>
+                        <PagerContent>
+                            <MudTablePager />
+                        </PagerContent>
+                    </MudTable>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <!-- Tab 2: Customer Ledger -->
+        <MudTabPanel Text="Customer Ledger" Icon="@Icons.Material.Filled.AccountBalanceWallet">
+            <div class="d-flex justify-between align-center mb-4">
+                <div class="d-flex align-center gap-4 flex-grow-1 mr-4">
+                    <MudSelect T="Guid?" Label="Select Customer" @bind-Value="_selectedCustomerId" @bind-Value:after="LoadLedger" Class="text-slate-200" Style="max-width: 400px;">
+                        @foreach (var c in _ledgerCustomers)
+                        {
+                            <MudSelectItem T="Guid?" Value="@c.CustomerId">@c.CustomerName (@c.CustomerCode)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+                <div class="d-flex gap-2">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Info" StartIcon="@Icons.Custom.FileFormats.FileExcel" OnClick="ExportLedgerExcel" Disabled="@(!_ledgerEntries.Any())">Excel</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.Print" OnClick="PrintLedger" Disabled="@(!_ledgerEntries.Any())">Print</MudButton>
+                </div>
+            </div>
+
+            @if (!_ledgerEntries.Any())
+            {
+                <div class="py-8 text-center text-slate-500">
+                    Select a customer from the dropdown above to view their financial ledger statement.
+                </div>
+            }
+            else
+            {
+                <MudTable Items="@_ledgerEntries" Hover="true" Class="glass-panel text-slate-200" Dense="true">
+                    <HeaderContent>
+                        <MudTh Style="color: #94A3B8;">Date</MudTh>
+                        <MudTh Style="color: #94A3B8;">Type</MudTh>
+                        <MudTh Style="color: #94A3B8;">Reference No</MudTh>
+                        <MudTh Style="color: #94A3B8;">Particulars</MudTh>
+                        <MudTh Style="color: #94A3B8; text-align: right;">Debit (Dr)</MudTh>
+                        <MudTh Style="color: #94A3B8; text-align: right;">Credit (Cr)</MudTh>
+                        <MudTh Style="color: #94A3B8; text-align: right;">Balance</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd Class="text-slate-300">@context.Date.LocalDateTime.ToString("dd-MM-yyyy HH:mm")</MudTd>
+                        <MudTd>
+                            @if (context.Type == "Invoice")
+                            {
+                                <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Text">Sales Invoice</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">Receipt</MudChip>
+                            }
+                        </MudTd>
+                        <MudTd Class="font-mono text-slate-200 font-weight-bold">@context.ReferenceNo</MudTd>
+                        <MudTd Class="text-slate-300">@context.Particulars</MudTd>
+                        <MudTd Style="text-align: right;" Class="text-red-400">@(context.Debit > 0 ? $"₹{context.Debit:N2}" : "-")</MudTd>
+                        <MudTd Style="text-align: right;" Class="text-green-400">@(context.Credit > 0 ? $"₹{context.Credit:N2}" : "-")</MudTd>
+                        <MudTd Style="text-align: right;" Class="text-slate-100 font-weight-bold">₹@context.Balance.ToString("N2")</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudTabPanel>
+
+        <!-- Tab 3: Proforma Invoice Report -->
+        <MudTabPanel Text="Proforma Report" Icon="@Icons.Material.Filled.Assignment">
+            <div class="d-flex justify-between align-center mb-4">
+                <MudText Typo="Typo.h6" Class="text-slate-200" Style="font-family: 'Outfit';">Proforma Invoices Log</MudText>
+                <div class="d-flex gap-2">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Info" StartIcon="@Icons.Custom.FileFormats.FileExcel" OnClick="ExportProformasExcel">Excel</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.Print" OnClick="PrintProformas">Print</MudButton>
+                </div>
+            </div>
+
+            <MudTable Items="@_proformas" Hover="true" Class="glass-panel text-slate-200" Dense="true" PagerContentClass="text-slate-200">
+                <HeaderContent>
+                    <MudTh Style="color: #94A3B8;">Date</MudTh>
+                    <MudTh Style="color: #94A3B8;">Proforma No</MudTh>
+                    <MudTh Style="color: #94A3B8;">Customer Name</MudTh>
+                    <MudTh Style="color: #94A3B8;">Mobile No</MudTh>
+                    <MudTh Style="color: #94A3B8; text-align: right;">Total Qty</MudTh>
+                    <MudTh Style="color: #94A3B8; text-align: right;">Net Amount</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd Class="text-slate-300">@context.ProformaDate.LocalDateTime.ToString("dd-MM-yyyy HH:mm")</MudTd>
+                    <MudTd Class="font-mono text-slate-100 font-weight-bold">@context.ProformaNo</MudTd>
+                    <MudTd Class="text-slate-200 font-weight-bold">@context.CustomerName</MudTd>
+                    <MudTd Class="text-slate-300">@context.MobileNo</MudTd>
+                    <MudTd Style="text-align: right;" Class="text-yellow-500">@context.TotalQty.ToString("N2")</MudTd>
+                    <MudTd Style="text-align: right;" Class="text-slate-100 font-weight-bold">₹@context.NetAmount.ToString("N2")</MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+<!-- Hidden Tables for A4 Reports Printing -->
+<div id="customerlist-print-container" style="display: none;">
+    <h2>Firm-wise Customer Directory</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Billing Firm</th>
+                <th>Cust Code</th>
+                <th>Customer Name</th>
+                <th>Mobile No</th>
+                <th>City</th>
+                <th>State</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in _customerList)
+            {
+                <tr>
+                    <td>@c.FirmName</td>
+                    <td>@c.CustomerCode</td>
+                    <td><strong>@c.CustomerName</strong></td>
+                    <td>@c.MobileNo</td>
+                    <td>@(c.City ?? "N/A")</td>
+                    <td>@(c.State ?? "N/A")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div id="ledger-print-container" style="display: none;">
+    <h2>Customer Financial Ledger</h2>
+    <p>Customer: @_ledgerCustomers.FirstOrDefault(c => c.CustomerId == _selectedCustomerId)?.CustomerName (@_ledgerCustomers.FirstOrDefault(c => c.CustomerId == _selectedCustomerId)?.CustomerCode)</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Ref No</th>
+                <th>Particulars</th>
+                <th style="text-align: right;">Debit (Dr)</th>
+                <th style="text-align: right;">Credit (Cr)</th>
+                <th style="text-align: right;">Balance</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var l in _ledgerEntries)
+            {
+                <tr>
+                    <td>@l.Date.LocalDateTime.ToString("dd-MM-yyyy HH:mm")</td>
+                    <td>@l.Type</td>
+                    <td>@l.ReferenceNo</td>
+                    <td>@l.Particulars</td>
+                    <td style="text-align: right;">@(l.Debit > 0 ? $"₹{l.Debit:N2}" : "-")</td>
+                    <td style="text-align: right;">@(l.Credit > 0 ? $"₹{l.Credit:N2}" : "-")</td>
+                    <td style="text-align: right;"><strong>₹@l.Balance.ToString("N2")</strong></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div id="proformas-print-container" style="display: none;">
+    <h2>Proforma Invoices Log</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Proforma No</th>
+                <th>Customer Name</th>
+                <th>Mobile No</th>
+                <th style="text-align: right;">Qty</th>
+                <th style="text-align: right;">Net Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in _proformas)
+            {
+                <tr>
+                    <td>@p.ProformaDate.LocalDateTime.ToString("dd-MM-yyyy HH:mm")</td>
+                    <td>@p.ProformaNo</td>
+                    <td><strong>@p.CustomerName</strong></td>
+                    <td>@p.MobileNo</td>
+                    <td style="text-align: right;">@p.TotalQty.ToString("N2")</td>
+                    <td style="text-align: right;"><strong>₹@p.NetAmount.ToString("N2")</strong></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private List<Firm> _firms = new();
+    private Guid? _selectedFirmId;
+    private DateTime? _startDate = DateTime.Today.AddDays(-30);
+    private DateTime? _endDate = DateTime.Today;
+
+    private int _activeTabIndex = 0;
+
+    // Tab 1 data
+    private List<FirmCustomerCountDto> _summaryCounts = new();
+    private List<FirmCustomerListDto> _customerList = new();
+
+    // Tab 2 data
+    private List<Customer> _allCustomers = new();
+    private List<Customer> _ledgerCustomers = new();
+    private Guid? _selectedCustomerId;
+    private List<LedgerEntryDto> _ledgerEntries = new();
+
+    // Tab 3 data
+    private List<ProformaInvoice> _proformas = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFirms();
+        await LoadAllCustomers();
+        await RefreshActiveTab();
+    }
+
+    private async Task LoadFirms()
+    {
+        try
+        {
+            var data = await Http.GetFromJsonAsync<List<Firm>>("api/firms") ?? new();
+            _firms = data.Where(f => f.Status == "Active").ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading firms: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadAllCustomers()
+    {
+        try
+        {
+            _allCustomers = await Http.GetFromJsonAsync<List<Customer>>("api/customers") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading customers list: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OnParamsChanged()
+    {
+        await RefreshActiveTab();
+    }
+
+    private async Task OnTabChanged(int index)
+    {
+        _activeTabIndex = index;
+        await RefreshActiveTab();
+    }
+
+    private async Task RefreshActiveTab()
+    {
+        if (_activeTabIndex == 0)
+        {
+            await LoadCustomerDirectory();
+        }
+        else if (_activeTabIndex == 1)
+        {
+            // Filter customers dropdown for Ledger by selected Firm
+            _ledgerCustomers = _selectedFirmId.HasValue 
+                ? _allCustomers.Where(c => c.FirmId == _selectedFirmId.Value).ToList() 
+                : _allCustomers;
+
+            // Reset ledger selection if the customer is not in the filtered list
+            if (_selectedCustomerId.HasValue && !_ledgerCustomers.Any(c => c.CustomerId == _selectedCustomerId.Value))
+            {
+                _selectedCustomerId = null;
+                _ledgerEntries.Clear();
+            }
+            else
+            {
+                await LoadLedger();
+            }
+        }
+        else if (_activeTabIndex == 2)
+        {
+            await LoadProformas();
+        }
+    }
+
+    private async Task LoadCustomerDirectory()
+    {
+        try
+        {
+            _summaryCounts = await Http.GetFromJsonAsync<List<FirmCustomerCountDto>>("api/firmreports/summary") ?? new();
+            
+            var firmQuery = _selectedFirmId.HasValue ? $"?firmId={_selectedFirmId.Value}" : "";
+            _customerList = await Http.GetFromJsonAsync<List<FirmCustomerListDto>>($"api/firmreports/customerlist{firmQuery}") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading directory: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadLedger()
+    {
+        if (!_selectedCustomerId.HasValue)
+        {
+            _ledgerEntries.Clear();
+            return;
+        }
+
+        try
+        {
+            _ledgerEntries = await Http.GetFromJsonAsync<List<LedgerEntryDto>>($"api/firmreports/ledger?customerId={_selectedCustomerId.Value}") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading ledger: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadProformas()
+    {
+        try
+        {
+            var firmQuery = _selectedFirmId.HasValue ? $"?firmId={_selectedFirmId.Value}" : "";
+            _proformas = await Http.GetFromJsonAsync<List<ProformaInvoice>>($"api/proformainvoice{firmQuery}") ?? new();
+
+            // Filter locally by date range
+            if (_startDate.HasValue)
+            {
+                var start = new DateTimeOffset(_startDate.Value);
+                _proformas = _proformas.Where(p => p.ProformaDate >= start).ToList();
+            }
+            if (_endDate.HasValue)
+            {
+                var end = new DateTimeOffset(_endDate.Value).AddDays(1);
+                _proformas = _proformas.Where(p => p.ProformaDate < end).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading proforma report: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // Export Excel methods
+    private async Task ExportCustomerListExcel() => await ExportTable("customerlist-print-container", "FirmWiseCustomerList");
+    private async Task ExportLedgerExcel() => await ExportTable("ledger-print-container", "CustomerLedger");
+    private async Task ExportProformasExcel() => await ExportTable("proformas-print-container", "ProformaInvoiceReport");
+
+    private async Task ExportTable(string divId, string name)
+    {
+        try
+        {
+            var html = await JSRuntime.InvokeAsync<string>("eval", $"document.getElementById('{divId}').innerHTML");
+            var excelContent = $"<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:x='urn:schemas-microsoft-com:office:excel' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'/></head><body>{html}</body></html>";
+            var bytes = System.Text.Encoding.UTF8.GetBytes(excelContent);
+            await JSRuntime.InvokeVoidAsync("webcamInterop.downloadFile", $"{name}_{DateTime.Now:yyyyMMdd}.xls", "application/vnd.ms-excel", Convert.ToBase64String(bytes));
+            Snackbar.Add("Report exported to Excel successfully!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Excel export failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // Print methods
+    private async Task PrintCustomerList() => await PrintElement("customerlist-print-container", "Firm-wise Customer Directory");
+    private async Task PrintLedger() => await PrintElement("ledger-print-container", "Customer Ledger Report");
+    private async Task PrintProformas() => await PrintElement("proformas-print-container", "Proforma Invoices Log");
+
+    private async Task PrintElement(string divId, string title)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("webcamInterop.printElement", divId, title);
+            Snackbar.Add("Print preview opened.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Printing failed: {ex.Message}", Severity.Error);
+        }
+    }
+}

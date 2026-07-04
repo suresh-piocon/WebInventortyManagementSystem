@@ -59,6 +59,7 @@
                         <AuthorizeView Roles="Admin,StoreManager" Context="managerContext">
                             <MudNavGroup Title="Masters" Icon="@Icons.Material.Filled.Settings" Expanded="false">
                                 <MudNavLink Href="masters/items" Icon="@Icons.Material.Filled.Layers">Item Master</MudNavLink>
+                                <MudNavLink Href="masters/firms" Icon="@Icons.Material.Filled.CorporateFare">Firm Master</MudNavLink>
                                 <MudNavLink Href="masters/customers" Icon="@Icons.Material.Filled.People">Customer Master</MudNavLink>
                                 <MudNavLink Href="masters/suppliers" Icon="@Icons.Material.Filled.Business">Supplier Master</MudNavLink>
                                 <MudNavLink Href="masters/categories" Icon="@Icons.Material.Filled.Category">Category Master</MudNavLink>
@@ -72,6 +73,7 @@
                         </AuthorizeView>
 
                         <MudNavGroup Title="Reports" Icon="@Icons.Material.Filled.Assessment" Expanded="false">
+                            <MudNavLink Href="reports/firm-wise" Icon="@Icons.Material.Filled.PieChart">Firm-wise Reports</MudNavLink>
                             <MudNavLink Href="reports/ledger" Icon="@Icons.Material.Filled.Book">Stock Ledger</MudNavLink>
                             <MudNavLink Href="reports/supplier-stock" Icon="@Icons.Material.Filled.Assignment">Supplier Stock</MudNavLink>
                             <MudNavLink Href="reports/supplier-purchase" Icon="@Icons.Material.Filled.ReceiptLong">Purchase History</MudNavLink>

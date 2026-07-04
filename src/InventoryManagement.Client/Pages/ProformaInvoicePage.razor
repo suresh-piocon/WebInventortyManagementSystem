@@ -14,7 +14,7 @@
             Stock Outward Proforma Invoice
         </MudText>
         <MudText Typo="Typo.body2" Class="text-slate-400">
-            Create proforma invoices, scan barcodes, group items by price, and issue stock immediately on submission.
+            Create proforma invoices, select registered firm, filter customers, scan barcodes, and issue stock.
         </MudText>
     </div>
 
@@ -37,6 +37,22 @@
                                            Variant="Variant.Outlined" 
                                            Class="mb-4 text-slate-200" />
 
+                            <!-- Step 1: Select Firm -->
+                            <MudSelect T="Firm" 
+                                       Label="Select Billing Firm" 
+                                       Value="_selectedFirm" 
+                                       ValueChanged="@(f => OnFirmSelected(f))"
+                                       Required="true"
+                                       RequiredError="Billing Firm is required"
+                                       Variant="Variant.Outlined" 
+                                       Class="mb-4 text-slate-200">
+                                @foreach (var firm in _firms)
+                                {
+                                    <MudSelectItem Value="@firm">@firm.FirmName (@firm.FirmCode)</MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <!-- Step 2: Select Customer (Filtered by Firm) -->
                             <div class="d-flex align-center gap-2 mb-4">
                                 <MudAutocomplete T="Customer" 
                                                  Label="Select Customer" 
@@ -46,6 +62,8 @@
                                                  ValueChanged="@(c => OnCustomerSelected(c))"
                                                  Required="true"
                                                  RequiredError="Customer selection is required"
+                                                 Disabled="@(_selectedFirm == null)"
+                                                 HelperText="@(_selectedFirm == null ? "Select a billing firm first" : "Customers linked to selected firm")"
                                                  Variant="Variant.Outlined" 
                                                  Class="text-slate-200 flex-grow-1" />
                                 
@@ -53,8 +71,9 @@
                                                Color="Color.Primary" 
                                                Variant="Variant.Outlined" 
                                                OnClick="OpenQuickAddCustomer" 
+                                               Disabled="@(_selectedFirm == null)"
                                                Style="height: 56px;" 
-                                               Tooltip="Quick Add Customer" />
+                                               Tooltip="Quick Add Customer under selected Firm" />
                             </div>
 
                             @if (_selectedCustomer != null)
@@ -115,10 +134,9 @@
                         <!-- Company Profile Settings Panel (Collapsible) -->
                         <MudExpansionPanels Class="mb-4" Style="background: transparent !important;">
                             <MudExpansionPanel Text="Print Header Settings" Class="glass-panel text-slate-200" Style="border: 1px solid rgba(255,255,255,0.08) !important;">
-                                <MudTextField T="string" Label="Company Name" @bind-Value="_companyName" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
-                                <MudTextField T="string" Label="Company Address" @bind-Value="_companyAddress" Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
-                                <MudTextField T="string" Label="Company GSTIN" @bind-Value="_companyGstin" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
-                                <MudTextField T="string" Label="Company Mobile" @bind-Value="_companyMobile" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                <MudTextField T="string" Label="Default Address" @bind-Value="_companyAddress" Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                                <MudTextField T="string" Label="Default GSTIN" @bind-Value="_companyGstin" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                                <MudTextField T="string" Label="Default Mobile" @bind-Value="_companyMobile" Variant="Variant.Outlined" Margin="Margin.Dense" />
                             </MudExpansionPanel>
                         </MudExpansionPanels>
 
@@ -152,10 +170,10 @@
                             </MudButton>
                             <MudButton ButtonType="ButtonType.Submit" 
                                        Variant="Variant.Filled" 
-                                       Color="Color.Success"
+                                       Color="Color.Primary"
                                        StartIcon="@Icons.Material.Filled.Save"
-                                       Disabled="@(!_lineItems.Any() || _saving || _selectedCustomer == null)"
-                                       Style="font-family: 'Outfit'; font-weight: 600;">
+                                       Disabled="@(!_lineItems.Any() || _saving || _selectedCustomer == null || _selectedFirm == null)"
+                                       Style="background: linear-gradient(135deg, #5C5CFF 0%, #00E5FF 100%); font-family: 'Outfit'; font-weight: 600;">
                                 @if (_saving)
                                 {
                                     <MudProgressCircular Size="Size.Small" Indeterminate="true" />
@@ -411,6 +429,7 @@
                 <HeaderContent>
                     <MudTh Style="color:#94A3B8;">Date</MudTh>
                     <MudTh Style="color:#94A3B8;">Proforma No</MudTh>
+                    <MudTh Style="color:#94A3B8;">Firm Details</MudTh>
                     <MudTh Style="color:#94A3B8;">Customer Details</MudTh>
                     <MudTh Style="color:#94A3B8;text-align:right;">Tot Qty</MudTh>
                     <MudTh Style="color:#94A3B8;text-align:right;">Taxable Value</MudTh>
@@ -420,6 +439,10 @@
                 <RowTemplate>
                     <MudTd DataLabel="Date" Class="text-slate-300">@context.ProformaDate.LocalDateTime.ToString("dd-MM-yyyy HH:mm")</MudTd>
                     <MudTh DataLabel="Proforma No" Class="text-slate-200 font-mono">@context.ProformaNo</MudTh>
+                    <MudTd DataLabel="Firm Details" Class="text-slate-300 font-weight-bold">
+                        <div>@context.FirmName</div>
+                        <div class="text-slate-400 font-mono" style="font-size: 10px;">Code: @context.FirmCode</div>
+                    </MudTd>
                     <MudTd DataLabel="Customer Details" Class="text-slate-200">
                         <div class="font-weight-bold">@context.CustomerName</div>
                         <div class="text-slate-400 font-mono" style="font-size: 11px;">@context.MobileNo</div>
@@ -451,7 +474,7 @@
 <MudDialog @bind-Visible="_quickAddOpen" Options="_dialogOptions">
     <TitleContent>
         <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
-            Quick Add Customer
+            Quick Add Customer (Billing Firm: @_selectedFirm?.FirmName)
         </MudText>
     </TitleContent>
     <DialogContent>
@@ -514,7 +537,9 @@
     private bool _loadingList = false;
     private string _searchString = "";
 
-    // Customer selection
+    // Firm and Customer selection
+    private List<Firm> _firms = new();
+    private Firm? _selectedFirm;
     private List<Customer> _customers = new();
     private Customer? _selectedCustomer;
 
@@ -525,8 +550,7 @@
     private bool _isQuickAddValid = false;
     private readonly DialogOptions _dialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
 
-    // Company Settings defaults
-    private string _companyName = "Kannan Silks";
+    // Company Settings defaults (fallbacks)
     private string _companyAddress = "123 Main Street, Gandhipuram, Coimbatore - 641012";
     private string _companyGstin = "33AAAAA1111A1Z1";
     private string _companyMobile = "+91 98765 43210";
@@ -550,7 +574,21 @@
     protected override async Task OnInitializedAsync()
     {
         ResetForm();
+        await LoadFirms();
         await LoadCustomers();
+    }
+
+    private async Task LoadFirms()
+    {
+        try
+        {
+            var data = await Http.GetFromJsonAsync<List<Firm>>("api/firms") ?? new();
+            _firms = data.Where(f => f.Status == "Active").ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading firms: {ex.Message}", Severity.Error);
+        }
     }
 
     private async Task LoadCustomers()
@@ -566,10 +604,34 @@
         }
     }
 
+    private void OnFirmSelected(Firm? f)
+    {
+        _selectedFirm = f;
+        if (f != null)
+        {
+            _proformaHeader.FirmId = f.FirmId;
+            _proformaHeader.FirmCode = f.FirmCode;
+            _proformaHeader.FirmName = f.FirmName;
+        }
+        else
+        {
+            _proformaHeader.FirmId = null;
+            _proformaHeader.FirmCode = null;
+            _proformaHeader.FirmName = null;
+        }
+
+        // Reset customer selection when Firm changes
+        OnCustomerSelected(null);
+    }
+
     private async Task<IEnumerable<Customer>> SearchCustomers(string value, CancellationToken token)
     {
-        if (string.IsNullOrEmpty(value)) return _customers;
-        return _customers.Where(c => 
+        if (_selectedFirm == null) return Array.Empty<Customer>();
+
+        var firmCustomers = _customers.Where(c => c.FirmId == _selectedFirm.FirmId);
+
+        if (string.IsNullOrEmpty(value)) return firmCustomers;
+        return firmCustomers.Where(c => 
             c.CustomerName.Contains(value, StringComparison.OrdinalIgnoreCase) || 
             c.MobileNo.Contains(value) || 
             c.CustomerCode.Contains(value, StringComparison.OrdinalIgnoreCase)
@@ -615,9 +677,18 @@
 
     private void OpenQuickAddCustomer()
     {
+        if (_selectedFirm == null)
+        {
+            Snackbar.Add("Please select a Firm first.", Severity.Warning);
+            return;
+        }
+
         _newCustomer = new Customer
         {
             CustomerId = Guid.Empty,
+            FirmId = _selectedFirm.FirmId,
+            FirmCode = _selectedFirm.FirmCode,
+            FirmName = _selectedFirm.FirmName,
             CustomerType = "Unregistered",
             Status = "Active",
             Country = "India"
@@ -640,7 +711,7 @@
             {
                 bool? proceed = await DialogService.ShowMessageBoxAsync(
                     "Duplicate Customer Warning",
-                    $"A customer with the name '{_newCustomer.CustomerName.Trim()}' is already registered. Proceed anyway?",
+                    $"A customer with the name '{_newCustomer.CustomerName.Trim()}' already exists. Proceed anyway?",
                     yesText: "Yes, Proceed", cancelText: "Cancel");
                 if (proceed != true)
                 {
@@ -743,6 +814,7 @@
             ProformaDate = DateTimeOffset.UtcNow
         };
         _proformaDate = DateTime.Today;
+        _selectedFirm = null;
         _selectedCustomer = null;
         _lineItems.Clear();
         _scanInput = "";
@@ -1113,6 +1185,12 @@
 
     private async Task SaveProforma()
     {
+        if (_selectedFirm == null)
+        {
+            Snackbar.Add("Please select a billing Firm first.", Severity.Error);
+            return;
+        }
+
         if (_selectedCustomer == null)
         {
             Snackbar.Add("Please select a customer first.", Severity.Error);
@@ -1135,6 +1213,9 @@
         _saving = true;
         try
         {
+            _proformaHeader.FirmId = _selectedFirm.FirmId;
+            _proformaHeader.FirmCode = _selectedFirm.FirmCode;
+            _proformaHeader.FirmName = _selectedFirm.FirmName;
             _proformaHeader.ProformaDate = _proformaDate ?? DateTimeOffset.UtcNow;
             _proformaHeader.TaxType = _taxType;
             _proformaHeader.Details = _lineItems.Select(l => new ProformaInvoiceDetailPostDto
@@ -1217,7 +1298,8 @@
         // Header
         sb.Append("  <div class=\"invoice-header\">");
         sb.Append("    <div class=\"company-details\">");
-        sb.Append($"      <h3 style=\"margin:0; font-size:18px;\">{_companyName}</h3>");
+        sb.Append($"      <h3 style=\"margin:0; font-size:18px;\">{p.FirmName ?? "N/A"}</h3>");
+        sb.Append($"      <p style=\"margin:4px 0; font-size:11px;\"><strong>Firm Code:</strong> {p.FirmCode ?? "N/A"}</p>");
         sb.Append($"      <p style=\"margin:4px 0; font-size:11px;\">{_companyAddress}</p>");
         sb.Append($"      <p style=\"margin:4px 0; font-size:11px;\"><strong>GSTIN:</strong> {_companyGstin} | <strong>Mobile:</strong> {_companyMobile}</p>");
         sb.Append("    </div>");

@@ -13,7 +13,7 @@
                 Customer Master
             </MudText>
             <MudText Typo="Typo.body2" Class="text-slate-400">
-                Manage customer profiles, credit limits, contact information, and billing registration details.
+                Manage customer profiles, link to registered firms, credit limits, and billing registration details.
             </MudText>
         </div>
         <div class="d-flex gap-2">
@@ -54,6 +54,14 @@
                               Immediate="true" />
             </MudItem>
             <MudItem xs="12" sm="3">
+                <MudSelect T="Guid?" Label="Filter by Firm" @bind-Value="_filterFirmId" Clearable="true" Class="text-slate-200">
+                    @foreach (var firm in _firms)
+                    {
+                        <MudSelectItem Value="@((Guid?)firm.FirmId)">@firm.FirmName</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="2">
                 <MudSelect T="string" Label="Filter by City" @bind-Value="_filterCity" Clearable="true" Class="text-slate-200">
                     @foreach (var city in _cities)
                     {
@@ -61,7 +69,7 @@
                     }
                 </MudSelect>
             </MudItem>
-            <MudItem xs="12" sm="3">
+            <MudItem xs="12" sm="2">
                 <MudSelect T="string" Label="Filter by State" @bind-Value="_filterState" Clearable="true" Class="text-slate-200">
                     @foreach (var state in _states)
                     {
@@ -69,7 +77,7 @@
                     }
                 </MudSelect>
             </MudItem>
-            <MudItem xs="12" sm="3">
+            <MudItem xs="12" sm="2">
                 <MudSelect T="string" Label="Customer Type" @bind-Value="_filterType" Clearable="true" Class="text-slate-200">
                     <MudSelectItem Value="@("Registered")">Registered</MudSelectItem>
                     <MudSelectItem Value="@("Unregistered")">Unregistered</MudSelectItem>
@@ -86,6 +94,7 @@
         <HeaderContent>
             <MudTh Style="color: #94A3B8;">Customer Code</MudTh>
             <MudTh Style="color: #94A3B8;">Customer Name</MudTh>
+            <MudTh Style="color: #94A3B8;">Firm Details</MudTh>
             <MudTh Style="color: #94A3B8;">Mobile No</MudTh>
             <MudTh Style="color: #94A3B8;">GSTIN</MudTh>
             <MudTh Style="color: #94A3B8;">City</MudTh>
@@ -97,6 +106,10 @@
         <RowTemplate>
             <MudTd DataLabel="Code" Class="text-slate-100 font-mono font-weight-bold">@context.CustomerCode</MudTd>
             <MudTd DataLabel="Customer Name" Class="text-slate-200 font-weight-bold">@context.CustomerName</MudTd>
+            <MudTd DataLabel="Firm Details" Class="text-slate-300">
+                <div class="font-weight-bold text-slate-200">@context.FirmName</div>
+                <div class="text-slate-400 font-mono" style="font-size: 11px;">@context.FirmCode</div>
+            </MudTd>
             <MudTd DataLabel="Mobile No" Class="text-slate-300">@context.MobileNo</MudTd>
             <MudTd DataLabel="GSTIN" Class="text-slate-300 font-mono">@(string.IsNullOrEmpty(context.GSTIN) ? "N/A" : context.GSTIN)</MudTd>
             <MudTd DataLabel="City" Class="text-slate-300">@(string.IsNullOrEmpty(context.City) ? "N/A" : context.City)</MudTd>
@@ -137,6 +150,15 @@
     <DialogContent>
         <MudForm @ref="_form" @bind-IsValid="_isFormValid">
             <MudGrid>
+                <!-- Firm Linkage (Mandatory) -->
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="Guid" Label="Link to Firm" @bind-Value="_editCustomer.FirmId" Required="true" RequiredError="Firm linkage is mandatory" Class="text-slate-200">
+                        @foreach (var firm in _firms)
+                        {
+                            <MudSelectItem Value="@firm.FirmId">@firm.FirmName (@firm.FirmCode)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
                 <MudItem xs="12" sm="6">
                     <MudTextField T="string" Label="Customer Name" @bind-Value="_editCustomer.CustomerName" Required="true" RequiredError="Customer Name is required" Class="text-slate-200" />
                 </MudItem>
@@ -227,6 +249,7 @@
             <MudGrid>
                 <MudItem xs="12" sm="6">
                     <div><strong>Customer Name:</strong> @_viewCustomer.CustomerName</div>
+                    <div><strong>Linked Firm:</strong> @_viewCustomer.FirmName (@_viewCustomer.FirmCode)</div>
                     <div><strong>Contact Person:</strong> @_viewCustomer.ContactPerson</div>
                     <div><strong>Mobile No:</strong> @_viewCustomer.MobileNo</div>
                     <div><strong>WhatsApp No:</strong> @_viewCustomer.WhatsappNo</div>
@@ -261,13 +284,14 @@
     <table>
         <thead>
             <tr>
-                <th style="width: 100px;">Code</th>
+                <th>Code</th>
                 <th>Customer Name</th>
+                <th>Firm Name</th>
+                <th>Firm Code</th>
                 <th>Mobile No</th>
                 <th>GSTIN</th>
                 <th>City</th>
                 <th>State</th>
-                <th style="text-align: right;">Credit Days</th>
                 <th>Status</th>
             </tr>
         </thead>
@@ -277,11 +301,12 @@
                 <tr>
                     <td>@c.CustomerCode</td>
                     <td><strong>@c.CustomerName</strong></td>
+                    <td>@c.FirmName</td>
+                    <td>@c.FirmCode</td>
                     <td>@c.MobileNo</td>
                     <td>@(string.IsNullOrEmpty(c.GSTIN) ? "N/A" : c.GSTIN)</td>
                     <td>@(string.IsNullOrEmpty(c.City) ? "N/A" : c.City)</td>
                     <td>@(string.IsNullOrEmpty(c.State) ? "N/A" : c.State)</td>
-                    <td style="text-align: right;">@c.CreditDays</td>
                     <td>@c.Status</td>
                 </tr>
             }
@@ -291,6 +316,7 @@
 
 @code {
     private List<Customer> _customers = new();
+    private List<Firm> _firms = new();
     private List<string> _cities = new();
     private List<string> _states = new();
 
@@ -299,6 +325,7 @@
 
     // Filters
     private string _searchString = "";
+    private Guid? _filterFirmId;
     private string? _filterCity;
     private string? _filterState;
     private string? _filterType;
@@ -319,6 +346,7 @@
              c.CustomerName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
              c.CustomerCode.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
              c.MobileNo.Contains(_searchString)) &&
+            (!_filterFirmId.HasValue || c.FirmId == _filterFirmId.Value) &&
             (string.IsNullOrEmpty(_filterCity) || c.City == _filterCity) &&
             (string.IsNullOrEmpty(_filterState) || c.State == _filterState) &&
             (string.IsNullOrEmpty(_filterType) || c.CustomerType == _filterType)
@@ -327,6 +355,20 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadCustomers();
+        await LoadFirms();
+    }
+
+    private async Task LoadFirms()
+    {
+        try
+        {
+            var data = await Http.GetFromJsonAsync<List<Firm>>("api/firms") ?? new();
+            _firms = data.Where(f => f.Status == "Active").ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading firms: {ex.Message}", Severity.Error);
+        }
     }
 
     private async Task LoadCustomers()
@@ -359,6 +401,13 @@
             Status = "Active",
             Country = "India"
         };
+        
+        // Auto-select first firm if available
+        if (_firms.Any())
+        {
+            _editCustomer.FirmId = _firms.First().FirmId;
+        }
+        
         _dialogOpen = true;
     }
 
@@ -367,6 +416,9 @@
         _editCustomer = new Customer
         {
             CustomerId = customer.CustomerId,
+            FirmId = customer.FirmId,
+            FirmCode = customer.FirmCode,
+            FirmName = customer.FirmName,
             CustomerCode = customer.CustomerCode,
             CustomerName = customer.CustomerName,
             ContactPerson = customer.ContactPerson,
@@ -408,11 +460,11 @@
         await _form.Validate();
         if (!_form.IsValid) return;
 
-        // Custom validation check: Check for duplicate name warning
         try
         {
             _saving = true;
             
+            // Duplicate name check warning
             var excludeIdParam = _editCustomer.CustomerId == Guid.Empty ? "" : $"&excludeId={_editCustomer.CustomerId}";
             var isDuplicate = await Http.GetFromJsonAsync<bool>($"api/customers/check-duplicate-name?name={Uri.EscapeDataString(_editCustomer.CustomerName.Trim())}{excludeIdParam}");
             
@@ -531,6 +583,8 @@
         sb.Append("<tr style='background-color:#f1f5f9; font-weight:bold;'>");
         sb.Append("<th>Customer Code</th>");
         sb.Append("<th>Customer Name</th>");
+        sb.Append("<th>Firm Code</th>");
+        sb.Append("<th>Firm Name</th>");
         sb.Append("<th>Contact Person</th>");
         sb.Append("<th>Mobile No</th>");
         sb.Append("<th>WhatsApp No</th>");
@@ -552,6 +606,8 @@
             sb.Append("<tr>");
             sb.Append($"<td>{c.CustomerCode}</td>");
             sb.Append($"<td>{c.CustomerName}</td>");
+            sb.Append($"<td>{c.FirmCode}</td>");
+            sb.Append($"<td>{c.FirmName}</td>");
             sb.Append($"<td>{c.ContactPerson ?? ""}</td>");
             sb.Append($"<td>{c.MobileNo}</td>");
             sb.Append($"<td>{c.WhatsappNo ?? ""}</td>");

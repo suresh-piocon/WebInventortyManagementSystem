@@ -26,9 +26,16 @@ namespace InventoryManagement.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetProformas()
+        public async Task<IActionResult> GetProformas([FromQuery] Guid? firmId)
         {
-            var data = await _context.ProformaInvoices
+            var query = _context.ProformaInvoices.AsQueryable();
+
+            if (firmId.HasValue)
+            {
+                query = query.Where(p => p.FirmId == firmId.Value);
+            }
+
+            var data = await query
                 .Include(p => p.Customer)
                 .Include(p => p.Details)
                     .ThenInclude(d => d.Item)
@@ -237,6 +244,9 @@ namespace InventoryManagement.Api.Controllers
                 var proforma = new ProformaInvoice
                 {
                     Id = Guid.NewGuid(),
+                    FirmId = dto.FirmId,
+                    FirmCode = dto.FirmCode,
+                    FirmName = dto.FirmName,
                     CustomerId = dto.CustomerId,
                     ProformaNo = proformaNo,
                     ProformaDate = dto.ProformaDate.ToUniversalTime(),

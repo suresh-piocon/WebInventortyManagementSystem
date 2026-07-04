@@ -316,6 +316,58 @@ using (var scope = app.Services.CreateScope())
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""GSTIN"" TEXT NULL;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""State"" TEXT NULL;"); } catch {}
 
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""FirmMaster"" (
+                        ""FirmId"" TEXT NOT NULL PRIMARY KEY,
+                        ""FirmCode"" TEXT NOT NULL,
+                        ""FirmName"" TEXT NOT NULL,
+                        ""ContactPerson"" TEXT NULL,
+                        ""MobileNo"" TEXT NULL,
+                        ""Email"" TEXT NULL,
+                        ""GSTIN"" TEXT NULL,
+                        ""PANNo"" TEXT NULL,
+                        ""Address1"" TEXT NULL,
+                        ""Address2"" TEXT NULL,
+                        ""City"" TEXT NULL,
+                        ""State"" TEXT NULL,
+                        ""Pincode"" TEXT NULL,
+                        ""Country"" TEXT NULL,
+                        ""Status"" TEXT NOT NULL DEFAULT 'Active',
+                        ""Remarks"" TEXT NULL,
+                        ""CreatedDate"" TEXT NOT NULL,
+                        ""ModifiedDate"" TEXT NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_FirmMaster_FirmCode"" ON ""FirmMaster"" (""FirmCode"");");
+
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""CustomerCollections"" (
+                        ""CollectionId"" TEXT NOT NULL PRIMARY KEY,
+                        ""CustomerId"" TEXT NOT NULL REFERENCES ""CustomerMaster""(""CustomerId"") ON DELETE CASCADE,
+                        ""CustomerName"" TEXT NOT NULL,
+                        ""FirmId"" TEXT NOT NULL REFERENCES ""FirmMaster""(""FirmId"") ON DELETE RESTRICT,
+                        ""FirmCode"" TEXT NOT NULL,
+                        ""FirmName"" TEXT NOT NULL,
+                        ""CollectionNo"" TEXT NOT NULL,
+                        ""CollectionDate"" TEXT NOT NULL,
+                        ""Amount"" TEXT NOT NULL,
+                        ""PaymentMode"" TEXT NOT NULL,
+                        ""ReferenceNo"" TEXT NULL,
+                        ""Remarks"" TEXT NULL,
+                        ""CreatedBy"" TEXT NOT NULL,
+                        ""CreatedAt"" TEXT NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CustomerCollections_CollectionNo"" ON ""CustomerCollections"" (""CollectionNo"");");
+
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""CustomerMaster"" ADD COLUMN ""FirmId"" TEXT NULL REFERENCES ""FirmMaster""(""FirmId"") ON DELETE RESTRICT;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""CustomerMaster"" ADD COLUMN ""FirmCode"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""CustomerMaster"" ADD COLUMN ""FirmName"" TEXT NULL;"); } catch {}
+
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""FirmId"" TEXT NULL REFERENCES ""FirmMaster""(""FirmId"") ON DELETE SET NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""FirmCode"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""FirmName"" TEXT NULL;"); } catch {}
+
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""GSTPercent"" numeric(5,2) NOT NULL DEFAULT 18.00;"); } catch {}
             }
             else
@@ -409,6 +461,58 @@ using (var scope = app.Services.CreateScope())
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""CustomerId"" uuid NULL REFERENCES ""CustomerMaster""(""CustomerId"") ON DELETE SET NULL;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""GSTIN"" varchar(15) NULL;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""State"" varchar(100) NULL;"); } catch {}
+
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""FirmMaster"" (
+                        ""FirmId"" uuid NOT NULL PRIMARY KEY,
+                        ""FirmCode"" varchar(30) NOT NULL,
+                        ""FirmName"" varchar(150) NOT NULL,
+                        ""ContactPerson"" varchar(100) NULL,
+                        ""MobileNo"" varchar(20) NULL,
+                        ""Email"" varchar(100) NULL,
+                        ""GSTIN"" varchar(15) NULL,
+                        ""PANNo"" varchar(10) NULL,
+                        ""Address1"" text NULL,
+                        ""Address2"" text NULL,
+                        ""City"" varchar(100) NULL,
+                        ""State"" varchar(100) NULL,
+                        ""Pincode"" varchar(10) NULL,
+                        ""Country"" varchar(100) NULL,
+                        ""Status"" varchar(20) NOT NULL DEFAULT 'Active',
+                        ""Remarks"" text NULL,
+                        ""CreatedDate"" timestamptz NOT NULL,
+                        ""ModifiedDate"" timestamptz NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_FirmMaster_FirmCode"" ON ""FirmMaster"" (""FirmCode"");");
+
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""CustomerCollections"" (
+                        ""CollectionId"" uuid NOT NULL PRIMARY KEY,
+                        ""CustomerId"" uuid NOT NULL REFERENCES ""CustomerMaster""(""CustomerId"") ON DELETE CASCADE,
+                        ""CustomerName"" varchar(150) NOT NULL,
+                        ""FirmId"" uuid NOT NULL REFERENCES ""FirmMaster""(""FirmId"") ON DELETE RESTRICT,
+                        ""FirmCode"" varchar(30) NOT NULL,
+                        ""FirmName"" varchar(150) NOT NULL,
+                        ""CollectionNo"" varchar(30) NOT NULL,
+                        ""CollectionDate"" timestamptz NOT NULL,
+                        ""Amount"" numeric(12,2) NOT NULL,
+                        ""PaymentMode"" varchar(20) NOT NULL,
+                        ""ReferenceNo"" varchar(50) NULL,
+                        ""Remarks"" text NULL,
+                        ""CreatedBy"" uuid NOT NULL,
+                        ""CreatedAt"" timestamptz NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CustomerCollections_CollectionNo"" ON ""CustomerCollections"" (""CollectionNo"");");
+
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""CustomerMaster"" ADD COLUMN ""FirmId"" uuid NULL REFERENCES ""FirmMaster""(""FirmId"") ON DELETE RESTRICT;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""CustomerMaster"" ADD COLUMN ""FirmCode"" varchar(30) NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""CustomerMaster"" ADD COLUMN ""FirmName"" varchar(150) NULL;"); } catch {}
+
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""FirmId"" uuid NULL REFERENCES ""FirmMaster""(""FirmId"") ON DELETE SET NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""FirmCode"" varchar(30) NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""FirmName"" varchar(150) NULL;"); } catch {}
 
                 context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN IF NOT EXISTS ""GSTPercent"" numeric(5,2) NOT NULL DEFAULT 18.00;");
             }
