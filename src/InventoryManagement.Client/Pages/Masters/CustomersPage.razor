@@ -1,0 +1,576 @@
+@page "/masters/customers"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Customer Master - Inventory Management</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="d-flex justify-between align-center mb-6">
+        <div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+                Customer Master
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-slate-400">
+                Manage customer profiles, credit limits, contact information, and billing registration details.
+            </MudText>
+        </div>
+        <div class="d-flex gap-2">
+            <MudButton Variant="Variant.Outlined" 
+                       Color="Color.Info" 
+                       StartIcon="@Icons.Custom.FileFormats.FileExcel"
+                       OnClick="ExportCustomersExcel"
+                       Style="font-family: 'Outfit';">
+                Export Excel
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" 
+                       Color="Color.Warning" 
+                       StartIcon="@Icons.Material.Filled.Print"
+                       OnClick="PrintCustomers"
+                       Style="font-family: 'Outfit';">
+                Print List
+            </MudButton>
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog"
+                       Style="background: linear-gradient(135deg, #5C5CFF 0%, #00E5FF 100%); font-family: 'Outfit'; font-weight: 600;">
+                Add Customer
+            </MudButton>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <MudPaper Class="glass-panel pa-4 mb-4">
+        <MudGrid>
+            <MudItem xs="12" sm="3">
+                <MudTextField @bind-Value="_searchString" 
+                              Placeholder="Search by Name, Code, Mobile..." 
+                              Adornment="Adornment.Start" 
+                              AdornmentIcon="@Icons.Material.Filled.Search" 
+                              IconSize="Size.Medium" 
+                              Class="text-slate-200" 
+                              Immediate="true" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="string" Label="Filter by City" @bind-Value="_filterCity" Clearable="true" Class="text-slate-200">
+                    @foreach (var city in _cities)
+                    {
+                        <MudSelectItem Value="@city">@city</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="string" Label="Filter by State" @bind-Value="_filterState" Clearable="true" Class="text-slate-200">
+                    @foreach (var state in _states)
+                    {
+                        <MudSelectItem Value="@state">@state</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="string" Label="Customer Type" @bind-Value="_filterType" Clearable="true" Class="text-slate-200">
+                    <MudSelectItem Value="@("Registered")">Registered</MudSelectItem>
+                    <MudSelectItem Value="@("Unregistered")">Unregistered</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <!-- Table Grid -->
+    <MudTable Items="@FilteredCustomers" 
+              Hover="true" 
+              Loading="@_loading" 
+              Class="glass-panel text-slate-200">
+        <HeaderContent>
+            <MudTh Style="color: #94A3B8;">Customer Code</MudTh>
+            <MudTh Style="color: #94A3B8;">Customer Name</MudTh>
+            <MudTh Style="color: #94A3B8;">Mobile No</MudTh>
+            <MudTh Style="color: #94A3B8;">GSTIN</MudTh>
+            <MudTh Style="color: #94A3B8;">City</MudTh>
+            <MudTh Style="color: #94A3B8;">State</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Credit Days</MudTh>
+            <MudTh Style="color: #94A3B8;">Status</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right; width: 140px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Code" Class="text-slate-100 font-mono font-weight-bold">@context.CustomerCode</MudTd>
+            <MudTd DataLabel="Customer Name" Class="text-slate-200 font-weight-bold">@context.CustomerName</MudTd>
+            <MudTd DataLabel="Mobile No" Class="text-slate-300">@context.MobileNo</MudTd>
+            <MudTd DataLabel="GSTIN" Class="text-slate-300 font-mono">@(string.IsNullOrEmpty(context.GSTIN) ? "N/A" : context.GSTIN)</MudTd>
+            <MudTd DataLabel="City" Class="text-slate-300">@(string.IsNullOrEmpty(context.City) ? "N/A" : context.City)</MudTd>
+            <MudTd DataLabel="State" Class="text-slate-300">@(string.IsNullOrEmpty(context.State) ? "N/A" : context.State)</MudTd>
+            <MudTd DataLabel="Credit Days" Style="text-align: right;" Class="text-slate-300">@context.CreditDays</MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.Status == "Active")
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">Active</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Text">Inactive</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Actions" Style="text-align: right;">
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenViewDialog(context))" Tooltip="View Profile" />
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" Tooltip="Edit Customer" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => ConfirmDelete(context))" Tooltip="Delete Customer" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+        <NoRecordsContent>
+            <MudText Class="text-slate-400 pa-4">No customers found.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudContainer>
+
+<!-- Dialog for Add/Edit -->
+<MudDialog @bind-Visible="_dialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
+            @(_editCustomer.CustomerId == Guid.Empty ? "Create New Customer" : "Edit Customer Details")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isFormValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Customer Name" @bind-Value="_editCustomer.CustomerName" Required="true" RequiredError="Customer Name is required" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Contact Person" @bind-Value="_editCustomer.ContactPerson" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Mobile Number" @bind-Value="_editCustomer.MobileNo" Required="true" RequiredError="Mobile Number is required" HelperText="Must be unique" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="WhatsApp Number" @bind-Value="_editCustomer.WhatsappNo" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Email ID" @bind-Value="_editCustomer.Email" Class="text-slate-200" HelperText="e.g. user@domain.com" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" Label="Customer Type" @bind-Value="_editCustomer.CustomerType" Required="true" Class="text-slate-200">
+                        <MudSelectItem Value="@("Unregistered")">Unregistered Customer</MudSelectItem>
+                        <MudSelectItem Value="@("Registered")">Registered (GST Registered)</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="GSTIN" @bind-Value="_editCustomer.GSTIN" Required="@(_editCustomer.CustomerType == "Registered")" RequiredError="GSTIN is required for Registered customers" Disabled="@(_editCustomer.CustomerType == "Unregistered")" Class="text-slate-200" HelperText="15-character GSTIN format" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="PAN Number" @bind-Value="_editCustomer.PANNo" Class="text-slate-200" MaxLength="10" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Address Line 1" @bind-Value="_editCustomer.Address1" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Address Line 2" @bind-Value="_editCustomer.Address2" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField T="string" Label="City" @bind-Value="_editCustomer.City" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField T="string" Label="State" @bind-Value="_editCustomer.State" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField T="string" Label="Pincode" @bind-Value="_editCustomer.Pincode" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField T="string" Label="Country" @bind-Value="_editCustomer.Country" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="int" Label="Credit Days" @bind-Value="_editCustomer.CreditDays" Min="0" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="decimal" Label="Credit Limit (₹)" @bind-Value="_editCustomer.CreditLimit" Min="0" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" Label="Status" @bind-Value="_editCustomer.Status" Required="true" Class="text-slate-200">
+                        <MudSelectItem Value="@("Active")">Active</MudSelectItem>
+                        <MudSelectItem Value="@("Inactive")">Inactive</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField T="string" Label="Remarks" @bind-Value="_editCustomer.Remarks" Lines="2" Class="text-slate-200" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog" Variant="Variant.Text" Color="Color.Secondary">Cancel</MudButton>
+        <MudButton OnClick="SaveCustomer" Variant="Variant.Filled" Color="Color.Primary" Disabled="@_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Dialog for View Details -->
+<MudDialog @bind-Visible="_viewDialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
+            Customer Profile: @_viewCustomer.CustomerCode
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <div style="color: #E2E8F0; line-height: 1.8;">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <div><strong>Customer Name:</strong> @_viewCustomer.CustomerName</div>
+                    <div><strong>Contact Person:</strong> @_viewCustomer.ContactPerson</div>
+                    <div><strong>Mobile No:</strong> @_viewCustomer.MobileNo</div>
+                    <div><strong>WhatsApp No:</strong> @_viewCustomer.WhatsappNo</div>
+                    <div><strong>Email ID:</strong> @_viewCustomer.Email</div>
+                    <div><strong>Customer Type:</strong> @_viewCustomer.CustomerType</div>
+                    <div><strong>GSTIN:</strong> @_viewCustomer.GSTIN</div>
+                    <div><strong>PAN No:</strong> @_viewCustomer.PANNo</div>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <div><strong>Address Line 1:</strong> @_viewCustomer.Address1</div>
+                    <div><strong>Address Line 2:</strong> @_viewCustomer.Address2</div>
+                    <div><strong>City:</strong> @_viewCustomer.City</div>
+                    <div><strong>State:</strong> @_viewCustomer.State</div>
+                    <div><strong>Pincode:</strong> @_viewCustomer.Pincode</div>
+                    <div><strong>Country:</strong> @_viewCustomer.Country</div>
+                    <div><strong>Credit Days:</strong> @_viewCustomer.CreditDays days</div>
+                    <div><strong>Credit Limit:</strong> ₹@_viewCustomer.CreditLimit.ToString("N2")</div>
+                    <div><strong>Status:</strong> @_viewCustomer.Status</div>
+                    <div><strong>Remarks:</strong> @_viewCustomer.Remarks</div>
+                </MudItem>
+            </MudGrid>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _viewDialogOpen = false" Variant="Variant.Filled" Color="Color.Primary">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Hidden Table for A4 Printing -->
+<div id="customer-table-print-container" style="display: none;">
+    <h2>Customer Master List</h2>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 100px;">Code</th>
+                <th>Customer Name</th>
+                <th>Mobile No</th>
+                <th>GSTIN</th>
+                <th>City</th>
+                <th>State</th>
+                <th style="text-align: right;">Credit Days</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in FilteredCustomers)
+            {
+                <tr>
+                    <td>@c.CustomerCode</td>
+                    <td><strong>@c.CustomerName</strong></td>
+                    <td>@c.MobileNo</td>
+                    <td>@(string.IsNullOrEmpty(c.GSTIN) ? "N/A" : c.GSTIN)</td>
+                    <td>@(string.IsNullOrEmpty(c.City) ? "N/A" : c.City)</td>
+                    <td>@(string.IsNullOrEmpty(c.State) ? "N/A" : c.State)</td>
+                    <td style="text-align: right;">@c.CreditDays</td>
+                    <td>@c.Status</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private List<Customer> _customers = new();
+    private List<string> _cities = new();
+    private List<string> _states = new();
+
+    private bool _loading = true;
+    private bool _saving = false;
+
+    // Filters
+    private string _searchString = "";
+    private string? _filterCity;
+    private string? _filterState;
+    private string? _filterType;
+
+    // Dialog state
+    private bool _dialogOpen = false;
+    private bool _viewDialogOpen = false;
+    private bool _isFormValid = false;
+    private MudForm? _form;
+    
+    private Customer _editCustomer = new();
+    private Customer _viewCustomer = new();
+    private readonly DialogOptions _dialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+    private IEnumerable<Customer> FilteredCustomers =>
+        _customers.Where(c =>
+            (string.IsNullOrWhiteSpace(_searchString) ||
+             c.CustomerName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+             c.CustomerCode.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+             c.MobileNo.Contains(_searchString)) &&
+            (string.IsNullOrEmpty(_filterCity) || c.City == _filterCity) &&
+            (string.IsNullOrEmpty(_filterState) || c.State == _filterState) &&
+            (string.IsNullOrEmpty(_filterType) || c.CustomerType == _filterType)
+        );
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+
+    private async Task LoadCustomers()
+    {
+        _loading = true;
+        try
+        {
+            _customers = await Http.GetFromJsonAsync<List<Customer>>("api/customers") ?? new();
+            
+            // Extract distinct cities & states for filter dropdowns
+            _cities = _customers.Where(c => !string.IsNullOrEmpty(c.City)).Select(c => c.City!).Distinct().OrderBy(c => c).ToList();
+            _states = _customers.Where(c => !string.IsNullOrEmpty(c.State)).Select(c => c.State!).Distinct().OrderBy(c => c).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading customers: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OpenAddDialog()
+    {
+        _editCustomer = new Customer
+        {
+            CustomerId = Guid.Empty,
+            CustomerType = "Unregistered",
+            Status = "Active",
+            Country = "India"
+        };
+        _dialogOpen = true;
+    }
+
+    private void OpenEditDialog(Customer customer)
+    {
+        _editCustomer = new Customer
+        {
+            CustomerId = customer.CustomerId,
+            CustomerCode = customer.CustomerCode,
+            CustomerName = customer.CustomerName,
+            ContactPerson = customer.ContactPerson,
+            MobileNo = customer.MobileNo,
+            WhatsappNo = customer.WhatsappNo,
+            Email = customer.Email,
+            GSTIN = customer.GSTIN,
+            PANNo = customer.PANNo,
+            Address1 = customer.Address1,
+            Address2 = customer.Address2,
+            City = customer.City,
+            State = customer.State,
+            Pincode = customer.Pincode,
+            Country = customer.Country,
+            CustomerType = customer.CustomerType,
+            CreditDays = customer.CreditDays,
+            CreditLimit = customer.CreditLimit,
+            Status = customer.Status,
+            Remarks = customer.Remarks,
+            CreatedDate = customer.CreatedDate
+        };
+        _dialogOpen = true;
+    }
+
+    private void OpenViewDialog(Customer customer)
+    {
+        _viewCustomer = customer;
+        _viewDialogOpen = true;
+    }
+
+    private void CloseDialog()
+    {
+        _dialogOpen = false;
+    }
+
+    private async Task SaveCustomer()
+    {
+        if (_form == null) return;
+        await _form.Validate();
+        if (!_form.IsValid) return;
+
+        // Custom validation check: Check for duplicate name warning
+        try
+        {
+            _saving = true;
+            
+            var excludeIdParam = _editCustomer.CustomerId == Guid.Empty ? "" : $"&excludeId={_editCustomer.CustomerId}";
+            var isDuplicate = await Http.GetFromJsonAsync<bool>($"api/customers/check-duplicate-name?name={Uri.EscapeDataString(_editCustomer.CustomerName.Trim())}{excludeIdParam}");
+            
+            if (isDuplicate)
+            {
+                bool? proceed = await DialogService.ShowMessageBoxAsync(
+                    "Duplicate Customer Warning",
+                    $"A customer with the name '{_editCustomer.CustomerName.Trim()}' is already registered. Do you still want to proceed and save this customer?",
+                    yesText: "Yes, Proceed", cancelText: "Cancel");
+                
+                if (proceed != true)
+                {
+                    _saving = false;
+                    return;
+                }
+            }
+
+            HttpResponseMessage response;
+            if (_editCustomer.CustomerId == Guid.Empty)
+            {
+                response = await Http.PostAsJsonAsync("api/customers", _editCustomer);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"api/customers/{_editCustomer.CustomerId}", _editCustomer);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Customer details saved successfully!", Severity.Success);
+                _dialogOpen = false;
+                await LoadCustomers();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Save failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving customer: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ConfirmDelete(Customer customer)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Delete Customer",
+            $"Are you sure you want to delete customer '{customer.CustomerName}'? This action cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/customers/{customer.CustomerId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Customer deleted successfully!", Severity.Success);
+                    await LoadCustomers();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Delete failed: {error}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting customer: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task PrintCustomers()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("webcamInterop.printElement", "customer-table-print-container", "Customer Master List");
+            Snackbar.Add("Print preview opened.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error launching print: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ExportCustomersExcel()
+    {
+        try
+        {
+            var excelContent = GenerateCustomersExcelHtml();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(excelContent);
+            await JSRuntime.InvokeVoidAsync("webcamInterop.downloadFile", $"CustomerMaster_{DateTime.Now:yyyyMMdd}.xls", "application/vnd.ms-excel", Convert.ToBase64String(bytes));
+            Snackbar.Add("Customer list exported to Excel successfully!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error exporting Excel: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private string GenerateCustomersExcelHtml()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<html xmlns:o=\"urn:schemas-microsoft-com:office:office\" xmlns:x=\"urn:schemas-microsoft-com:office:excel\" xmlns=\"http://www.w3.org/TR/REC-html40\">");
+        sb.Append("<head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Customers</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>");
+        sb.Append("<body>");
+        sb.Append("<table border='1'>");
+        sb.Append("<thead>");
+        sb.Append("<tr style='background-color:#f1f5f9; font-weight:bold;'>");
+        sb.Append("<th>Customer Code</th>");
+        sb.Append("<th>Customer Name</th>");
+        sb.Append("<th>Contact Person</th>");
+        sb.Append("<th>Mobile No</th>");
+        sb.Append("<th>WhatsApp No</th>");
+        sb.Append("<th>Email ID</th>");
+        sb.Append("<th>GSTIN</th>");
+        sb.Append("<th>PAN No</th>");
+        sb.Append("<th>City</th>");
+        sb.Append("<th>State</th>");
+        sb.Append("<th>Customer Type</th>");
+        sb.Append("<th>Credit Days</th>");
+        sb.Append("<th>Credit Limit</th>");
+        sb.Append("<th>Status</th>");
+        sb.Append("</tr>");
+        sb.Append("</thead>");
+        sb.Append("<tbody>");
+
+        foreach (var c in FilteredCustomers)
+        {
+            sb.Append("<tr>");
+            sb.Append($"<td>{c.CustomerCode}</td>");
+            sb.Append($"<td>{c.CustomerName}</td>");
+            sb.Append($"<td>{c.ContactPerson ?? ""}</td>");
+            sb.Append($"<td>{c.MobileNo}</td>");
+            sb.Append($"<td>{c.WhatsappNo ?? ""}</td>");
+            sb.Append($"<td>{c.Email ?? ""}</td>");
+            sb.Append($"<td>{c.GSTIN ?? ""}</td>");
+            sb.Append($"<td>{c.PANNo ?? ""}</td>");
+            sb.Append($"<td>{c.City ?? ""}</td>");
+            sb.Append($"<td>{c.State ?? ""}</td>");
+            sb.Append($"<td>{c.CustomerType}</td>");
+            sb.Append($"<td>{c.CreditDays}</td>");
+            sb.Append($"<td>{c.CreditLimit.ToString("F2")}</td>");
+            sb.Append($"<td>{c.Status}</td>");
+            sb.Append("</tr>");
+        }
+
+        sb.Append("</tbody>");
+        sb.Append("</table>");
+        sb.Append("</body>");
+        sb.Append("</html>");
+        return sb.ToString();
+    }
+}

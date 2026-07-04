@@ -37,26 +37,69 @@
                                            Variant="Variant.Outlined" 
                                            Class="mb-4 text-slate-200" />
 
-                            <MudTextField T="string" 
-                                           Label="Customer Name" 
-                                           @bind-Value="_proformaHeader.CustomerName" 
-                                           Required="true"
-                                           RequiredError="Customer name is required"
-                                           Variant="Variant.Outlined" 
-                                           Class="mb-4 text-slate-200" />
+                            <div class="d-flex align-center gap-2 mb-4">
+                                <MudAutocomplete T="Customer" 
+                                                 Label="Select Customer" 
+                                                 Value="_selectedCustomer" 
+                                                 SearchFunc="@SearchCustomers" 
+                                                 ToStringFunc="@(c => c == null ? "" : $"{c.CustomerName} ({c.MobileNo}) - {c.CustomerCode}")" 
+                                                 ValueChanged="@(c => OnCustomerSelected(c))"
+                                                 Required="true"
+                                                 RequiredError="Customer selection is required"
+                                                 Variant="Variant.Outlined" 
+                                                 Class="text-slate-200 flex-grow-1" />
+                                
+                                <MudIconButton Icon="@Icons.Material.Filled.PersonAdd" 
+                                               Color="Color.Primary" 
+                                               Variant="Variant.Outlined" 
+                                               OnClick="OpenQuickAddCustomer" 
+                                               Style="height: 56px;" 
+                                               Tooltip="Quick Add Customer" />
+                            </div>
 
-                            <MudTextField T="string" 
-                                           Label="Mobile No" 
-                                           @bind-Value="_proformaHeader.MobileNo" 
-                                           Variant="Variant.Outlined" 
-                                           Class="mb-4 text-slate-200" />
+                            @if (_selectedCustomer != null)
+                            {
+                                <MudTextField T="string" 
+                                               Label="Customer Name" 
+                                               Value="_proformaHeader.CustomerName" 
+                                               Disabled="true"
+                                               Variant="Variant.Outlined" 
+                                               Class="mb-4 text-slate-200 font-weight-bold" />
 
-                            <MudTextField T="string" 
-                                           Label="Address" 
-                                           @bind-Value="_proformaHeader.Address" 
-                                           Lines="3"
-                                           Variant="Variant.Outlined" 
-                                           Class="mb-4 text-slate-200" />
+                                <MudTextField T="string" 
+                                               Label="Mobile No" 
+                                               Value="_proformaHeader.MobileNo" 
+                                               Disabled="true"
+                                               Variant="Variant.Outlined" 
+                                               Class="mb-4 text-slate-200" />
+
+                                <MudTextField T="string" 
+                                               Label="Address" 
+                                               Value="_proformaHeader.Address" 
+                                               Lines="2"
+                                               Disabled="true"
+                                               Variant="Variant.Outlined" 
+                                               Class="mb-4 text-slate-200" />
+
+                                <MudGrid Class="mb-4">
+                                    <MudItem xs="6">
+                                        <MudTextField T="string" 
+                                                       Label="GSTIN" 
+                                                       Value="_proformaHeader.GSTIN" 
+                                                       Disabled="true"
+                                                       Variant="Variant.Outlined" 
+                                                       Class="text-slate-200 font-mono" />
+                                    </MudItem>
+                                    <MudItem xs="6">
+                                        <MudTextField T="string" 
+                                                       Label="State" 
+                                                       Value="_proformaHeader.State" 
+                                                       Disabled="true"
+                                                       Variant="Variant.Outlined" 
+                                                       Class="text-slate-200" />
+                                    </MudItem>
+                                </MudGrid>
+                            }
 
                             <MudSelect T="string" 
                                        Label="Tax Transaction Type" 
@@ -111,7 +154,7 @@
                                        Variant="Variant.Filled" 
                                        Color="Color.Success"
                                        StartIcon="@Icons.Material.Filled.Save"
-                                       Disabled="@(!_lineItems.Any() || _saving)"
+                                       Disabled="@(!_lineItems.Any() || _saving || _selectedCustomer == null)"
                                        Style="font-family: 'Outfit'; font-weight: 600;">
                                 @if (_saving)
                                 {
@@ -380,6 +423,10 @@
                     <MudTd DataLabel="Customer Details" Class="text-slate-200">
                         <div class="font-weight-bold">@context.CustomerName</div>
                         <div class="text-slate-400 font-mono" style="font-size: 11px;">@context.MobileNo</div>
+                        @if (!string.IsNullOrEmpty(context.GSTIN))
+                        {
+                            <div class="text-slate-400 font-mono" style="font-size: 10px;">GSTIN: @context.GSTIN</div>
+                        }
                     </MudTd>
                     <MudTd DataLabel="Tot Qty" Style="text-align:right;" Class="text-yellow-500 font-weight-bold">@context.TotalQty.ToString("N2")</MudTd>
                     <MudTd DataLabel="Taxable Value" Style="text-align:right;" Class="text-slate-300">₹@context.TotalTaxableValue.ToString("N2")</MudTd>
@@ -400,6 +447,58 @@
     </MudTabs>
 </MudContainer>
 
+<!-- Quick Add Customer Dialog -->
+<MudDialog @bind-Visible="_quickAddOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
+            Quick Add Customer
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_quickAddForm" @bind-IsValid="_isQuickAddValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Customer Name" @bind-Value="_newCustomer.CustomerName" Required="true" RequiredError="Name is required" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Mobile Number" @bind-Value="_newCustomer.MobileNo" Required="true" RequiredError="Mobile is required" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" Label="Customer Type" @bind-Value="_newCustomer.CustomerType" Required="true" Class="text-slate-200">
+                        <MudSelectItem Value="@("Unregistered")">Unregistered</MudSelectItem>
+                        <MudSelectItem Value="@("Registered")">Registered (GST)</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="GSTIN" @bind-Value="_newCustomer.GSTIN" Required="@(_newCustomer.CustomerType == "Registered")" RequiredError="GSTIN required for Registered" Disabled="@(_newCustomer.CustomerType == "Unregistered")" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Address Line 1" @bind-Value="_newCustomer.Address1" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="City" @bind-Value="_newCustomer.City" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="State" @bind-Value="_newCustomer.State" Class="text-slate-200" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _quickAddOpen = false" Variant="Variant.Text" Color="Color.Secondary">Cancel</MudButton>
+        <MudButton OnClick="SaveQuickCustomer" Variant="Variant.Filled" Color="Color.Primary" Disabled="@_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                <MudText>Save & Select</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     private ProformaInvoicePostDto _proformaHeader = new();
     private DateTime? _proformaDate = DateTime.Today;
@@ -414,6 +513,17 @@
     private List<ProformaInvoice> _proformas = new();
     private bool _loadingList = false;
     private string _searchString = "";
+
+    // Customer selection
+    private List<Customer> _customers = new();
+    private Customer? _selectedCustomer;
+
+    // Quick add dialog variables
+    private bool _quickAddOpen = false;
+    private Customer _newCustomer = new();
+    private MudForm? _quickAddForm;
+    private bool _isQuickAddValid = false;
+    private readonly DialogOptions _dialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
 
     // Company Settings defaults
     private string _companyName = "Kannan Silks";
@@ -437,9 +547,136 @@
     private decimal _roundOff;
     private decimal _netAmount;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         ResetForm();
+        await LoadCustomers();
+    }
+
+    private async Task LoadCustomers()
+    {
+        try
+        {
+            var data = await Http.GetFromJsonAsync<List<Customer>>("api/customers") ?? new();
+            _customers = data.Where(c => c.Status == "Active").ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading customers: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task<IEnumerable<Customer>> SearchCustomers(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value)) return _customers;
+        return _customers.Where(c => 
+            c.CustomerName.Contains(value, StringComparison.OrdinalIgnoreCase) || 
+            c.MobileNo.Contains(value) || 
+            c.CustomerCode.Contains(value, StringComparison.OrdinalIgnoreCase)
+        );
+    }
+
+    private void OnCustomerSelected(Customer? c)
+    {
+        _selectedCustomer = c;
+        if (c != null)
+        {
+            _proformaHeader.CustomerId = c.CustomerId;
+            _proformaHeader.CustomerName = c.CustomerName;
+            _proformaHeader.MobileNo = c.MobileNo;
+            _proformaHeader.Address = $"{c.Address1 ?? ""}{(string.IsNullOrEmpty(c.Address2) ? "" : ", " + c.Address2)}{(string.IsNullOrEmpty(c.City) ? "" : ", " + c.City)}{(string.IsNullOrEmpty(c.Pincode) ? "" : " - " + c.Pincode)}";
+            _proformaHeader.GSTIN = c.GSTIN;
+            _proformaHeader.State = c.State;
+
+            // Auto toggle tax type based on state
+            if (!string.IsNullOrEmpty(c.State) && 
+                (c.State.Replace(" ", "").Equals("TamilNadu", StringComparison.OrdinalIgnoreCase) || 
+                 c.State.Equals("Tamil Nadu", StringComparison.OrdinalIgnoreCase) ||
+                 c.State.Equals("TN", StringComparison.OrdinalIgnoreCase)))
+            {
+                _taxType = "Intra-State";
+            }
+            else
+            {
+                _taxType = "Inter-State";
+            }
+        }
+        else
+        {
+            _proformaHeader.CustomerId = null;
+            _proformaHeader.CustomerName = string.Empty;
+            _proformaHeader.MobileNo = null;
+            _proformaHeader.Address = null;
+            _proformaHeader.GSTIN = null;
+            _proformaHeader.State = null;
+        }
+        CalculateFooter();
+    }
+
+    private void OpenQuickAddCustomer()
+    {
+        _newCustomer = new Customer
+        {
+            CustomerId = Guid.Empty,
+            CustomerType = "Unregistered",
+            Status = "Active",
+            Country = "India"
+        };
+        _quickAddOpen = true;
+    }
+
+    private async Task SaveQuickCustomer()
+    {
+        if (_quickAddForm == null) return;
+        await _quickAddForm.Validate();
+        if (!_quickAddForm.IsValid) return;
+
+        _saving = true;
+        try
+        {
+            // Check for duplicate name warning
+            var isDuplicate = await Http.GetFromJsonAsync<bool>($"api/customers/check-duplicate-name?name={Uri.EscapeDataString(_newCustomer.CustomerName.Trim())}");
+            if (isDuplicate)
+            {
+                bool? proceed = await DialogService.ShowMessageBoxAsync(
+                    "Duplicate Customer Warning",
+                    $"A customer with the name '{_newCustomer.CustomerName.Trim()}' is already registered. Proceed anyway?",
+                    yesText: "Yes, Proceed", cancelText: "Cancel");
+                if (proceed != true)
+                {
+                    _saving = false;
+                    return;
+                }
+            }
+
+            var response = await Http.PostAsJsonAsync("api/customers", _newCustomer);
+            if (response.IsSuccessStatusCode)
+            {
+                var created = await response.Content.ReadFromJsonAsync<Customer>();
+                Snackbar.Add("Customer added successfully!", Severity.Success);
+                _quickAddOpen = false;
+                
+                await LoadCustomers();
+                
+                if (created != null)
+                {
+                    OnCustomerSelected(_customers.FirstOrDefault(c => c.CustomerId == created.CustomerId));
+                }
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Quick Add failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error during Quick Add: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
     }
 
     private async Task OnTabChanged(int index)
@@ -506,6 +743,7 @@
             ProformaDate = DateTimeOffset.UtcNow
         };
         _proformaDate = DateTime.Today;
+        _selectedCustomer = null;
         _lineItems.Clear();
         _scanInput = "";
         _taxType = "Intra-State";
@@ -760,17 +998,14 @@
     private void OnQuantityChanged(ProformaLineItem line, decimal value)
     {
         line.Quantity = value;
-        // Distribute the quantity across the scanned batch barcodes
         if (line.ScannedBarcodes.Any())
         {
-            // If only one barcode exists, set its quantity directly
             if (line.ScannedBarcodes.Count == 1)
             {
                 line.ScannedBarcodes[0].Quantity = value;
             }
             else
             {
-                // Distribute or assign to the first barcode (fallback)
                 line.ScannedBarcodes[0].Quantity = value;
             }
         }
@@ -878,9 +1113,15 @@
 
     private async Task SaveProforma()
     {
+        if (_selectedCustomer == null)
+        {
+            Snackbar.Add("Please select a customer first.", Severity.Error);
+            return;
+        }
+
         if (!_lineItems.Any()) return;
 
-        // Stock quantity validations before posting
+        // Stock quantity validations
         foreach (var line in _lineItems)
         {
             var maxAvailable = line.ScannedBarcodes.Sum(b => b.AvailableQuantity);
@@ -926,7 +1167,6 @@
                 
                 if (saved != null)
                 {
-                    // Print invoice immediately
                     await LoadAndPrintProforma(saved.Id);
                 }
                 
@@ -959,7 +1199,6 @@
                 return;
             }
             
-            // Build the HTML print layout dynamically
             var html = GeneratePrintHtml(p);
             await JSRuntime.InvokeVoidAsync("webcamInterop.printInvoice", html, $"Proforma_{p.ProformaNo}");
             Snackbar.Add("Print preview opened.", Severity.Info);
@@ -998,8 +1237,9 @@
         sb.Append($"      <strong>Address:</strong> {p.Address ?? "N/A"}");
         sb.Append("    </div>");
         sb.Append("    <div class=\"grid-col\" style=\"text-align: right;\">");
-        sb.Append($"      <strong>Tax State:</strong> {p.TaxType}<br/>");
-        sb.Append($"      <strong>Status:</strong> Submitted & Stock Outwarded");
+        sb.Append($"      <strong>GSTIN:</strong> {p.GSTIN ?? "N/A"}<br/>");
+        sb.Append($"      <strong>State:</strong> {p.State ?? "N/A"}<br/>");
+        sb.Append($"      <strong>Tax State:</strong> {p.TaxType}");
         sb.Append("    </div>");
         sb.Append("  </div>");
 

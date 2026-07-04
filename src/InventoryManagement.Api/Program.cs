@@ -236,6 +236,8 @@ using (var scope = app.Services.CreateScope())
                         ""CustomerName"" TEXT NOT NULL,
                         ""MobileNo"" TEXT NULL,
                         ""Address"" TEXT NULL,
+                        ""GSTIN"" TEXT NULL,
+                        ""State"" TEXT NULL,
                         ""TaxType"" TEXT NOT NULL DEFAULT 'Intra-State',
                         ""TotalQty"" TEXT NOT NULL,
                         ""TotalTaxableValue"" TEXT NOT NULL,
@@ -282,6 +284,37 @@ using (var scope = app.Services.CreateScope())
                         ""Quantity"" TEXT NOT NULL
                     );
                 ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""CustomerMaster"" (
+                        ""CustomerId"" TEXT NOT NULL PRIMARY KEY,
+                        ""CustomerCode"" TEXT NOT NULL,
+                        ""CustomerName"" TEXT NOT NULL,
+                        ""ContactPerson"" TEXT NULL,
+                        ""MobileNo"" TEXT NOT NULL,
+                        ""WhatsappNo"" TEXT NULL,
+                        ""Email"" TEXT NULL,
+                        ""GSTIN"" TEXT NULL,
+                        ""PANNo"" TEXT NULL,
+                        ""Address1"" TEXT NULL,
+                        ""Address2"" TEXT NULL,
+                        ""City"" TEXT NULL,
+                        ""State"" TEXT NULL,
+                        ""Pincode"" TEXT NULL,
+                        ""Country"" TEXT NULL,
+                        ""CustomerType"" TEXT NOT NULL DEFAULT 'Unregistered',
+                        ""CreditDays"" INTEGER NOT NULL DEFAULT 0,
+                        ""CreditLimit"" TEXT NOT NULL DEFAULT '0',
+                        ""Status"" TEXT NOT NULL DEFAULT 'Active',
+                        ""Remarks"" TEXT NULL,
+                        ""CreatedDate"" TEXT NOT NULL,
+                        ""ModifiedDate"" TEXT NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CustomerMaster_MobileNo"" ON ""CustomerMaster"" (""MobileNo"");");
+                context.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CustomerMaster_CustomerCode"" ON ""CustomerMaster"" (""CustomerCode"");");
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""CustomerId"" TEXT NULL REFERENCES ""CustomerMaster""(""CustomerId"") ON DELETE SET NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""GSTIN"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""State"" TEXT NULL;"); } catch {}
 
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""GSTPercent"" numeric(5,2) NOT NULL DEFAULT 18.00;"); } catch {}
             }
@@ -296,6 +329,8 @@ using (var scope = app.Services.CreateScope())
                         ""CustomerName"" varchar(150) NOT NULL,
                         ""MobileNo"" varchar(20) NULL,
                         ""Address"" text NULL,
+                        ""GSTIN"" varchar(15) NULL,
+                        ""State"" varchar(100) NULL,
                         ""TaxType"" varchar(20) NOT NULL DEFAULT 'Intra-State',
                         ""TotalQty"" numeric(12,2) NOT NULL,
                         ""TotalTaxableValue"" numeric(12,2) NOT NULL,
@@ -342,6 +377,38 @@ using (var scope = app.Services.CreateScope())
                         ""Quantity"" numeric(12,2) NOT NULL
                     );
                 ");
+
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""CustomerMaster"" (
+                        ""CustomerId"" uuid NOT NULL PRIMARY KEY,
+                        ""CustomerCode"" varchar(30) NOT NULL,
+                        ""CustomerName"" varchar(150) NOT NULL,
+                        ""ContactPerson"" varchar(100) NULL,
+                        ""MobileNo"" varchar(20) NOT NULL,
+                        ""WhatsappNo"" varchar(20) NULL,
+                        ""Email"" varchar(100) NULL,
+                        ""GSTIN"" varchar(15) NULL,
+                        ""PANNo"" varchar(10) NULL,
+                        ""Address1"" text NULL,
+                        ""Address2"" text NULL,
+                        ""City"" varchar(100) NULL,
+                        ""State"" varchar(100) NULL,
+                        ""Pincode"" varchar(10) NULL,
+                        ""Country"" varchar(100) NULL,
+                        ""CustomerType"" varchar(20) NOT NULL DEFAULT 'Unregistered',
+                        ""CreditDays"" integer NOT NULL DEFAULT 0,
+                        ""CreditLimit"" numeric(12,2) NOT NULL DEFAULT 0,
+                        ""Status"" varchar(20) NOT NULL DEFAULT 'Active',
+                        ""Remarks"" text NULL,
+                        ""CreatedDate"" timestamptz NOT NULL,
+                        ""ModifiedDate"" timestamptz NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CustomerMaster_MobileNo"" ON ""CustomerMaster"" (""MobileNo"");");
+                context.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CustomerMaster_CustomerCode"" ON ""CustomerMaster"" (""CustomerCode"");");
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""CustomerId"" uuid NULL REFERENCES ""CustomerMaster""(""CustomerId"") ON DELETE SET NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""GSTIN"" varchar(15) NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""ProformaInvoices"" ADD COLUMN ""State"" varchar(100) NULL;"); } catch {}
 
                 context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN IF NOT EXISTS ""GSTPercent"" numeric(5,2) NOT NULL DEFAULT 18.00;");
             }

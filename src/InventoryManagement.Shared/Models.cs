@@ -680,6 +680,11 @@ namespace InventoryManagement.Shared
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();
 
+        public Guid? CustomerId { get; set; }
+
+        [ForeignKey(nameof(CustomerId))]
+        public Customer? Customer { get; set; }
+
         [Required]
         [StringLength(30)]
         public string ProformaNo { get; set; } = string.Empty;
@@ -695,6 +700,12 @@ namespace InventoryManagement.Shared
         public string? MobileNo { get; set; }
 
         public string? Address { get; set; }
+
+        [StringLength(15)]
+        public string? GSTIN { get; set; }
+
+        [StringLength(100)]
+        public string? State { get; set; }
 
         [Required]
         [StringLength(20)]
@@ -823,10 +834,13 @@ namespace InventoryManagement.Shared
 
     public class ProformaInvoicePostDto
     {
+        public Guid? CustomerId { get; set; }
         public DateTimeOffset ProformaDate { get; set; }
         public string CustomerName { get; set; } = string.Empty;
         public string? MobileNo { get; set; }
         public string? Address { get; set; }
+        public string? GSTIN { get; set; }
+        public string? State { get; set; }
         public string TaxType { get; set; } = "Intra-State";
         public List<ProformaInvoiceDetailPostDto> Details { get; set; } = new();
     }
@@ -853,5 +867,72 @@ namespace InventoryManagement.Shared
         public string BatchNo { get; set; } = string.Empty;
         public string TrackingNo { get; set; } = string.Empty;
         public decimal Quantity { get; set; }
+    }
+
+    [Table("CustomerMaster")]
+    public class Customer
+    {
+        [Key]
+        public Guid CustomerId { get; set; } = Guid.NewGuid();
+
+        [Required]
+        [StringLength(30)]
+        public string CustomerCode { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(150)]
+        public string CustomerName { get; set; } = string.Empty;
+
+        [StringLength(100)]
+        public string? ContactPerson { get; set; }
+
+        [Required]
+        [StringLength(20)]
+        public string MobileNo { get; set; } = string.Empty;
+
+        [StringLength(20)]
+        public string? WhatsappNo { get; set; }
+
+        [StringLength(100)]
+        public string? Email { get; set; }
+
+        [StringLength(15)]
+        public string? GSTIN { get; set; }
+
+        [StringLength(10)]
+        public string? PANNo { get; set; }
+
+        public string? Address1 { get; set; }
+        public string? Address2 { get; set; }
+
+        [StringLength(100)]
+        public string? City { get; set; }
+
+        [StringLength(100)]
+        public string? State { get; set; }
+
+        [StringLength(10)]
+        public string? Pincode { get; set; }
+
+        [StringLength(100)]
+        public string? Country { get; set; }
+
+        [Required]
+        [StringLength(20)]
+        public string CustomerType { get; set; } = "Unregistered"; // "Registered" or "Unregistered"
+
+        public int CreditDays { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal CreditLimit { get; set; } = 0;
+
+        [Required]
+        [StringLength(20)]
+        public string Status { get; set; } = "Active"; // "Active" or "Inactive"
+
+        public string? Remarks { get; set; }
+
+        public DateTimeOffset CreatedDate { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset ModifiedDate { get; set; } = DateTimeOffset.UtcNow;
     }
 }

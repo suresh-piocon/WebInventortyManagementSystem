@@ -29,6 +29,7 @@ namespace InventoryManagement.Api.Controllers
         public async Task<IActionResult> GetProformas()
         {
             var data = await _context.ProformaInvoices
+                .Include(p => p.Customer)
                 .Include(p => p.Details)
                     .ThenInclude(d => d.Item)
                 .OrderByDescending(p => p.ProformaDate)
@@ -40,6 +41,7 @@ namespace InventoryManagement.Api.Controllers
         public async Task<IActionResult> GetProforma(Guid id)
         {
             var data = await _context.ProformaInvoices
+                .Include(p => p.Customer)
                 .Include(p => p.Details)
                     .ThenInclude(d => d.Barcodes)
                 .FirstOrDefaultAsync(p => p.Id == id);
@@ -235,11 +237,14 @@ namespace InventoryManagement.Api.Controllers
                 var proforma = new ProformaInvoice
                 {
                     Id = Guid.NewGuid(),
+                    CustomerId = dto.CustomerId,
                     ProformaNo = proformaNo,
                     ProformaDate = dto.ProformaDate.ToUniversalTime(),
                     CustomerName = dto.CustomerName,
                     MobileNo = dto.MobileNo,
                     Address = dto.Address,
+                    GSTIN = dto.GSTIN,
+                    State = dto.State,
                     TaxType = dto.TaxType,
                     TotalQty = dto.Details.Sum(d => d.Quantity),
                     TotalTaxableValue = dto.Details.Sum(d => d.TaxableValue),

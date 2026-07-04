@@ -41,6 +41,7 @@ namespace InventoryManagement.Api.Data
         public DbSet<ProformaInvoice> ProformaInvoices => Set<ProformaInvoice>();
         public DbSet<ProformaInvoiceDetail> ProformaInvoiceDetails => Set<ProformaInvoiceDetail>();
         public DbSet<ProformaInvoiceDetailBarcode> ProformaInvoiceDetailBarcodes => Set<ProformaInvoiceDetailBarcode>();
+        public DbSet<Customer> Customers => Set<Customer>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -57,6 +58,8 @@ namespace InventoryManagement.Api.Data
             modelBuilder.Entity<BarcodeMaster>().HasIndex(bm => bm.Barcode).IsUnique();
             modelBuilder.Entity<QRCodeMaster>().HasIndex(qm => qm.QRCode).IsUnique();
             modelBuilder.Entity<QRCodeMaster>().HasIndex(qm => qm.TrackingNo);
+            modelBuilder.Entity<Customer>().HasIndex(c => c.MobileNo).IsUnique();
+            modelBuilder.Entity<Customer>().HasIndex(c => c.CustomerCode).IsUnique();
 
             // Set up cascading deletes
             modelBuilder.Entity<StockInwardDetail>()
@@ -82,6 +85,12 @@ namespace InventoryManagement.Api.Data
                 .WithMany(d => d.Barcodes)
                 .HasForeignKey(b => b.ProformaInvoiceDetailId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProformaInvoice>()
+                .HasOne(p => p.Customer)
+                .WithMany()
+                .HasForeignKey(p => p.CustomerId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // Precision for decimals
             modelBuilder.Entity<Item>()
@@ -134,6 +143,9 @@ namespace InventoryManagement.Api.Data
 
             modelBuilder.Entity<ProformaInvoiceDetailBarcode>()
                 .Property(b => b.Quantity).HasPrecision(12, 2);
+
+            modelBuilder.Entity<Customer>()
+                .Property(c => c.CreditLimit).HasPrecision(12, 2);
         }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
