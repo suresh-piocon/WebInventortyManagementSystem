@@ -91,7 +91,7 @@
                     <MudTextField T="string" Label="Weft Type Code" @bind-Value="_editType.Code" Required="true" RequiredError="Code is required" Class="text-slate-200" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudTextField T="string" Label="Weft Type (e.g. 1.250+0.500)" Value="_editType.WeftType" Required="true" RequiredError="Weft combination formula is required" Class="text-slate-200" Disabled="true" />
+                    <MudTextField T="string" Label="Weft Type (e.g. 1.250+0.500)" Value="_editType.WeftType" Required="true" RequiredError="Weft combination formula is required" Class="text-slate-200" ValueChanged="OnWeftTypeChangedDirect" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
                     <MudNumericField T="decimal" Label="Weft Part 1" Value="_editType.WeftPart1" Required="true" Min="0.001M" Format="F3" Class="text-slate-200" ValueChanged="OnPart1Changed" />
@@ -187,6 +187,40 @@
             _editType.WeftType = $"{_editType.WeftPart1:F3}";
         }
         _editType.Description = _editType.WeftType;
+    }
+
+    private void OnWeftTypeChangedDirect(string val)
+    {
+        _editType.WeftType = val;
+        _editType.Description = val;
+        
+        if (string.IsNullOrEmpty(val))
+        {
+            _editType.WeftPart1 = 0;
+            _editType.WeftPart2 = 0;
+            return;
+        }
+
+        var parts = val.Split('+');
+        if (parts.Length == 1)
+        {
+            if (decimal.TryParse(parts[0].Trim(), out var p1))
+            {
+                _editType.WeftPart1 = p1;
+            }
+            _editType.WeftPart2 = 0;
+        }
+        else if (parts.Length >= 2)
+        {
+            if (decimal.TryParse(parts[0].Trim(), out var p1))
+            {
+                _editType.WeftPart1 = p1;
+            }
+            if (decimal.TryParse(parts[1].Trim(), out var p2))
+            {
+                _editType.WeftPart2 = p2;
+            }
+        }
     }
 
     private void OpenAddDialog()
