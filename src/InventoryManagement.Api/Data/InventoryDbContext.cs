@@ -315,10 +315,34 @@ namespace InventoryManagement.Api.Data
                 .HasForeignKey(d => d.DesignId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<DyeingIssueDetail>()
+                .HasOne(d => d.WarpTypeSpec)
+                .WithMany()
+                .HasForeignKey(d => d.WarpTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DyeingIssueDetail>()
+                .HasOne(d => d.WeftTypeSpec)
+                .WithMany()
+                .HasForeignKey(d => d.WeftTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<DyeingReceiveDetail>()
                 .HasOne(d => d.Design)
                 .WithMany()
                 .HasForeignKey(d => d.DesignId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DyeingReceiveDetail>()
+                .HasOne(d => d.WarpTypeSpec)
+                .WithMany()
+                .HasForeignKey(d => d.WarpTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DyeingReceiveDetail>()
+                .HasOne(d => d.WeftTypeSpec)
+                .WithMany()
+                .HasForeignKey(d => d.WeftTypeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // Configure all DateTimeOffset properties to convert to UTC for PostgreSQL

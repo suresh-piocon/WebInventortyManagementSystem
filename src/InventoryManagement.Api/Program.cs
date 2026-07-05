@@ -602,7 +602,9 @@ using (var scope = app.Services.CreateScope())
                     CREATE TABLE IF NOT EXISTS ""DyeingIssueDetails"" (
                         ""Id"" TEXT NOT NULL PRIMARY KEY,
                         ""DyeingIssueId"" TEXT NOT NULL REFERENCES ""DyeingIssues""(""Id"") ON DELETE CASCADE,
-                        ""DesignId"" TEXT NOT NULL REFERENCES ""Items""(""Id"") ON DELETE RESTRICT,
+                        ""DesignId"" TEXT NULL REFERENCES ""Items""(""Id"") ON DELETE RESTRICT,
+                        ""WarpTypeId"" TEXT NULL REFERENCES ""WarpTypeMaster""(""Id"") ON DELETE RESTRICT,
+                        ""WeftTypeId"" TEXT NULL REFERENCES ""WeftTypeMaster""(""Id"") ON DELETE RESTRICT,
                         ""YarnType"" TEXT NOT NULL,
                         ""WarpYarn"" TEXT NULL,
                         ""WeftYarn"" TEXT NULL,
@@ -628,7 +630,9 @@ using (var scope = app.Services.CreateScope())
                     CREATE TABLE IF NOT EXISTS ""DyeingReceiveDetails"" (
                         ""Id"" TEXT NOT NULL PRIMARY KEY,
                         ""DyeingReceiveId"" TEXT NOT NULL REFERENCES ""DyeingReceives""(""Id"") ON DELETE CASCADE,
-                        ""DesignId"" TEXT NOT NULL REFERENCES ""Items""(""Id"") ON DELETE RESTRICT,
+                        ""DesignId"" TEXT NULL REFERENCES ""Items""(""Id"") ON DELETE RESTRICT,
+                        ""WarpTypeId"" TEXT NULL REFERENCES ""WarpTypeMaster""(""Id"") ON DELETE RESTRICT,
+                        ""WeftTypeId"" TEXT NULL REFERENCES ""WeftTypeMaster""(""Id"") ON DELETE RESTRICT,
                         ""YarnType"" TEXT NOT NULL,
                         ""DyedColor"" TEXT NULL,
                         ""QtyReceived"" TEXT NOT NULL,
@@ -694,6 +698,12 @@ using (var scope = app.Services.CreateScope())
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""StockLedger"" ADD COLUMN ""InwardWeight"" TEXT NOT NULL DEFAULT '0';"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""StockLedger"" ADD COLUMN ""OutwardWeight"" TEXT NOT NULL DEFAULT '0';"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""StockLedger"" ADD COLUMN ""BalanceWeight"" TEXT NOT NULL DEFAULT '0';"); } catch {}
+
+                // Alter Dyeing details tables
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingIssueDetails"" ADD COLUMN ""WarpTypeId"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingIssueDetails"" ADD COLUMN ""WeftTypeId"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""WarpTypeId"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""WeftTypeId"" TEXT NULL;"); } catch {}
             }
             else
             {
@@ -770,7 +780,9 @@ using (var scope = app.Services.CreateScope())
                     CREATE TABLE IF NOT EXISTS ""DyeingIssueDetails"" (
                         ""Id"" uuid NOT NULL PRIMARY KEY,
                         ""DyeingIssueId"" uuid NOT NULL REFERENCES ""DyeingIssues""(""Id"") ON DELETE CASCADE,
-                        ""DesignId"" uuid NOT NULL REFERENCES ""Items""(""Id"") ON DELETE RESTRICT,
+                        ""DesignId"" uuid NULL REFERENCES ""Items""(""Id"") ON DELETE RESTRICT,
+                        ""WarpTypeId"" uuid NULL REFERENCES ""WarpTypeMaster""(""Id"") ON DELETE RESTRICT,
+                        ""WeftTypeId"" uuid NULL REFERENCES ""WeftTypeMaster""(""Id"") ON DELETE RESTRICT,
                         ""YarnType"" varchar(20) NOT NULL,
                         ""WarpYarn"" varchar(100) NULL,
                         ""WeftYarn"" varchar(100) NULL,
@@ -796,7 +808,9 @@ using (var scope = app.Services.CreateScope())
                     CREATE TABLE IF NOT EXISTS ""DyeingReceiveDetails"" (
                         ""Id"" uuid NOT NULL PRIMARY KEY,
                         ""DyeingReceiveId"" uuid NOT NULL REFERENCES ""DyeingReceives""(""Id"") ON DELETE CASCADE,
-                        ""DesignId"" uuid NOT NULL REFERENCES ""Items""(""Id"") ON DELETE RESTRICT,
+                        ""DesignId"" uuid NULL REFERENCES ""Items""(""Id"") ON DELETE RESTRICT,
+                        ""WarpTypeId"" uuid NULL REFERENCES ""WarpTypeMaster""(""Id"") ON DELETE RESTRICT,
+                        ""WeftTypeId"" uuid NULL REFERENCES ""WeftTypeMaster""(""Id"") ON DELETE RESTRICT,
                         ""YarnType"" varchar(20) NOT NULL,
                         ""DyedColor"" varchar(50) NULL,
                         ""QtyReceived"" numeric(12,2) NOT NULL,
@@ -862,6 +876,14 @@ using (var scope = app.Services.CreateScope())
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""StockLedger"" ADD COLUMN ""InwardWeight"" numeric(12,3) NOT NULL DEFAULT 0;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""StockLedger"" ADD COLUMN ""OutwardWeight"" numeric(12,3) NOT NULL DEFAULT 0;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""StockLedger"" ADD COLUMN ""BalanceWeight"" numeric(12,3) NOT NULL DEFAULT 0;"); } catch {}
+
+                // Alter Dyeing details tables
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingIssueDetails"" ALTER COLUMN ""DesignId"" DROP NOT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingIssueDetails"" ADD COLUMN ""WarpTypeId"" uuid NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingIssueDetails"" ADD COLUMN ""WeftTypeId"" uuid NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ALTER COLUMN ""DesignId"" DROP NOT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""WarpTypeId"" uuid NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""WeftTypeId"" uuid NULL;"); } catch {}
             }
             Console.WriteLine("Job Work database tables and schema verified successfully.");
         }

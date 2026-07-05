@@ -195,7 +195,7 @@
         </MudText>
     </TitleContent>
     <DialogContent>
-        <MudForm @ref="_entryForm" @bind-IsValid="_isEntryValid">
+        <MudForm @ref="_entryForm" @bind-IsValid="_isEntryValid" @onkeyup="HandleKeyUp">
             <MudGrid>
                 <MudItem xs="12" sm="6">
                     <MudDatePicker Label="Date" @bind-Date="_entryDate" Required="true" Class="text-slate-200" />
@@ -217,9 +217,26 @@
                     </MudSelect>
                 </MudItem>
 
-                <MudItem xs="12">
-                    <MudTextField T="string" Label="Details" @bind-Value="_editEntry.Details" Class="text-slate-200" HelperText="e.g. yarn spec, payment ref, design name" />
-                </MudItem>
+                @if (_editEntry.EntryType == "Dyed Warp" || _editEntry.EntryType == "Dyed Weft")
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudTextField T="string" Label="Required Specification" Value="@_requiredYarnSpec" ReadOnly="true" Variant="Variant.Outlined" Class="text-slate-100" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="string" Label="Select Available Color in Stock" Value="_selectedStockColor" Required="true" RequiredError="Color selection is required" Variant="Variant.Outlined" Class="text-slate-200" ValueChanged="OnStockColorChanged">
+                            @foreach (var y in _availableYarnList)
+                            {
+                                <MudSelectItem Value="@y.color">@y.displayName</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                }
+                else
+                {
+                    <MudItem xs="12">
+                        <MudTextField T="string" Label="Details" @bind-Value="_editEntry.Details" Class="text-slate-200" HelperText="e.g. yarn spec, payment ref, design name" />
+                    </MudItem>
+                }
 
                 @if (_showQtyField)
                 {
@@ -437,7 +454,11 @@
         _outstandingBalance = _totalDebit - _totalCredit;
     }
 
-    private void OpenEntryDialog()
+    private string _requiredYarnSpec = "";
+    private string _selectedStockColor = "";
+    private List<AvailableYarnDto> _availableYarnList = new();
+
+    private async Task OpenEntryDialog()
     {
         _editEntry = new WeavingLedgerEntry
         {
@@ -448,15 +469,17 @@
         _entryDate = DateTime.Today;
         _entryQty = 0;
         _entryWeight = 0;
-        OnEntryTypeChanged("Dyed Warp");
+        _selectedStockColor = "";
+        await OnEntryTypeChanged("Dyed Warp");
         _entryDialogOpen = true;
     }
 
-    private void OnEntryTypeChanged(string val)
+    private async Task OnEntryTypeChanged(string val)
     {
         _editEntry.EntryType = val;
+        _availableYarnList.Clear();
+        _selectedStockColor = "";
 
-        // Configure input visibility
         if (val == "Dyed Warp")
         {
             _showQtyField = true;
@@ -464,7 +487,9 @@
             _showFinancialFields = false;
             _qtyLabel = "Warp Qty (Sarees)";
             _weightLabel = "Warp Weight in Kgs";
-            _editEntry.Details = _activeAllocation?.Design?.WarpType;
+            _requiredYarnSpec = _activeAllocation?.Design?.WarpType ?? "Unknown Warp";
+            _editEntry.Details = "";
+            await LoadAvailableYarn("Dyed Warp");
         }
         else if (val == "Dyed Weft")
         {
@@ -472,7 +497,9 @@
             _showWeightField = true;
             _showFinancialFields = false;
             _weightLabel = "Weft Weight in Kgs";
-            _editEntry.Details = _activeAllocation?.Design?.WeftType;
+            _requiredYarnSpec = _activeAllocation?.Design?.WeftType ?? "Unknown Weft";
+            _editEntry.Details = "";
+            await LoadAvailableYarn("Dyed Weft");
         }
         else if (val == "Zari" || val == "Silk" || val == "Others")
         {
@@ -494,11 +521,49 @@
         }
         else
         {
-            // Cash, NEFT, TDS, transfers
             _showQtyField = false;
             _showWeightField = false;
             _showFinancialFields = true;
             _editEntry.Details = val == "Cash" ? "Cash Paid" : "Bank Transfer";
+        }
+    }
+
+    private async Task LoadAvailableYarn(string yarnType)
+    {
+        if (_activeAllocation == null) return;
+        try
+        {
+            _availableYarnList = await Http.GetFromJsonAsync<List<AvailableYarnDto>>($"api/jobwork/weaving/available-yarn?allocationId={_activeAllocation.Id}&yarnType={yarnType}") ?? new();
+            if (_availableYarnList.Any())
+            {
+                var first = _availableYarnList.First();
+                OnStockColorChanged(first.color);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading yarn stock: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OnStockColorChanged(string val)
+    {
+        _selectedStockColor = val;
+        _editEntry.Details = val;
+
+        var matched = _availableYarnList.FirstOrDefault(y => y.color == val);
+        if (matched != null)
+        {
+            _entryWeight = matched.balanceWeight;
+            _entryQty = matched.balanceQty;
+        }
+    }
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SaveEntry();
         }
     }
 
@@ -518,7 +583,6 @@
         {
             _editEntry.Date = _entryDate ?? DateTimeOffset.UtcNow;
             
-            // Map qty and weights
             if (_editEntry.EntryType == "Dyed Warp")
             {
                 _editEntry.WarpQty = _entryQty;
@@ -556,6 +620,15 @@
         {
             _savingEntry = false;
         }
+    }
+
+    public class AvailableYarnDto
+    {
+        public Guid itemId { get; set; }
+        public string color { get; set; } = "";
+        public decimal balanceQty { get; set; }
+        public decimal balanceWeight { get; set; }
+        public string displayName { get; set; } = "";
     }
 
     private async Task DeleteLedgerEntry(Guid entryId)

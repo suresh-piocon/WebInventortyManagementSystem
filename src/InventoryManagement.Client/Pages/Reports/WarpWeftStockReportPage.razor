@@ -1,0 +1,148 @@
+@page "/reports/warp-weft-stock"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Warp & Weft Yarn Stock Report</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="mb-6 d-flex justify-between align-center">
+        <div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+                Warp & Weft Yarn Stock Report
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-slate-400">
+                Live summarized stock balances grouped by standard Warp and Weft configurations
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Outlined" Color="Color.Info" StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadStock" Style="font-family: 'Outfit';">
+            Refresh
+        </MudButton>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="d-flex flex-column align-center justify-center py-16">
+            <MudProgressCircular Color="Color.Info" Size="Size.Large" Indeterminate="true" Class="mb-4" />
+            <MudText Class="text-slate-400">Loading summarized stock levels...</MudText>
+        </div>
+    }
+    else
+    {
+        <MudGrid>
+            <!-- Warp Yarn Stock Table -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="glass-panel pa-6">
+                    <div class="d-flex align-center mb-4">
+                        <MudIcon Icon="@Icons.Material.Filled.Layers" Class="text-blue-400 mr-2" Size="Size.Medium" />
+                        <MudText Typo="Typo.h6" Class="text-slate-200 font-weight-bold" Style="font-family: 'Outfit';">
+                            Warp Yarn Stock Summary
+                        </MudText>
+                    </div>
+
+                    <MudTable Items="_warpStock" Hover="true" Bordered="false" Striped="true" Elevation="0" Class="mud-table-transparent">
+                        <HeaderContent>
+                            <MudTh style="color: #94A3B8;">Warp Type</MudTh>
+                            <MudTh style="color: #94A3B8;">Color</MudTh>
+                            <MudTh style="color: #94A3B8; text-align: right;">Total Qty</MudTh>
+                            <MudTh style="color: #94A3B8; text-align: right;">Total Weight (Kgs)</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Warp Type" style="color: white; font-weight: 500;">@context.type</MudTd>
+                            <MudTd DataLabel="Color" style="color: #CBD5E1;">
+                                <span class="badge" style="background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); padding: 2px 8px; border-radius: 4px;">
+                                    @context.color
+                                </span>
+                            </MudTd>
+                            <MudTd DataLabel="Total Qty" style="color: white; text-align: right;">@context.qty.ToString("N0")</MudTd>
+                            <MudTd DataLabel="Total Weight" style="color: #38BDF8; font-weight: bold; text-align: right;">@context.weight.ToString("F3")</MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>
+                            <MudText Class="text-slate-400 pa-4 text-center">No Warp Yarn stock balances found.</MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Weft Yarn Stock Table -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="glass-panel pa-6">
+                    <div class="d-flex align-center mb-4">
+                        <MudIcon Icon="@Icons.Material.Filled.LineWeight" Class="text-purple-400 mr-2" Size="Size.Medium" />
+                        <MudText Typo="Typo.h6" Class="text-slate-200 font-weight-bold" Style="font-family: 'Outfit';">
+                            Weft Yarn Stock Summary
+                        </MudText>
+                    </div>
+
+                    <MudTable Items="_weftStock" Hover="true" Bordered="false" Striped="true" Elevation="0" Class="mud-table-transparent">
+                        <HeaderContent>
+                            <MudTh style="color: #94A3B8;">Weft Type</MudTh>
+                            <MudTh style="color: #94A3B8;">Color</MudTh>
+                            <MudTh style="color: #94A3B8; text-align: right;">Total Qty</MudTh>
+                            <MudTh style="color: #94A3B8; text-align: right;">Total Weight (Kgs)</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Weft Type" style="color: white; font-weight: 500;">@context.type</MudTd>
+                            <MudTd DataLabel="Color" style="color: #CBD5E1;">
+                                <span class="badge" style="background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.2); padding: 2px 8px; border-radius: 4px;">
+                                    @context.color
+                                </span>
+                            </MudTd>
+                            <MudTd DataLabel="Total Qty" style="color: white; text-align: right;">@context.qty.ToString("N0")</MudTd>
+                            <MudTd DataLabel="Total Weight" style="color: #C084FC; font-weight: bold; text-align: right;">@context.weight.ToString("F3")</MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>
+                            <MudText Class="text-slate-400 pa-4 text-center">No Weft Yarn stock balances found.</MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private List<StockRecordDto> _warpStock = new();
+    private List<StockRecordDto> _weftStock = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStock();
+    }
+
+    private async Task LoadStock()
+    {
+        _loading = true;
+        try
+        {
+            var res = await Http.GetFromJsonAsync<StockSummaryResult>("api/jobwork/stock/warp-weft-summary");
+            if (res != null)
+            {
+                _warpStock = res.warpStock ?? new();
+                _weftStock = res.weftStock ?? new();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading stock report: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    public class StockSummaryResult
+    {
+        public List<StockRecordDto>? warpStock { get; set; }
+        public List<StockRecordDto>? weftStock { get; set; }
+    }
+
+    public class StockRecordDto
+    {
+        public string type { get; set; } = "";
+        public string color { get; set; } = "";
+        public decimal qty { get; set; }
+        public decimal weight { get; set; }
+    }
+}

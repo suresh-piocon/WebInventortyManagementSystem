@@ -281,7 +281,9 @@ namespace InventoryManagement.Api.Controllers
             var data = await _context.DyeingIssues
                 .Include(i => i.Dyer)
                 .Include(i => i.Details)
-                    .ThenInclude(d => d.Design)
+                    .ThenInclude(d => d.WarpTypeSpec)
+                .Include(i => i.Details)
+                    .ThenInclude(d => d.WeftTypeSpec)
                 .OrderByDescending(i => i.IssueDate)
                 .ToListAsync();
             return Ok(data);
@@ -296,22 +298,33 @@ namespace InventoryManagement.Api.Controllers
             using var trans = await _context.Database.BeginTransactionAsync();
             try
             {
-                var year = DateTime.UtcNow.Year;
-                var prefix = $"DYI-{year}-";
-                var maxNo = await _context.DyeingIssues
-                    .Where(i => i.IssueNo.StartsWith(prefix))
-                    .Select(i => i.IssueNo)
-                    .ToListAsync();
-                int nextSeq = 1;
-                foreach (var no in maxNo)
+                if (string.IsNullOrWhiteSpace(issue.IssueNo))
                 {
-                    var parts = no.Split('-');
-                    if (parts.Length >= 3 && int.TryParse(parts[2], out var seq))
+                    var year = DateTime.UtcNow.Year;
+                    var prefix = $"DYI-{year}-";
+                    var maxNo = await _context.DyeingIssues
+                        .Where(i => i.IssueNo.StartsWith(prefix))
+                        .Select(i => i.IssueNo)
+                        .ToListAsync();
+                    int nextSeq = 1;
+                    foreach (var no in maxNo)
                     {
-                        if (seq >= nextSeq) nextSeq = seq + 1;
+                        var parts = no.Split('-');
+                        if (parts.Length >= 3 && int.TryParse(parts[2], out var seq))
+                        {
+                            if (seq >= nextSeq) nextSeq = seq + 1;
+                        }
+                    }
+                    issue.IssueNo = $"{prefix}{nextSeq:D6}";
+                }
+                else
+                {
+                    if (await _context.DyeingIssues.AnyAsync(i => i.IssueNo.ToLower() == issue.IssueNo.ToLower()))
+                    {
+                        return BadRequest($"Issue number {issue.IssueNo} already exists.");
                     }
                 }
-                issue.IssueNo = $"{prefix}{nextSeq:D6}";
+
                 issue.Id = Guid.NewGuid();
                 issue.CreatedAt = DateTimeOffset.UtcNow;
                 issue.Dyer = null;
@@ -327,15 +340,23 @@ namespace InventoryManagement.Api.Controllers
                     detail.Id = Guid.NewGuid();
                     detail.DyeingIssueId = issue.Id;
                     
-                    var designItem = await _context.Items.FindAsync(detail.DesignId);
-                    var designName = designItem?.Name ?? "Unknown Design";
-
                     detail.Design = null;
+                    detail.WarpTypeSpec = null;
+                    detail.WeftTypeSpec = null;
 
                     // Resolve Stock Item
-                    string spec = detail.YarnType == "Warp" 
-                        ? (designItem?.WarpType ?? "Unknown Warp") 
-                        : (designItem?.WeftType ?? "Unknown Weft");
+                    string spec = "";
+                    if (detail.YarnType == "Warp")
+                    {
+                        var warp = await _context.WarpTypeMasters.FindAsync(detail.WarpTypeId);
+                        spec = warp?.WarpType ?? "Unknown Warp";
+                    }
+                    else
+                    {
+                        var weft = await _context.WeftTypeMasters.FindAsync(detail.WeftTypeId);
+                        spec = weft?.WeftType ?? "Unknown Weft";
+                    }
+
                     string stockCode = $"GREY-{detail.YarnType.ToUpper()}-{spec.Replace("*","-").Replace("+","-")}";
                     string stockName = $"Grey {detail.YarnType} Yarn | {spec}";
                     var stockItemId = await GetOrCreateStandardItemAsync(stockCode, stockName, "Grey Yarn", "KG");
@@ -385,7 +406,7 @@ namespace InventoryManagement.Api.Controllers
                         JobWorkerId = issue.DyerId,
                         TransactionDate = issue.IssueDate,
                         VoucherNo = issue.IssueNo,
-                        Particulars = $"Grey {detail.YarnType} Yarn issued for Design: {designName}",
+                        Particulars = $"Grey {detail.YarnType} Yarn issued | {spec}",
                         IssueQty = detail.Qty,
                         ReceiveQty = 0,
                         IssueWeight = detail.WeightKgs,
@@ -418,7 +439,9 @@ namespace InventoryManagement.Api.Controllers
             var data = await _context.DyeingReceives
                 .Include(r => r.Dyer)
                 .Include(r => r.Details)
-                    .ThenInclude(d => d.Design)
+                    .ThenInclude(d => d.WarpTypeSpec)
+                .Include(r => r.Details)
+                    .ThenInclude(d => d.WeftTypeSpec)
                 .OrderByDescending(r => r.ReceiveDate)
                 .ToListAsync();
             return Ok(data);
@@ -460,21 +483,31 @@ namespace InventoryManagement.Api.Controllers
                     detail.Id = Guid.NewGuid();
                     detail.DyeingReceiveId = receive.Id;
 
-                    var designItem = await _context.Items.FindAsync(detail.DesignId);
-                    var designName = designItem?.Name ?? "Unknown Design";
-
                     detail.Design = null;
+                    detail.WarpTypeSpec = null;
+                    detail.WeftTypeSpec = null;
 
                     // Resolve Stock Item (Dyed Warp or Dyed Weft)
-                    string spec = detail.YarnType == "Warp" 
-                        ? (designItem?.WarpType ?? "Unknown Warp") 
-                        : (designItem?.WeftType ?? "Unknown Weft");
+                    string spec = "";
+                    if (detail.YarnType == "Warp")
+                    {
+                        var warp = await _context.WarpTypeMasters.FindAsync(detail.WarpTypeId);
+                        spec = warp?.WarpType ?? "Unknown Warp";
+                    }
+                    else
+                    {
+                        var weft = await _context.WeftTypeMasters.FindAsync(detail.WeftTypeId);
+                        spec = weft?.WeftType ?? "Unknown Weft";
+                    }
                     string color = string.IsNullOrEmpty(detail.DyedColor) ? "RAW" : detail.DyedColor;
 
-                    string stockCode = $"DYED-{detail.YarnType.ToUpper()}-{designItem?.Code ?? "UNK"}-{spec.Replace("*","-").Replace("+","-")}-{color.ToUpper()}";
-                    string stockName = $"{designName} | {spec} | {color} (Dyed {detail.YarnType})";
+                    // Group by WarpType/WeftType Stock directly!
+                    string typeCode = detail.YarnType.ToUpper(); // "WARP" or "WEFT"
+                    string stockCode = $"DYED-{typeCode}-{spec.Replace("*","-").Replace("+","-")}-{color.ToUpper()}";
+                    string stockName = $"Dyed {detail.YarnType} Yarn | {spec} | {color}";
+                    string category = detail.YarnType == "Warp" ? "Warp Yarn Stock" : "Weft Yarn Stock";
                     
-                    var stockItemId = await GetOrCreateStandardItemAsync(stockCode, stockName, "Dyed Yarn", "KG");
+                    var stockItemId = await GetOrCreateStandardItemAsync(stockCode, stockName, category, "KG");
 
                     // 1. Add Stock To Dyed Warp / Dyed Weft Yarn Stock
                     var currentStockBal = await _context.StockLedgers
@@ -493,7 +526,9 @@ namespace InventoryManagement.Api.Controllers
                     {
                         dyeingRate = await _context.DyeingIssueDetails
                             .Include(d => d.DyeingIssue)
-                            .Where(d => d.DyeingIssue!.IssueNo == receive.IssueReferenceNo && d.DesignId == detail.DesignId && d.YarnType == detail.YarnType)
+                            .Where(d => d.DyeingIssue!.IssueNo == receive.IssueReferenceNo 
+                                     && d.YarnType == detail.YarnType 
+                                     && (detail.YarnType == "Warp" ? d.WarpTypeId == detail.WarpTypeId : d.WeftTypeId == detail.WeftTypeId))
                             .Select(d => d.Rate)
                             .FirstOrDefaultAsync();
                     }
@@ -534,7 +569,7 @@ namespace InventoryManagement.Api.Controllers
                         JobWorkerId = receive.DyerId,
                         TransactionDate = receive.ReceiveDate,
                         VoucherNo = receive.ReceiveNo,
-                        Particulars = $"Dyed {detail.YarnType} Yarn received for Design: {designName}",
+                        Particulars = $"Dyed {detail.YarnType} Yarn received | {spec} | {color}",
                         IssueQty = 0,
                         ReceiveQty = detail.QtyReceived,
                         IssueWeight = 0,
@@ -603,9 +638,21 @@ namespace InventoryManagement.Api.Controllers
                     entryType.Equals("Dyed Weft", StringComparison.OrdinalIgnoreCase))
                 {
                     // 1. Stock Deduct
-                    string spec = entryType.Equals("Dyed Warp", StringComparison.OrdinalIgnoreCase) 
-                        ? (allocation.Design?.WarpType ?? "Unknown Warp") 
-                        : (allocation.Design?.WeftType ?? "Unknown Weft");
+                    string spec = "";
+                    if (entryType.Equals("Dyed Warp", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var designItem = await _context.Items
+                            .Include(d => d.WarpTypeSpec)
+                            .FirstOrDefaultAsync(d => d.Id == allocation.ItemId);
+                        spec = designItem?.WarpTypeSpec?.WarpType ?? allocation.Design?.WarpType ?? "Unknown Warp";
+                    }
+                    else
+                    {
+                        var designItem = await _context.Items
+                            .Include(d => d.WeftTypeSpec)
+                            .FirstOrDefaultAsync(d => d.Id == allocation.ItemId);
+                        spec = designItem?.WeftTypeSpec?.WeftType ?? allocation.Design?.WeftType ?? "Unknown Weft";
+                    }
                     
                     string color = "RAW";
                     if (!string.IsNullOrEmpty(entry.Details))
@@ -618,10 +665,11 @@ namespace InventoryManagement.Api.Controllers
                     }
 
                     string typeCode = entryType.Equals("Dyed Warp", StringComparison.OrdinalIgnoreCase) ? "WARP" : "WEFT";
-                    string code = $"DYED-{typeCode}-{allocation.Design?.Code ?? "UNK"}-{spec.Replace("*","-").Replace("+","-")}-{color.Replace(" ","-")}";
-                    string name = $"{allocation.Design?.Name ?? "Design"} | {spec} | {color} (Dyed {typeCode.ToLower()})";
+                    string code = $"DYED-{typeCode}-{spec.Replace("*","-").Replace("+","-")}-{color.Replace(" ","-").ToUpper()}";
+                    string name = $"Dyed {(typeCode == "WARP" ? "Warp" : "Weft")} Yarn | {spec} | {color}";
+                    string category = typeCode == "WARP" ? "Warp Yarn Stock" : "Weft Yarn Stock";
                     
-                    var itemId = await GetOrCreateStandardItemAsync(code, name, "Dyed Yarn", "KG");
+                    var itemId = await GetOrCreateStandardItemAsync(code, name, category, "KG");
 
                     var lastBal = await _context.StockLedgers
                         .Where(sl => sl.ItemId == itemId)
@@ -1037,6 +1085,187 @@ namespace InventoryManagement.Api.Controllers
             };
 
             return Ok(dashboard);
+        }
+
+        [HttpGet("dyeing/next-issue-no")]
+        public async Task<IActionResult> GetNextIssueNo()
+        {
+            var year = DateTime.UtcNow.Year;
+            var prefix = $"DYI-{year}-";
+            var maxNo = await _context.DyeingIssues
+                .Where(i => i.IssueNo.StartsWith(prefix))
+                .Select(i => i.IssueNo)
+                .ToListAsync();
+            int nextSeq = 1;
+            foreach (var no in maxNo)
+            {
+                var parts = no.Split('-');
+                if (parts.Length >= 3 && int.TryParse(parts[2], out var seq))
+                {
+                    if (seq >= nextSeq) nextSeq = seq + 1;
+                }
+            }
+            return Ok(new { nextNo = $"{prefix}{nextSeq:D6}" });
+        }
+
+        [HttpGet("weaving/available-yarn")]
+        public async Task<IActionResult> GetAvailableYarnForWeaving([FromQuery] Guid allocationId, [FromQuery] string yarnType)
+        {
+            var allocation = await _context.LoomAllocations
+                .Include(a => a.Design)
+                    .ThenInclude(d => d!.WarpTypeSpec)
+                .Include(a => a.Design)
+                    .ThenInclude(d => d!.WeftTypeSpec)
+                .FirstOrDefaultAsync(a => a.Id == allocationId);
+
+            if (allocation == null || allocation.Design == null)
+            {
+                return BadRequest("Invalid allocation.");
+            }
+
+            var design = allocation.Design;
+            string spec = "";
+            if (yarnType.Equals("Dyed Warp", StringComparison.OrdinalIgnoreCase))
+            {
+                spec = design.WarpTypeSpec?.WarpType ?? design.WarpType ?? "";
+            }
+            else
+            {
+                spec = design.WeftTypeSpec?.WeftType ?? design.WeftType ?? "";
+            }
+
+            if (string.IsNullOrEmpty(spec))
+            {
+                return Ok(new List<object>());
+            }
+
+            // Find all items that match this spec (ignore design code if they just want the warp/weft type stock sum!)
+            // Wait, the user said:
+            // "weaving issue if i select dyed warp it should fetch the warp type stock of respective design."
+            // "same in dyed weft also."
+            // So we fetch the stock items where category is "Warp Yarn Stock" or "Weft Yarn Stock" and the spec matches.
+            string categoryName = yarnType.Equals("Dyed Warp", StringComparison.OrdinalIgnoreCase) ? "Warp Yarn Stock" : "Weft Yarn Stock";
+
+            var stockItems = await _context.Items
+                .Where(i => i.CategoryId == _context.Categories.FirstOrDefault(c => c.Name == categoryName).Id 
+                         && i.Name.Contains(spec))
+                .ToListAsync();
+
+            var result = new List<object>();
+            foreach (var item in stockItems)
+            {
+                var lastLedger = await _context.StockLedgers
+                    .Where(sl => sl.ItemId == item.Id)
+                    .OrderByDescending(sl => sl.TransactionDate)
+                    .ThenByDescending(sl => sl.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                decimal balanceQty = lastLedger?.BalanceQty ?? 0;
+                decimal balanceWeight = lastLedger?.BalanceWeight ?? 0;
+
+                if (balanceQty == 0 && balanceWeight == 0) continue;
+
+                // Extract color name from name (format: Dyed Warp Yarn | [Spec] | [Color])
+                var parts = item.Name.Split('|');
+                string colorName = parts.Length > 2 ? parts[2].Trim() : "RAW";
+
+                result.Add(new
+                {
+                    itemId = item.Id,
+                    color = colorName,
+                    balanceQty = balanceQty,
+                    balanceWeight = balanceWeight,
+                    displayName = $"{colorName} (Bal: {balanceQty:N0} Pcs / {balanceWeight:F3} Kgs)"
+                });
+            }
+
+            return Ok(result);
+        }
+
+        [HttpGet("stock/warp-weft-summary")]
+        public async Task<IActionResult> GetWarpWeftStockSummary()
+        {
+            var stockItems = await _context.Items
+                .Where(i => i.Code.StartsWith("DYED-WARP-") || 
+                            i.Code.StartsWith("DYED-WEFT-") || 
+                            i.Code.StartsWith("GREY-WARP-") || 
+                            i.Code.StartsWith("GREY-WEFT-"))
+                .ToListAsync();
+
+            var warpList = new List<object>();
+            var weftList = new List<object>();
+
+            foreach (var item in stockItems)
+            {
+                var lastLedger = await _context.StockLedgers
+                    .Where(sl => sl.ItemId == item.Id)
+                    .OrderByDescending(sl => sl.TransactionDate)
+                    .ThenByDescending(sl => sl.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                decimal balanceQty = lastLedger?.BalanceQty ?? 0;
+                decimal balanceWeight = lastLedger?.BalanceWeight ?? 0;
+
+                if (balanceQty == 0 && balanceWeight == 0) continue;
+
+                var parts = item.Code.Split('-');
+                bool isDyed = parts[0] == "DYED";
+                bool isWarp = parts[1] == "WARP";
+
+                string typeFormula = "";
+                string color = "Grey (Raw)";
+
+                if (isDyed)
+                {
+                    var nameParts = item.Name.Split('|');
+                    typeFormula = nameParts.Length > 1 ? nameParts[1].Trim() : "Unknown";
+                    color = nameParts.Length > 2 ? nameParts[2].Trim() : "RAW";
+                }
+                else
+                {
+                    var nameParts = item.Name.Split('|');
+                    typeFormula = nameParts.Length > 1 ? nameParts[1].Trim() : "Unknown";
+                }
+
+                var record = new
+                {
+                    type = typeFormula,
+                    color = color,
+                    qty = balanceQty,
+                    weight = balanceWeight
+                };
+
+                if (isWarp) warpList.Add(record);
+                else weftList.Add(record);
+            }
+
+            var groupedWarp = warpList
+                .Cast<dynamic>()
+                .GroupBy(w => new { w.type, w.color })
+                .Select(g => new
+                {
+                    type = g.Key.type,
+                    color = g.Key.color,
+                    qty = g.Sum(x => (decimal)x.qty),
+                    weight = g.Sum(x => (decimal)x.weight)
+                })
+                .OrderBy(g => g.type)
+                .ToList();
+
+            var groupedWeft = weftList
+                .Cast<dynamic>()
+                .GroupBy(w => new { w.type, w.color })
+                .Select(g => new
+                {
+                    type = g.Key.type,
+                    color = g.Key.color,
+                    qty = g.Sum(x => (decimal)x.qty),
+                    weight = g.Sum(x => (decimal)x.weight)
+                })
+                .OrderBy(g => g.type)
+                .ToList();
+
+            return Ok(new { warpStock = groupedWarp, weftStock = groupedWeft });
         }
     }
 }

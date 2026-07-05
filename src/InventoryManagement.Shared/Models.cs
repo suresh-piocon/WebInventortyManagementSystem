@@ -1310,11 +1310,18 @@ namespace InventoryManagement.Shared
         [ForeignKey(nameof(DyeingIssueId))]
         public DyeingIssue? DyeingIssue { get; set; }
 
-        [Required]
-        public Guid DesignId { get; set; }
+        public Guid? DesignId { get; set; }
 
         [ForeignKey(nameof(DesignId))]
         public Item? Design { get; set; }
+
+        public Guid? WarpTypeId { get; set; }
+        [ForeignKey(nameof(WarpTypeId))]
+        public WarpTypeMaster? WarpTypeSpec { get; set; }
+
+        public Guid? WeftTypeId { get; set; }
+        [ForeignKey(nameof(WeftTypeId))]
+        public WeftTypeMaster? WeftTypeSpec { get; set; }
 
         [Required]
         [StringLength(20)]
@@ -1383,11 +1390,18 @@ namespace InventoryManagement.Shared
         [ForeignKey(nameof(DyeingReceiveId))]
         public DyeingReceive? DyeingReceive { get; set; }
 
-        [Required]
-        public Guid DesignId { get; set; }
+        public Guid? DesignId { get; set; }
 
         [ForeignKey(nameof(DesignId))]
         public Item? Design { get; set; }
+
+        public Guid? WarpTypeId { get; set; }
+        [ForeignKey(nameof(WarpTypeId))]
+        public WarpTypeMaster? WarpTypeSpec { get; set; }
+
+        public Guid? WeftTypeId { get; set; }
+        [ForeignKey(nameof(WeftTypeId))]
+        public WeftTypeMaster? WeftTypeSpec { get; set; }
 
         [Required]
         [StringLength(20)]

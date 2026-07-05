@@ -26,6 +26,8 @@
                         <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" /> Header Info
                     </MudText>
 
+                    <MudTextField T="string" Label="Issue No*" @bind-Value="_issue.IssueNo" Required="true" RequiredError="Issue No is required" Variant="Variant.Outlined" Class="mb-4 text-slate-200" />
+
                     <MudDatePicker Label="Issue Date" @bind-Date="_issueDate" Required="true" Variant="Variant.Outlined" Class="mb-4 text-slate-200" />
 
                     <MudSelect T="Guid" Label="Select Dyer" @bind-Value="_issue.DyerId" Required="true" RequiredError="Dyer is required" Variant="Variant.Outlined" Class="mb-4 text-slate-200">
@@ -81,8 +83,8 @@
                             <table class="w-100 mud-table" style="border-collapse: collapse;">
                                 <thead>
                                     <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
-                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 200px;">Design / Item</th>
                                         <th style="color: #94A3B8; padding: 8px; text-align: left; width: 110px;">Yarn Type</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 220px;">Warp/Weft Type</th>
                                         <th style="color: #94A3B8; padding: 8px; text-align: left; width: 110px;">Color</th>
                                         <th style="color: #94A3B8; padding: 8px; text-align: right; width: 80px;">Qty</th>
                                         <th style="color: #94A3B8; padding: 8px; text-align: right; width: 90px;">Wt (Kgs)</th>
@@ -98,18 +100,30 @@
                                         var line = _lineItems[index];
                                         <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle;">
                                             <td style="padding: 4px;">
-                                                <MudSelect T="Guid" @bind-Value="line.DesignId" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 180px;">
-                                                    @foreach (var item in _designs)
-                                                    {
-                                                        <MudSelectItem Value="@item.Id">@item.Name</MudSelectItem>
-                                                    }
-                                                </MudSelect>
-                                            </td>
-                                            <td style="padding: 4px;">
-                                                <MudSelect T="string" @bind-Value="line.YarnType" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 90px;">
+                                                <MudSelect @ref="_yarnTypeRefs[index]" T="string" Value="line.YarnType" ValueChanged="@((string val) => OnYarnTypeChanged(index, val))" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 90px;">
                                                     <MudSelectItem Value="@("Warp")">Warp</MudSelectItem>
                                                     <MudSelectItem Value="@("Weft")">Weft</MudSelectItem>
                                                 </MudSelect>
+                                            </td>
+                                            <td style="padding: 4px;">
+                                                @if (line.YarnType == "Warp")
+                                                {
+                                                    <MudSelect T="Guid?" @bind-Value="line.WarpTypeId" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 200px;">
+                                                        @foreach (var wt in _warpTypes)
+                                                        {
+                                                            <MudSelectItem Value="@((Guid?)wt.Id)">@wt.WarpType</MudSelectItem>
+                                                        }
+                                                    </MudSelect>
+                                                }
+                                                else
+                                                {
+                                                    <MudSelect T="Guid?" @bind-Value="line.WeftTypeId" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 200px;">
+                                                        @foreach (var wt in _weftTypes)
+                                                        {
+                                                            <MudSelectItem Value="@((Guid?)wt.Id)">@wt.WeftType</MudSelectItem>
+                                                        }
+                                                    </MudSelect>
+                                                }
                                             </td>
                                             <td style="padding: 4px;">
                                                 <MudTextField T="string" @bind-Value="line.Color" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 90px;" />
@@ -121,7 +135,7 @@
                                                 <MudNumericField T="decimal" @bind-Value="line.WeightKgs" Min="0.01M" HideSpinButtons="true" Format="F3" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 70px;" />
                                             </td>
                                             <td style="padding: 4px;">
-                                                <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" HideSpinButtons="true" Format="F2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 80px;" />
+                                                <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" HideSpinButtons="true" Format="F2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 80px;" @onkeydown="@((KeyboardEventArgs e) => OnRateKeyDown(e, index))" />
                                             </td>
                                             <td style="padding: 4px; text-align: right;" class="text-slate-300 font-weight-bold">
                                                 ₹@((line.Qty * line.Rate).ToString("N2"))
@@ -149,16 +163,18 @@
 
 @code {
     private List<JobWorkMaster> _dyers = new();
-    private List<Item> _designs = new();
+    private List<WarpTypeMaster> _warpTypes = new();
+    private List<WeftTypeMaster> _weftTypes = new();
     private DyeingIssue _issue = new();
     private DateTime? _issueDate = DateTime.Today;
     private List<DyeingIssueDetail> _lineItems = new();
+    private Dictionary<int, MudSelect<string>> _yarnTypeRefs = new();
     private bool _saving = false;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadLookups();
-        ResetForm();
+        await ResetForm();
     }
 
     private async Task LoadLookups()
@@ -168,7 +184,11 @@
             var workers = await Http.GetFromJsonAsync<List<JobWorkMaster>>("api/jobwork/workers") ?? new();
             _dyers = workers.Where(w => w.Type == "Dyer" && w.Active).ToList();
 
-            _designs = await Http.GetFromJsonAsync<List<Item>>("api/masters/items") ?? new();
+            var warps = await Http.GetFromJsonAsync<List<WarpTypeMaster>>("api/masters/warptypes") ?? new();
+            _warpTypes = warps.Where(w => w.Active).ToList();
+
+            var wefts = await Http.GetFromJsonAsync<List<WeftTypeMaster>>("api/masters/wefttypes") ?? new();
+            _weftTypes = wefts.Where(w => w.Active).ToList();
         }
         catch (Exception ex)
         {
@@ -176,15 +196,25 @@
         }
     }
 
-    private void ResetForm()
+    private async Task ResetForm()
     {
         _issue = new DyeingIssue
         {
             IssueDate = DateTimeOffset.UtcNow,
-            DyerId = _dyers.FirstOrDefault()?.Id ?? Guid.Empty
+            DyerId = _dyers.FirstOrDefault()?.Id ?? Guid.Empty,
+            IssueNo = ""
         };
         _issueDate = DateTime.Today;
         _lineItems.Clear();
+        _yarnTypeRefs.Clear();
+
+        try
+        {
+            var nextNoRes = await Http.GetFromJsonAsync<NextNoResult>("api/jobwork/dyeing/next-issue-no");
+            _issue.IssueNo = nextNoRes?.nextNo ?? "";
+        }
+        catch {}
+
         AddRow();
     }
 
@@ -192,12 +222,42 @@
     {
         _lineItems.Add(new DyeingIssueDetail
         {
-            DesignId = _designs.FirstOrDefault()?.Id ?? Guid.Empty,
             YarnType = "Warp",
+            WarpTypeId = _warpTypes.FirstOrDefault()?.Id,
             Qty = 1,
             WeightKgs = 1,
             Rate = 0
         });
+    }
+
+    private void OnYarnTypeChanged(int index, string val)
+    {
+        var line = _lineItems[index];
+        line.YarnType = val;
+        if (val == "Warp")
+        {
+            line.WarpTypeId = _warpTypes.FirstOrDefault()?.Id;
+            line.WeftTypeId = null;
+        }
+        else
+        {
+            line.WeftTypeId = _weftTypes.FirstOrDefault()?.Id;
+            line.WarpTypeId = null;
+        }
+    }
+
+    private async Task OnRateKeyDown(KeyboardEventArgs e, int index)
+    {
+        if (e.Key == "Enter")
+        {
+            AddRow();
+            await Task.Delay(50);
+            int nextIndex = _lineItems.Count - 1;
+            if (_yarnTypeRefs.TryGetValue(nextIndex, out var select))
+            {
+                await select.FocusAsync();
+            }
+        }
     }
 
     private void RemoveRow(int index)
@@ -224,8 +284,9 @@
             // Map details
             _issue.Details = _lineItems.Select(l => new DyeingIssueDetail
             {
-                DesignId = l.DesignId,
                 YarnType = l.YarnType,
+                WarpTypeId = l.WarpTypeId,
+                WeftTypeId = l.WeftTypeId,
                 Color = l.Color,
                 Qty = l.Qty,
                 WeightKgs = l.WeightKgs,
@@ -238,7 +299,7 @@
             if (response.IsSuccessStatusCode)
             {
                 Snackbar.Add("Dyeing issue saved successfully! Grey stock deducted.", Severity.Success);
-                ResetForm();
+                await ResetForm();
             }
             else
             {
@@ -254,5 +315,10 @@
         {
             _saving = false;
         }
+    }
+
+    public class NextNoResult
+    {
+        public string nextNo { get; set; } = "";
     }
 }
