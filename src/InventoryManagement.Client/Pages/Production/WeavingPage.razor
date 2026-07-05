@@ -463,24 +463,76 @@
 
     private string GetWarpStatus()
     {
-        var latestWarp = _ledgerEntries
-            .LastOrDefault(w => w.EntryType.Equals("Dyed Warp", StringComparison.OrdinalIgnoreCase));
+        var warpEntries = _ledgerEntries
+            .Where(w => w.EntryType.Equals("Dyed Warp", StringComparison.OrdinalIgnoreCase))
+            .ToList();
             
-        if (latestWarp == null) return "New";
-        
-        var latestWarpIndex = _ledgerEntries.IndexOf(latestWarp);
-        decimal receivedSarees = 0;
-        for (int i = latestWarpIndex; i < _ledgerEntries.Count; i++)
+        if (!warpEntries.Any()) return "New";
+
+        for (int i = 0; i < warpEntries.Count; i++)
         {
-            if (_ledgerEntries[i].EntryType.Equals("Saree", StringComparison.OrdinalIgnoreCase))
+            var currentWarp = warpEntries[i];
+            var currentWarpIndex = _ledgerEntries.IndexOf(currentWarp);
+            
+            int nextWarpIndex = _ledgerEntries.Count;
+            if (i + 1 < warpEntries.Count)
             {
-                receivedSarees += _ledgerEntries[i].RodQty;
+                nextWarpIndex = _ledgerEntries.IndexOf(warpEntries[i + 1]);
+            }
+            
+            decimal receivedSarees = 0;
+            for (int j = currentWarpIndex; j < nextWarpIndex; j++)
+            {
+                if (_ledgerEntries[j].EntryType.Equals("Saree", StringComparison.OrdinalIgnoreCase))
+                {
+                    receivedSarees += _ledgerEntries[j].RodQty;
+                }
+            }
+            
+            if (receivedSarees < currentWarp.WarpQty)
+            {
+                return receivedSarees == 0 ? "New" : "Running";
             }
         }
         
-        if (receivedSarees == 0) return "New";
-        if (receivedSarees < latestWarp.WarpQty) return "Running";
         return "Completed";
+    }
+
+    private int GetNewWarpCount()
+    {
+        var warpEntries = _ledgerEntries
+            .Where(w => w.EntryType.Equals("Dyed Warp", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+            
+        int newWarpCount = 0;
+        
+        for (int i = 0; i < warpEntries.Count; i++)
+        {
+            var currentWarp = warpEntries[i];
+            var currentWarpIndex = _ledgerEntries.IndexOf(currentWarp);
+            
+            int nextWarpIndex = _ledgerEntries.Count;
+            if (i + 1 < warpEntries.Count)
+            {
+                nextWarpIndex = _ledgerEntries.IndexOf(warpEntries[i + 1]);
+            }
+            
+            decimal receivedSarees = 0;
+            for (int j = currentWarpIndex; j < nextWarpIndex; j++)
+            {
+                if (_ledgerEntries[j].EntryType.Equals("Saree", StringComparison.OrdinalIgnoreCase))
+                {
+                    receivedSarees += _ledgerEntries[j].RodQty;
+                }
+            }
+            
+            if (receivedSarees == 0)
+            {
+                newWarpCount++;
+            }
+        }
+        
+        return newWarpCount;
     }
 
     private string _requiredYarnSpec = "";
@@ -605,9 +657,9 @@
     {
         if (_entryForm == null) return;
         await _entryForm.Validate();
-        if (_editEntry.EntryType == "Dyed Warp" && GetWarpStatus() == "Running")
+        if (_editEntry.EntryType == "Dyed Warp" && GetNewWarpCount() > 0)
         {
-            Snackbar.Add("Cannot issue a new warp while the current warp is still Running. Please receive all sarees to complete the current warp first.", Severity.Error);
+            Snackbar.Add("Cannot issue a new warp already new wrp given on this loom no of this weaver.", Severity.Error);
             return;
         }
 
