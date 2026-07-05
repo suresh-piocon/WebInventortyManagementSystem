@@ -530,6 +530,30 @@ using (var scope = app.Services.CreateScope())
             if (isSqlite)
             {
                 context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""WarpTypeMaster"" (
+                        ""Id"" TEXT NOT NULL PRIMARY KEY,
+                        ""Code"" TEXT NOT NULL,
+                        ""WarpType"" TEXT NOT NULL,
+                        ""EndsCount"" INTEGER NOT NULL,
+                        ""YarnCount"" INTEGER NOT NULL,
+                        ""Description"" TEXT NULL,
+                        ""Active"" INTEGER NOT NULL DEFAULT 1,
+                        ""CreatedAt"" TEXT NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""WeftTypeMaster"" (
+                        ""Id"" TEXT NOT NULL PRIMARY KEY,
+                        ""Code"" TEXT NOT NULL,
+                        ""WeftType"" TEXT NOT NULL,
+                        ""WeftPart1"" TEXT NOT NULL,
+                        ""WeftPart2"" TEXT NOT NULL,
+                        ""Description"" TEXT NULL,
+                        ""Active"" INTEGER NOT NULL DEFAULT 1,
+                        ""CreatedAt"" TEXT NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
                     CREATE TABLE IF NOT EXISTS ""JobWorkMaster"" (
                         ""Id"" TEXT NOT NULL PRIMARY KEY,
                         ""Name"" TEXT NOT NULL,
@@ -663,6 +687,8 @@ using (var scope = app.Services.CreateScope())
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""NoOfMarks"" INTEGER NOT NULL DEFAULT 0;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""BodyImage"" TEXT NULL;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""PalluImage"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""WarpTypeId"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""WeftTypeId"" TEXT NULL;"); } catch {}
 
                 // Alter StockLedger Table
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""StockLedger"" ADD COLUMN ""InwardWeight"" TEXT NOT NULL DEFAULT '0';"); } catch {}
@@ -671,6 +697,30 @@ using (var scope = app.Services.CreateScope())
             }
             else
             {
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""WarpTypeMaster"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""Code"" varchar(50) NOT NULL,
+                        ""WarpType"" varchar(100) NOT NULL,
+                        ""EndsCount"" integer NOT NULL,
+                        ""YarnCount"" integer NOT NULL,
+                        ""Description"" text NULL,
+                        ""Active"" boolean NOT NULL DEFAULT true,
+                        ""CreatedAt"" timestamptz NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""WeftTypeMaster"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""Code"" varchar(50) NOT NULL,
+                        ""WeftType"" varchar(100) NOT NULL,
+                        ""WeftPart1"" numeric(12,3) NOT NULL,
+                        ""WeftPart2"" numeric(12,3) NOT NULL,
+                        ""Description"" text NULL,
+                        ""Active"" boolean NOT NULL DEFAULT true,
+                        ""CreatedAt"" timestamptz NOT NULL
+                    );
+                ");
                 context.Database.ExecuteSqlRaw(@"
                     CREATE TABLE IF NOT EXISTS ""JobWorkMaster"" (
                         ""Id"" uuid NOT NULL PRIMARY KEY,
@@ -805,6 +855,8 @@ using (var scope = app.Services.CreateScope())
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""NoOfMarks"" integer NOT NULL DEFAULT 0;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""BodyImage"" text NULL;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""PalluImage"" text NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""WarpTypeId"" uuid NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""WeftTypeId"" uuid NULL;"); } catch {}
 
                 // Alter StockLedger Table
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""StockLedger"" ADD COLUMN ""InwardWeight"" numeric(12,3) NOT NULL DEFAULT 0;"); } catch {}

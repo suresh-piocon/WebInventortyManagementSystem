@@ -35,7 +35,7 @@
                         }
                     </MudSelect>
 
-                    <MudSelect T="string" Label="Issue Reference No" @bind-Value="_receive.IssueReferenceNo" Variant="Variant.Outlined" Class="mb-4 text-slate-200" Placeholder="Select Issue Reference">
+                    <MudSelect T="string" Label="Issue Reference No" Value="_receive.IssueReferenceNo" Variant="Variant.Outlined" Class="mb-4 text-slate-200" Placeholder="Select Issue Reference" ValueChanged="OnIssueReferenceChanged">
                         @foreach (var refNo in _dyeingIssueRefs)
                         {
                             <MudSelectItem Value="@refNo">@refNo</MudSelectItem>
@@ -186,7 +186,44 @@
             .Distinct()
             .ToList();
         
-        _receive.IssueReferenceNo = _dyeingIssueRefs.FirstOrDefault();
+        var firstRef = _dyeingIssueRefs.FirstOrDefault() ?? string.Empty;
+        OnIssueReferenceChanged(firstRef);
+    }
+
+    private void OnIssueReferenceChanged(string refNo)
+    {
+        _receive.IssueReferenceNo = refNo;
+        
+        if (string.IsNullOrEmpty(refNo))
+        {
+            _lineItems.Clear();
+            AddRow();
+            return;
+        }
+
+        // Find the issue
+        var issue = _allIssues.FirstOrDefault(i => i.IssueNo == refNo);
+        if (issue != null && issue.Details != null && issue.Details.Any())
+        {
+            _lineItems.Clear();
+            foreach (var detail in issue.Details)
+            {
+                _lineItems.Add(new DyeingReceiveDetail
+                {
+                    DesignId = detail.DesignId,
+                    YarnType = detail.YarnType,
+                    DyedColor = detail.Color,
+                    QtyReceived = detail.Qty,
+                    WeightReceived = detail.WeightKgs,
+                    WasteWeight = 0
+                });
+            }
+        }
+        else
+        {
+            _lineItems.Clear();
+            AddRow();
+        }
     }
 
     private void ResetForm()
@@ -203,8 +240,10 @@
         {
             OnDyerChanged(_receive.DyerId);
         }
-
-        AddRow();
+        else
+        {
+            AddRow();
+        }
     }
 
     private void AddRow()

@@ -143,6 +143,14 @@ namespace InventoryManagement.Shared
         [StringLength(100)]
         public string? WeftType { get; set; }
 
+        public Guid? WarpTypeId { get; set; }
+        [ForeignKey(nameof(WarpTypeId))]
+        public WarpTypeMaster? WarpTypeSpec { get; set; }
+
+        public Guid? WeftTypeId { get; set; }
+        [ForeignKey(nameof(WeftTypeId))]
+        public WeftTypeMaster? WeftTypeSpec { get; set; }
+
         [Column(TypeName = "decimal(12, 2)")]
         public decimal Wages { get; set; } = 0;
 
@@ -1542,5 +1550,57 @@ namespace InventoryManagement.Shared
         public decimal PendingDyeingQty { get; set; }
         public decimal PendingWeavingQty { get; set; }
         public decimal FinishedSareeStock { get; set; }
+    }
+
+    [Table("WarpTypeMaster")]
+    public class WarpTypeMaster
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        [StringLength(50)]
+        public string Code { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(100)]
+        public string WarpType { get; set; } = string.Empty;
+
+        public int EndsCount { get; set; }
+
+        public int YarnCount { get; set; }
+
+        public string? Description { get; set; }
+
+        public bool Active { get; set; } = true;
+
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    [Table("WeftTypeMaster")]
+    public class WeftTypeMaster
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        [StringLength(50)]
+        public string Code { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(100)]
+        public string WeftType { get; set; } = string.Empty;
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal WeftPart1 { get; set; }
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal WeftPart2 { get; set; }
+
+        public string? Description { get; set; }
+
+        public bool Active { get; set; } = true;
+
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 }

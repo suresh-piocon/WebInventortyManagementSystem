@@ -121,10 +121,22 @@
                 </MudItem>
 
                 <MudItem xs="12" sm="4">
-                    <MudTextField T="string" Label="Warp Type" @bind-Value="_editItem.WarpType" HelperText="e.g., 40*5900" Class="text-slate-200" />
+                    <MudSelect T="Guid?" Label="Warp Type" Value="_editItem.WarpTypeId" Class="text-slate-200" ValueChanged="OnWarpTypeChanged" Variant="Variant.Text">
+                        <MudSelectItem T="Guid?" Value="@((Guid?)null)">[Select Warp Type]</MudSelectItem>
+                        @foreach (var w in _warpTypes)
+                        {
+                            <MudSelectItem T="Guid?" Value="@((Guid?)w.Id)">@w.WarpType</MudSelectItem>
+                        }
+                    </MudSelect>
                 </MudItem>
                 <MudItem xs="12" sm="4">
-                    <MudTextField T="string" Label="Weft Type" @bind-Value="_editItem.WeftType" HelperText="e.g., 3.200*0.950" Class="text-slate-200" />
+                    <MudSelect T="Guid?" Label="Weft Type" Value="_editItem.WeftTypeId" Class="text-slate-200" ValueChanged="OnWeftTypeChanged" Variant="Variant.Text">
+                        <MudSelectItem T="Guid?" Value="@((Guid?)null)">[Select Weft Type]</MudSelectItem>
+                        @foreach (var w in _weftTypes)
+                        {
+                            <MudSelectItem T="Guid?" Value="@((Guid?)w.Id)">@w.WeftType</MudSelectItem>
+                        }
+                    </MudSelect>
                 </MudItem>
                 <MudItem xs="12" sm="4">
                     <MudTextField T="string" Label="Brand Name" @bind-Value="_editItem.Brand" Class="text-slate-200" />
@@ -209,6 +221,8 @@
     private List<Item> _items = new();
     private List<Category> _categories = new();
     private List<Unit> _units = new();
+    private List<WarpTypeMaster> _warpTypes = new();
+    private List<WeftTypeMaster> _weftTypes = new();
     private bool _loading = true;
     private bool _saving = false;
     private string _searchString = "";
@@ -232,6 +246,12 @@
         {
             _categories = await Http.GetFromJsonAsync<List<Category>>("api/masters/categories") ?? new();
             _units = await Http.GetFromJsonAsync<List<Unit>>("api/masters/units") ?? new();
+            
+            var warps = await Http.GetFromJsonAsync<List<WarpTypeMaster>>("api/masters/warptypes") ?? new();
+            _warpTypes = warps.Where(w => w.Active).ToList();
+
+            var wefts = await Http.GetFromJsonAsync<List<WeftTypeMaster>>("api/masters/wefttypes") ?? new();
+            _weftTypes = wefts.Where(w => w.Active).ToList();
         }
         catch (Exception ex)
         {
@@ -291,6 +311,8 @@
             MinimumStock = item.MinimumStock,
             ReorderLevel = item.ReorderLevel,
             BarcodeType = item.BarcodeType,
+            WarpTypeId = item.WarpTypeId,
+            WeftTypeId = item.WeftTypeId,
             WarpType = item.WarpType,
             WeftType = item.WeftType,
             Wages = item.Wages,
@@ -376,6 +398,20 @@
     private void RecalculateTotalWeight()
     {
         _editItem.TotalWeight = _editItem.WarpWeight + _editItem.WeftWeight + _editItem.ZariWeight;
+    }
+
+    private void OnWarpTypeChanged(Guid? id)
+    {
+        _editItem.WarpTypeId = id;
+        var spec = _warpTypes.FirstOrDefault(w => w.Id == id);
+        _editItem.WarpType = spec?.WarpType;
+    }
+
+    private void OnWeftTypeChanged(Guid? id)
+    {
+        _editItem.WeftTypeId = id;
+        var spec = _weftTypes.FirstOrDefault(w => w.Id == id);
+        _editItem.WeftType = spec?.WeftType;
     }
 
     private async Task ConfirmDelete(Item item)

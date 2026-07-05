@@ -333,8 +333,11 @@ namespace InventoryManagement.Api.Controllers
                     detail.Design = null;
 
                     // Resolve Stock Item
-                    string stockCode = detail.YarnType == "Warp" ? "GREY_WARP" : "GREY_WEFT";
-                    string stockName = detail.YarnType == "Warp" ? "Grey Warp Yarn" : "Grey Weft Yarn";
+                    string spec = detail.YarnType == "Warp" 
+                        ? (designItem?.WarpType ?? "Unknown Warp") 
+                        : (designItem?.WeftType ?? "Unknown Weft");
+                    string stockCode = $"GREY-{detail.YarnType.ToUpper()}-{spec.Replace("*","-").Replace("+","-")}";
+                    string stockName = $"Grey {detail.YarnType} Yarn | {spec}";
                     var stockItemId = await GetOrCreateStandardItemAsync(stockCode, stockName, "Grey Yarn", "KG");
 
                     // 1. Stock Deduct from Grey Warp/Weft Yarn Stock
@@ -463,8 +466,14 @@ namespace InventoryManagement.Api.Controllers
                     detail.Design = null;
 
                     // Resolve Stock Item (Dyed Warp or Dyed Weft)
-                    string stockCode = detail.YarnType == "Warp" ? "DYED_WARP" : "DYED_WEFT";
-                    string stockName = detail.YarnType == "Warp" ? "Dyed Warp Yarn" : "Dyed Weft Yarn";
+                    string spec = detail.YarnType == "Warp" 
+                        ? (designItem?.WarpType ?? "Unknown Warp") 
+                        : (designItem?.WeftType ?? "Unknown Weft");
+                    string color = string.IsNullOrEmpty(detail.DyedColor) ? "RAW" : detail.DyedColor;
+
+                    string stockCode = $"DYED-{detail.YarnType.ToUpper()}-{designItem?.Code ?? "UNK"}-{spec.Replace("*","-").Replace("+","-")}-{color.ToUpper()}";
+                    string stockName = $"{designName} | {spec} | {color} (Dyed {detail.YarnType})";
+                    
                     var stockItemId = await GetOrCreateStandardItemAsync(stockCode, stockName, "Dyed Yarn", "KG");
 
                     // 1. Add Stock To Dyed Warp / Dyed Weft Yarn Stock
@@ -594,8 +603,24 @@ namespace InventoryManagement.Api.Controllers
                     entryType.Equals("Dyed Weft", StringComparison.OrdinalIgnoreCase))
                 {
                     // 1. Stock Deduct
-                    string code = entryType.Equals("Dyed Warp", StringComparison.OrdinalIgnoreCase) ? "DYED_WARP" : "DYED_WEFT";
-                    string name = entryType.Equals("Dyed Warp", StringComparison.OrdinalIgnoreCase) ? "Dyed Warp Yarn" : "Dyed Weft Yarn";
+                    string spec = entryType.Equals("Dyed Warp", StringComparison.OrdinalIgnoreCase) 
+                        ? (allocation.Design?.WarpType ?? "Unknown Warp") 
+                        : (allocation.Design?.WeftType ?? "Unknown Weft");
+                    
+                    string color = "RAW";
+                    if (!string.IsNullOrEmpty(entry.Details))
+                    {
+                        color = entry.Details.Trim().ToUpper();
+                    }
+                    else if (!string.IsNullOrEmpty(entry.Narration))
+                    {
+                        color = entry.Narration.Trim().ToUpper();
+                    }
+
+                    string typeCode = entryType.Equals("Dyed Warp", StringComparison.OrdinalIgnoreCase) ? "WARP" : "WEFT";
+                    string code = $"DYED-{typeCode}-{allocation.Design?.Code ?? "UNK"}-{spec.Replace("*","-").Replace("+","-")}-{color.Replace(" ","-")}";
+                    string name = $"{allocation.Design?.Name ?? "Design"} | {spec} | {color} (Dyed {typeCode.ToLower()})";
+                    
                     var itemId = await GetOrCreateStandardItemAsync(code, name, "Dyed Yarn", "KG");
 
                     var lastBal = await _context.StockLedgers

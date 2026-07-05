@@ -1,0 +1,298 @@
+@page "/masters/wefttypes"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Weft Type Master - Inventory Management</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="d-flex justify-between align-center mb-6">
+        <div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+                Weft Type Master
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-slate-400">
+                Maintain all standard weft combinations used in designs
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog"
+                   Style="background: linear-gradient(135deg, #5C5CFF 0%, #00E5FF 100%); font-family: 'Outfit'; font-weight: 600;">
+            Add Weft Type
+        </MudButton>
+    </div>
+
+    <MudTable Items="@_weftTypes" 
+              Hover="true" 
+              Loading="@_loading" 
+              SearchString="@_searchString" 
+              Filter="new Func<WeftTypeMaster, bool>(FilterFunc)"
+              Class="glass-panel text-slate-200">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">Weft Types</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString" 
+                           Placeholder="Search weft combinations..." 
+                           Adornment="Adornment.Start" 
+                           AdornmentIcon="@Icons.Material.Filled.Search" 
+                           IconSize="Size.Medium" 
+                           Class="mt-0 text-slate-200" 
+                           Style="color: white;"/>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh Style="color: #94A3B8;">Code</MudTh>
+            <MudTh Style="color: #94A3B8;">Weft Type</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Weft Part 1</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Weft Part 2</MudTh>
+            <MudTh Style="color: #94A3B8;">Description</MudTh>
+            <MudTh Style="color: #94A3B8;">Status</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right; width: 120px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Code" Class="text-slate-100 font-mono">@context.Code</MudTd>
+            <MudTd DataLabel="Weft Type" Class="text-slate-100 font-weight-bold">@context.WeftType</MudTd>
+            <MudTd DataLabel="Part 1" Class="text-slate-200" Style="text-align: right;">@context.WeftPart1.ToString("F3")</MudTd>
+            <MudTd DataLabel="Part 2" Class="text-slate-200" Style="text-align: right;">@context.WeftPart2.ToString("F3")</MudTd>
+            <MudTd DataLabel="Description" Class="text-slate-300">@(string.IsNullOrEmpty(context.Description) ? "N/A" : context.Description)</MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.Active)
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Active</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small">Inactive</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Actions" Style="text-align: right;">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => ConfirmDelete(context))" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+<!-- Dialog for Add/Edit -->
+<MudDialog @bind-Visible="_dialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
+            @(_editType.Id == Guid.Empty ? "Create New Weft Type" : "Edit Weft Type")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isFormValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Weft Type Code" @bind-Value="_editType.Code" Required="true" RequiredError="Code is required" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Weft Type (e.g. 1.250+0.500)" Value="_editType.WeftType" Required="true" RequiredError="Weft combination formula is required" Class="text-slate-200" Disabled="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal" Label="Weft Part 1" Value="_editType.WeftPart1" Required="true" Min="0.001M" Format="F3" Class="text-slate-200" ValueChanged="OnPart1Changed" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal" Label="Weft Part 2" Value="_editType.WeftPart2" Required="true" Min="0" Format="F3" Class="text-slate-200" ValueChanged="OnPart2Changed" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField T="string" Label="Description" @bind-Value="_editType.Description" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSwitch T="bool" Label="Active" @bind-Value="_editType.Active" Color="Color.Success" Class="text-slate-200" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog" Variant="Variant.Text" Color="Color.Secondary">Cancel</MudButton>
+        <MudButton OnClick="SaveWeftType" Variant="Variant.Filled" Color="Color.Primary" Disabled="@_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<WeftTypeMaster> _weftTypes = new();
+    private string _searchString = "";
+    private bool _loading = true;
+    private bool _saving = false;
+
+    private bool _dialogOpen = false;
+    private bool _isFormValid = false;
+    private MudForm? _form;
+    private WeftTypeMaster _editType = new();
+
+    private readonly DialogOptions _dialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWeftTypes();
+    }
+
+    private async Task LoadWeftTypes()
+    {
+        _loading = true;
+        try
+        {
+            _weftTypes = await Http.GetFromJsonAsync<List<WeftTypeMaster>>("api/masters/wefttypes") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading weft types: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool FilterFunc(WeftTypeMaster element) =>
+        string.IsNullOrWhiteSpace(_searchString) ||
+        element.Code.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        element.WeftType.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        (element.Description != null && element.Description.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+
+    private void OnPart1Changed(decimal part1)
+    {
+        _editType.WeftPart1 = part1;
+        RecalculateFormula();
+    }
+
+    private void OnPart2Changed(decimal part2)
+    {
+        _editType.WeftPart2 = part2;
+        RecalculateFormula();
+    }
+
+    private void RecalculateFormula()
+    {
+        if (_editType.WeftPart2 > 0)
+        {
+            _editType.WeftType = $"{_editType.WeftPart1:F3}+{_editType.WeftPart2:F3}";
+        }
+        else
+        {
+            _editType.WeftType = $"{_editType.WeftPart1:F3}";
+        }
+        _editType.Description = _editType.WeftType;
+    }
+
+    private void OpenAddDialog()
+    {
+        _editType = new WeftTypeMaster
+        {
+            Id = Guid.Empty,
+            Code = $"WF{( _weftTypes.Count + 1):D4}",
+            WeftType = "1.250+0.500",
+            WeftPart1 = 1.250M,
+            WeftPart2 = 0.500M,
+            Active = true
+        };
+        RecalculateFormula();
+        _dialogOpen = true;
+    }
+
+    private void OpenEditDialog(WeftTypeMaster type)
+    {
+        _editType = new WeftTypeMaster
+        {
+            Id = type.Id,
+            Code = type.Code,
+            WeftType = type.WeftType,
+            WeftPart1 = type.WeftPart1,
+            WeftPart2 = type.WeftPart2,
+            Description = type.Description,
+            Active = type.Active,
+            CreatedAt = type.CreatedAt
+        };
+        _dialogOpen = true;
+    }
+
+    private void CloseDialog()
+    {
+        _dialogOpen = false;
+    }
+
+    private async Task SaveWeftType()
+    {
+        if (_form == null) return;
+        await _form.Validate();
+        if (!_form.IsValid) return;
+
+        _saving = true;
+        try
+        {
+            HttpResponseMessage response;
+            if (_editType.Id == Guid.Empty)
+            {
+                response = await Http.PostAsJsonAsync("api/masters/wefttypes", _editType);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"api/masters/wefttypes/{_editType.Id}", _editType);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Weft type saved successfully!", Severity.Success);
+                _dialogOpen = false;
+                await LoadWeftTypes();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Save failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving weft type: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ConfirmDelete(WeftTypeMaster type)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Confirm Delete", 
+            $"Are you sure you want to delete weft type '{type.WeftType}'?", 
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/masters/wefttypes/{type.Id}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Weft type deleted successfully!", Severity.Success);
+                    await LoadWeftTypes();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Delete failed: {error}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting weft type: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

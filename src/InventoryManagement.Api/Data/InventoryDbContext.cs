@@ -55,6 +55,8 @@ namespace InventoryManagement.Api.Data
         public DbSet<DyeingReceiveDetail> DyeingReceiveDetails => Set<DyeingReceiveDetail>();
         public DbSet<WeavingLedgerEntry> WeavingLedgerEntries => Set<WeavingLedgerEntry>();
         public DbSet<JobLedger> JobLedgers => Set<JobLedger>();
+        public DbSet<WarpTypeMaster> WarpTypeMasters => Set<WarpTypeMaster>();
+        public DbSet<WeftTypeMaster> WeftTypeMasters => Set<WeftTypeMaster>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -332,6 +334,21 @@ namespace InventoryManagement.Api.Data
                     }
                 }
             }
+
+            modelBuilder.Entity<WarpTypeMaster>().HasIndex(w => w.WarpType).IsUnique();
+            modelBuilder.Entity<WeftTypeMaster>().HasIndex(w => w.WeftType).IsUnique();
+
+            modelBuilder.Entity<Item>()
+                .HasOne(i => i.WarpTypeSpec)
+                .WithMany()
+                .HasForeignKey(i => i.WarpTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Item>()
+                .HasOne(i => i.WeftTypeSpec)
+                .WithMany()
+                .HasForeignKey(i => i.WeftTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

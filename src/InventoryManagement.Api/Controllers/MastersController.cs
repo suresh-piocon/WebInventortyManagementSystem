@@ -215,6 +215,8 @@ namespace InventoryManagement.Api.Controllers
             var data = await _context.Items
                 .Include(i => i.Category)
                 .Include(i => i.Unit)
+                .Include(i => i.WarpTypeSpec)
+                .Include(i => i.WeftTypeSpec)
                 .OrderBy(i => i.Name)
                 .ToListAsync();
             return Ok(data);
@@ -233,6 +235,8 @@ namespace InventoryManagement.Api.Controllers
             // Clear navigation objects to prevent EF trying to insert them as new records
             item.Category = null;
             item.Unit = null;
+            item.WarpTypeSpec = null;
+            item.WeftTypeSpec = null;
 
             _context.Items.Add(item);
             await _context.SaveChangesAsync();
@@ -241,6 +245,8 @@ namespace InventoryManagement.Api.Controllers
             var savedItem = await _context.Items
                 .Include(i => i.Category)
                 .Include(i => i.Unit)
+                .Include(i => i.WarpTypeSpec)
+                .Include(i => i.WeftTypeSpec)
                 .FirstOrDefaultAsync(i => i.Id == item.Id);
 
             return Ok(savedItem);
@@ -267,7 +273,9 @@ namespace InventoryManagement.Api.Controllers
             entity.MinimumStock = item.MinimumStock;
             entity.ReorderLevel = item.ReorderLevel;
             entity.BarcodeType = item.BarcodeType;
-            
+            entity.WarpTypeId = item.WarpTypeId;
+            entity.WeftTypeId = item.WeftTypeId;
+
             // Design master fields
             entity.WarpType = item.WarpType;
             entity.WeftType = item.WeftType;
@@ -289,7 +297,9 @@ namespace InventoryManagement.Api.Controllers
             var savedItem = await _context.Items
                 .Include(i => i.Category)
                 .Include(i => i.Unit)
-                .FirstOrDefaultAsync(i => i.Id == id);
+                .Include(i => i.WarpTypeSpec)
+                .Include(i => i.WeftTypeSpec)
+                .FirstOrDefaultAsync(i => id == i.Id);
 
             return Ok(savedItem);
         }
@@ -306,6 +316,136 @@ namespace InventoryManagement.Api.Controllers
             }
 
             _context.Items.Remove(entity);
+            await _context.SaveChangesAsync();
+            return Ok();
+        }
+
+        // ==========================================
+        // WARP TYPE MASTER
+        // ==========================================
+        [HttpGet("warptypes")]
+        public async Task<IActionResult> GetWarpTypes()
+        {
+            var data = await _context.WarpTypeMasters
+                .OrderBy(w => w.WarpType)
+                .ToListAsync();
+            return Ok(data);
+        }
+
+        [HttpPost("warptypes")]
+        public async Task<IActionResult> CreateWarpType([FromBody] WarpTypeMaster type)
+        {
+            if (await _context.WarpTypeMasters.AnyAsync(w => w.WarpType.ToLower() == type.WarpType.ToLower()))
+            {
+                return BadRequest("Warp type already exists.");
+            }
+            type.Id = Guid.NewGuid();
+            type.CreatedAt = DateTimeOffset.UtcNow;
+            _context.WarpTypeMasters.Add(type);
+            await _context.SaveChangesAsync();
+            return Ok(type);
+        }
+
+        [HttpPut("warptypes/{id}")]
+        public async Task<IActionResult> UpdateWarpType(Guid id, [FromBody] WarpTypeMaster type)
+        {
+            var entity = await _context.WarpTypeMasters.FindAsync(id);
+            if (entity == null) return NotFound();
+
+            if (await _context.WarpTypeMasters.AnyAsync(w => w.Id != id && w.WarpType.ToLower() == type.WarpType.ToLower()))
+            {
+                return BadRequest("Warp type already exists.");
+            }
+
+            entity.Code = type.Code;
+            entity.WarpType = type.WarpType;
+            entity.EndsCount = type.EndsCount;
+            entity.YarnCount = type.YarnCount;
+            entity.Description = type.Description;
+            entity.Active = type.Active;
+
+            _context.WarpTypeMasters.Update(entity);
+            await _context.SaveChangesAsync();
+            return Ok(entity);
+        }
+
+        [HttpDelete("warptypes/{id}")]
+        public async Task<IActionResult> DeleteWarpType(Guid id)
+        {
+            var entity = await _context.WarpTypeMasters.FindAsync(id);
+            if (entity == null) return NotFound();
+
+            if (await _context.Items.AnyAsync(i => i.WarpTypeId == id))
+            {
+                return BadRequest("Cannot delete warp type. It is assigned to designs.");
+            }
+
+            _context.WarpTypeMasters.Remove(entity);
+            await _context.SaveChangesAsync();
+            return Ok();
+        }
+
+        // ==========================================
+        // WEFT TYPE MASTER
+        // ==========================================
+        [HttpGet("wefttypes")]
+        public async Task<IActionResult> GetWeftTypes()
+        {
+            var data = await _context.WeftTypeMasters
+                .OrderBy(w => w.WeftType)
+                .ToListAsync();
+            return Ok(data);
+        }
+
+        [HttpPost("wefttypes")]
+        public async Task<IActionResult> CreateWeftType([FromBody] WeftTypeMaster type)
+        {
+            if (await _context.WeftTypeMasters.AnyAsync(w => w.WeftType.ToLower() == type.WeftType.ToLower()))
+            {
+                return BadRequest("Weft type already exists.");
+            }
+            type.Id = Guid.NewGuid();
+            type.CreatedAt = DateTimeOffset.UtcNow;
+            _context.WeftTypeMasters.Add(type);
+            await _context.SaveChangesAsync();
+            return Ok(type);
+        }
+
+        [HttpPut("wefttypes/{id}")]
+        public async Task<IActionResult> UpdateWeftType(Guid id, [FromBody] WeftTypeMaster type)
+        {
+            var entity = await _context.WeftTypeMasters.FindAsync(id);
+            if (entity == null) return NotFound();
+
+            if (await _context.WeftTypeMasters.AnyAsync(w => w.Id != id && w.WeftType.ToLower() == type.WeftType.ToLower()))
+            {
+                return BadRequest("Weft type already exists.");
+            }
+
+            entity.Code = type.Code;
+            entity.WeftType = type.WeftType;
+            entity.WeftPart1 = type.WeftPart1;
+            entity.WeftPart2 = type.WeftPart2;
+            entity.Description = type.Description;
+            entity.Active = type.Active;
+
+            _context.WeftTypeMasters.Update(entity);
+            await _context.SaveChangesAsync();
+            return Ok(entity);
+        }
+
+        [HttpDelete("wefttypes/{id}")]
+        public async Task<IActionResult> DeleteWeftType(Guid id)
+        {
+            var entity = await _context.WeftTypeMasters.FindAsync(id);
+            if (entity == null) return NotFound();
+
+            if (await _context.Items.AnyAsync(i => i.WeftTypeId == id))
+            {
+                return BadRequest("Cannot delete weft type. It is assigned to designs.");
+            }
+
+            _context.WeftTypeMasters.Remove(entity);
             await _context.SaveChangesAsync();
             return Ok();
         }
