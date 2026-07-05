@@ -318,6 +318,20 @@ namespace InventoryManagement.Api.Data
                 .WithMany()
                 .HasForeignKey(d => d.DesignId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure all DateTimeOffset properties to convert to UTC for PostgreSQL
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType == typeof(DateTimeOffset) || property.ClrType == typeof(DateTimeOffset?))
+                    {
+                        property.SetValueConverter(new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTimeOffset, DateTimeOffset>(
+                            v => v.ToUniversalTime(),
+                            v => v.ToUniversalTime()));
+                    }
+                }
+            }
         }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
