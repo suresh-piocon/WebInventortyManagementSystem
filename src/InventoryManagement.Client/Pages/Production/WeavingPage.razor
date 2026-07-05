@@ -90,9 +90,16 @@
                     </MudButton>
                 </MudItem>
                 <MudItem xs="12" sm="3" Class="d-flex align-center justify-center">
-                    <div style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; width: 100%; height: 56px;" class="d-flex align-center justify-center">
-                        <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Success" Class="mr-2" />
-                        <MudText Typo="Typo.h6" Color="Color.Success" Style="font-weight: 700; font-family: 'Outfit';">Running</MudText>
+                    @{
+                        var status = GetWarpStatus();
+                        var bg = status == "New" ? "rgba(59,130,246,0.1)" : (status == "Running" ? "rgba(16,185,129,0.1)" : "rgba(168,85,247,0.1)");
+                        var border = status == "New" ? "1px solid rgba(59,130,246,0.3)" : (status == "Running" ? "1px solid rgba(16,185,129,0.3)" : "1px solid rgba(168,85,247,0.3)");
+                        var icon = status == "New" ? Icons.Material.Filled.FiberNew : (status == "Running" ? Icons.Material.Filled.PlayArrow : Icons.Material.Filled.CheckCircle);
+                        var color = status == "New" ? Color.Info : (status == "Running" ? Color.Success : Color.Secondary);
+                    }
+                    <div style="background: @bg; border: @border; border-radius: 8px; width: 100%; height: 56px;" class="d-flex align-center justify-center">
+                        <MudIcon Icon="@icon" Color="@color" Class="mr-2" />
+                        <MudText Typo="Typo.h6" Color="@color" Style="font-weight: 700; font-family: 'Outfit';">@status</MudText>
                     </div>
                 </MudItem>
                 <MudItem xs="12" sm="3" Class="d-flex align-center justify-center">
@@ -454,6 +461,28 @@
         _outstandingBalance = _totalDebit - _totalCredit;
     }
 
+    private string GetWarpStatus()
+    {
+        var latestWarp = _ledgerEntries
+            .LastOrDefault(w => w.EntryType.Equals("Dyed Warp", StringComparison.OrdinalIgnoreCase));
+            
+        if (latestWarp == null) return "New";
+        
+        var latestWarpIndex = _ledgerEntries.IndexOf(latestWarp);
+        decimal receivedSarees = 0;
+        for (int i = latestWarpIndex; i < _ledgerEntries.Count; i++)
+        {
+            if (_ledgerEntries[i].EntryType.Equals("Saree", StringComparison.OrdinalIgnoreCase))
+            {
+                receivedSarees += _ledgerEntries[i].RodQty;
+            }
+        }
+        
+        if (receivedSarees == 0) return "New";
+        if (receivedSarees < latestWarp.WarpQty) return "Running";
+        return "Completed";
+    }
+
     private string _requiredYarnSpec = "";
     private string _selectedStockColor = "";
     private List<AvailableYarnDto> _availableYarnList = new();
@@ -576,7 +605,11 @@
     {
         if (_entryForm == null) return;
         await _entryForm.Validate();
-        if (!_entryForm.IsValid) return;
+        if (_editEntry.EntryType == "Dyed Warp" && GetWarpStatus() == "Running")
+        {
+            Snackbar.Add("Cannot issue a new warp while the current warp is still Running. Please receive all sarees to complete the current warp first.", Severity.Error);
+            return;
+        }
 
         _savingEntry = true;
         try
