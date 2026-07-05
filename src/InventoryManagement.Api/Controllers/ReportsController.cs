@@ -321,14 +321,20 @@ namespace InventoryManagement.Api.Controllers
                 .ThenBy(l => l.CreatedAt)
                 .ToListAsync();
 
-            // Recompute running balance per-item
+            // Recompute running balance per-item (quantity and weight)
             var runningByItem = new Dictionary<Guid, decimal>();
+            var runningWtByItem = new Dictionary<Guid, decimal>();
             foreach (var entry in data)
             {
                 if (!runningByItem.ContainsKey(entry.ItemId))
+                {
                     runningByItem[entry.ItemId] = 0;
+                    runningWtByItem[entry.ItemId] = 0;
+                }
                 runningByItem[entry.ItemId] += entry.InwardQty - entry.OutwardQty;
+                runningWtByItem[entry.ItemId] += entry.InwardWeight - entry.OutwardWeight;
                 entry.BalanceQty = runningByItem[entry.ItemId];
+                entry.BalanceWeight = runningWtByItem[entry.ItemId];
             }
 
             // Project to include item name/code for the all-items view
@@ -346,6 +352,9 @@ namespace InventoryManagement.Api.Controllers
                 InwardQty = l.InwardQty,
                 OutwardQty = l.OutwardQty,
                 BalanceQty = l.BalanceQty,
+                InwardWeight = l.InwardWeight,
+                OutwardWeight = l.OutwardWeight,
+                BalanceWeight = l.BalanceWeight,
                 UnitPrice = l.UnitPrice
             }).ToList();
 

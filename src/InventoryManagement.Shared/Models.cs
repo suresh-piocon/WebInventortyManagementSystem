@@ -137,6 +137,41 @@ namespace InventoryManagement.Shared
         [Column(TypeName = "decimal(5, 2)")]
         public decimal GSTPercent { get; set; } = 18.00M;
 
+        [StringLength(100)]
+        public string? WarpType { get; set; }
+
+        [StringLength(100)]
+        public string? WeftType { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal Wages { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal WarpWeight { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal WeftWeight { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal ZariWeight { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal TotalWeight { get; set; } = 0;
+
+        [StringLength(50)]
+        public string? Reed { get; set; }
+
+        [StringLength(50)]
+        public string? Thread { get; set; }
+
+        public int NoOfCards { get; set; } = 0;
+
+        public int NoOfMarks { get; set; } = 0;
+
+        public string? BodyImage { get; set; }
+
+        public string? PalluImage { get; set; }
+
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 
@@ -400,6 +435,15 @@ namespace InventoryManagement.Shared
 
         [Column(TypeName = "decimal(12, 4)")]
         public decimal UnitPrice { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal InwardWeight { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal OutwardWeight { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal BalanceWeight { get; set; } = 0;
 
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
@@ -671,6 +715,9 @@ namespace InventoryManagement.Shared
         public decimal InwardQty { get; set; }
         public decimal OutwardQty { get; set; }
         public decimal BalanceQty { get; set; }
+        public decimal InwardWeight { get; set; }
+        public decimal OutwardWeight { get; set; }
+        public decimal BalanceWeight { get; set; }
         public decimal UnitPrice { get; set; }
     }
 
@@ -1127,5 +1174,373 @@ namespace InventoryManagement.Shared
         public decimal Cost { get; set; }
         public decimal Profit { get; set; }
         public decimal MarginPercent { get; set; }
+    }
+
+    // ==========================================
+    // JOB WORK MODULE ENTITIES
+    // ==========================================
+
+    [Table("JobWorkMaster")]
+    public class JobWorkMaster
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        [StringLength(150)]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(50)]
+        public string Type { get; set; } = "Other"; // "Dyer", "Weaver", "Zari Worker", "Finishing Worker", "Other"
+
+        public string? Address { get; set; }
+
+        [StringLength(20)]
+        public string? Mobile { get; set; }
+
+        [StringLength(15)]
+        public string? GSTIN { get; set; }
+
+        [StringLength(100)]
+        public string? LedgerAccount { get; set; }
+
+        public bool Active { get; set; } = true;
+
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    [Table("LoomMaster")]
+    public class LoomMaster
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        [StringLength(50)]
+        public string LoomNo { get; set; } = string.Empty;
+
+        [Required]
+        public Guid WeaverId { get; set; }
+
+        [ForeignKey(nameof(WeaverId))]
+        public JobWorkMaster? Weaver { get; set; }
+
+        public bool Active { get; set; } = true;
+
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    [Table("LoomAllocation")]
+    public class LoomAllocation
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        public Guid LoomId { get; set; }
+
+        [ForeignKey(nameof(LoomId))]
+        public LoomMaster? Loom { get; set; }
+
+        [Required]
+        public Guid ItemId { get; set; } // Allocated Design
+
+        [ForeignKey(nameof(ItemId))]
+        public Item? Design { get; set; }
+
+        [StringLength(100)]
+        public string? SubWeaver { get; set; }
+
+        [StringLength(50)]
+        public string? WarpRefNo { get; set; }
+
+        public DateTimeOffset StartDate { get; set; } = DateTimeOffset.UtcNow;
+
+        public bool Active { get; set; } = true;
+
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    [Table("DyeingIssues")]
+    public class DyeingIssue
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        [StringLength(50)]
+        public string IssueNo { get; set; } = string.Empty;
+
+        [Required]
+        public DateTimeOffset IssueDate { get; set; } = DateTimeOffset.UtcNow;
+
+        [Required]
+        public Guid DyerId { get; set; }
+
+        [ForeignKey(nameof(DyerId))]
+        public JobWorkMaster? Dyer { get; set; }
+
+        public string? Narration { get; set; }
+
+        public Guid CreatedBy { get; set; }
+
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+        public List<DyeingIssueDetail> Details { get; set; } = new();
+    }
+
+    [Table("DyeingIssueDetails")]
+    public class DyeingIssueDetail
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        public Guid DyeingIssueId { get; set; }
+
+        [ForeignKey(nameof(DyeingIssueId))]
+        public DyeingIssue? DyeingIssue { get; set; }
+
+        [Required]
+        public Guid DesignId { get; set; }
+
+        [ForeignKey(nameof(DesignId))]
+        public Item? Design { get; set; }
+
+        [Required]
+        [StringLength(20)]
+        public string YarnType { get; set; } = "Warp"; // "Warp" or "Weft"
+
+        [StringLength(100)]
+        public string? WarpYarn { get; set; }
+
+        [StringLength(100)]
+        public string? WeftYarn { get; set; }
+
+        [StringLength(50)]
+        public string? Color { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal Qty { get; set; }
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal WeightKgs { get; set; }
+
+        [Column(TypeName = "decimal(12, 4)")]
+        public decimal Rate { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal Amount { get; set; }
+    }
+
+    [Table("DyeingReceives")]
+    public class DyeingReceive
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        [StringLength(50)]
+        public string ReceiveNo { get; set; } = string.Empty;
+
+        [Required]
+        public DateTimeOffset ReceiveDate { get; set; } = DateTimeOffset.UtcNow;
+
+        [Required]
+        public Guid DyerId { get; set; }
+
+        [ForeignKey(nameof(DyerId))]
+        public JobWorkMaster? Dyer { get; set; }
+
+        [StringLength(50)]
+        public string? IssueReferenceNo { get; set; }
+
+        public Guid CreatedBy { get; set; }
+
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+        public List<DyeingReceiveDetail> Details { get; set; } = new();
+    }
+
+    [Table("DyeingReceiveDetails")]
+    public class DyeingReceiveDetail
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        public Guid DyeingReceiveId { get; set; }
+
+        [ForeignKey(nameof(DyeingReceiveId))]
+        public DyeingReceive? DyeingReceive { get; set; }
+
+        [Required]
+        public Guid DesignId { get; set; }
+
+        [ForeignKey(nameof(DesignId))]
+        public Item? Design { get; set; }
+
+        [Required]
+        [StringLength(20)]
+        public string YarnType { get; set; } = "Warp"; // "Warp" or "Weft"
+
+        [StringLength(50)]
+        public string? DyedColor { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal QtyReceived { get; set; }
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal WeightReceived { get; set; }
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal WasteWeight { get; set; }
+    }
+
+    [Table("WeavingLedger")]
+    public class WeavingLedgerEntry
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        public Guid LoomAllocationId { get; set; }
+
+        [ForeignKey(nameof(LoomAllocationId))]
+        public LoomAllocation? LoomAllocation { get; set; }
+
+        [Required]
+        public DateTimeOffset Date { get; set; } = DateTimeOffset.UtcNow;
+
+        [Required]
+        [StringLength(50)]
+        public string EntryType { get; set; } = string.Empty; // "Dyed Warp", "Dyed Weft", "Zari", "Saree", "Cash", "NEFT", "DebitTransfer", "CreditTransfer", "TDS", "Requirement", "LnoChange", "WtAdjust"
+
+        [StringLength(250)]
+        public string? Details { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal WarpQty { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal IssuedWt { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal RodQty { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal RodWt { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal Debit { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal Credit { get; set; } = 0;
+
+        [StringLength(500)]
+        public string? Narration { get; set; }
+
+        [Required]
+        [StringLength(10)]
+        public string Status { get; set; } = "S";
+
+        public Guid CreatedBy { get; set; }
+
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    [Table("JobLedger")]
+    public class JobLedger
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        public Guid JobWorkerId { get; set; }
+
+        [ForeignKey(nameof(JobWorkerId))]
+        public JobWorkMaster? JobWorker { get; set; }
+
+        [Required]
+        public DateTimeOffset TransactionDate { get; set; }
+
+        [Required]
+        [StringLength(50)]
+        public string VoucherNo { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(250)]
+        public string Particulars { get; set; } = string.Empty;
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal IssueQty { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal ReceiveQty { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal IssueWeight { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal ReceiveWeight { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal Debit { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal Credit { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal Balance { get; set; } = 0;
+
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    // ==========================================
+    // JOB WORK DTOs
+    // ==========================================
+
+    public class WeaverAccountDto
+    {
+        public Guid LoomAllocationId { get; set; }
+        public string LoomNo { get; set; } = string.Empty;
+        public string WeaverName { get; set; } = string.Empty;
+        public string DesignName { get; set; } = string.Empty;
+        public decimal TotalDebit { get; set; }
+        public decimal TotalCredit { get; set; }
+        public decimal OutstandingBalance { get; set; }
+    }
+
+    public class LoomBalanceDto
+    {
+        public string LoomNo { get; set; } = string.Empty;
+        public string WeaverName { get; set; } = string.Empty;
+        public string DesignName { get; set; } = string.Empty;
+        public decimal IssuedWarpQty { get; set; }
+        public decimal ReceivedSareeQty { get; set; }
+        public decimal BalanceSareeQty { get; set; }
+        public decimal IssuedWeight { get; set; }
+        public decimal ReceivedWeight { get; set; }
+        public decimal BalanceWeight { get; set; }
+    }
+
+    public class DesignBalanceDto
+    {
+        public string DesignName { get; set; } = string.Empty;
+        public decimal PendingDyeingQty { get; set; }
+        public decimal PendingWeavingQty { get; set; }
+        public decimal FinishedSareeStock { get; set; }
+    }
+
+    public class JobWorkDashboardDto
+    {
+        public decimal DyerOutstanding { get; set; }
+        public decimal WeaverOutstanding { get; set; }
+        public List<LoomBalanceDto> LoomBalances { get; set; } = new();
+        public List<DesignBalanceDto> DesignBalances { get; set; } = new();
+        public decimal PendingDyeingQty { get; set; }
+        public decimal PendingWeavingQty { get; set; }
+        public decimal FinishedSareeStock { get; set; }
     }
 }

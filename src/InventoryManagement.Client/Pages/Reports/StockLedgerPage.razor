@@ -192,8 +192,11 @@
                 <MudTh Style="color: #94A3B8;">Reference No</MudTh>
                 <MudTh Style="color: #94A3B8;">Batch / Tracking</MudTh>
                 <MudTh Style="color: #94A3B8; text-align: right;">Inward Qty</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right;">Inward Wt (Kg)</MudTh>
                 <MudTh Style="color: #94A3B8; text-align: right;">Outward Qty</MudTh>
-                <MudTh Style="color: #94A3B8; text-align: right;">Balance</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right;">Outward Wt (Kg)</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right;">Balance Qty</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right;">Balance Wt (Kg)</MudTh>
                 <MudTh Style="color: #94A3B8; text-align: right;">Unit Price</MudTh>
             </HeaderContent>
             <RowTemplate>
@@ -226,11 +229,20 @@
                 <MudTd DataLabel="Inward Qty" Style="text-align: right;" Class="text-green-400 font-weight-bold">
                     @(context.InwardQty > 0 ? $"+{context.InwardQty:N2}" : "-")
                 </MudTd>
+                <MudTd DataLabel="Inward Wt (Kg)" Style="text-align: right;" Class="text-green-400">
+                    @(context.InwardWeight > 0 ? $"+{context.InwardWeight:F3}" : "-")
+                </MudTd>
                 <MudTd DataLabel="Outward Qty" Style="text-align: right;" Class="text-red-400 font-weight-bold">
                     @(context.OutwardQty > 0 ? $"-{context.OutwardQty:N2}" : "-")
                 </MudTd>
-                <MudTd DataLabel="Balance" Style="text-align: right;" Class="text-slate-100 font-weight-bold">
+                <MudTd DataLabel="Outward Wt (Kg)" Style="text-align: right;" Class="text-red-400">
+                    @(context.OutwardWeight > 0 ? $"-{context.OutwardWeight:F3}" : "-")
+                </MudTd>
+                <MudTd DataLabel="Balance Qty" Style="text-align: right;" Class="text-slate-100 font-weight-bold">
                     @context.BalanceQty.ToString("N2")
+                </MudTd>
+                <MudTd DataLabel="Balance Wt (Kg)" Style="text-align: right;" Class="text-slate-200 font-weight-bold">
+                    @context.BalanceWeight.ToString("F3")
                 </MudTd>
                 <MudTd DataLabel="Unit Price" Style="text-align: right;" Class="text-slate-300">
                     ₹@context.UnitPrice.ToString("N2")
@@ -309,8 +321,11 @@
                 <MudTh Style="color: #94A3B8;">Batch No</MudTh>
                 <MudTh Style="color: #94A3B8;">Tracking No</MudTh>
                 <MudTh Style="color: #94A3B8; text-align: right;">Inward Qty</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right;">Inward Wt (Kg)</MudTh>
                 <MudTh Style="color: #94A3B8; text-align: right;">Outward Qty</MudTh>
-                <MudTh Style="color: #94A3B8; text-align: right;">Running Balance</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right;">Outward Wt (Kg)</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right;">Running Balance Qty</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right;">Running Balance Wt (Kg)</MudTh>
                 <MudTh Style="color: #94A3B8; text-align: right;">Unit Price</MudTh>
             </HeaderContent>
             <RowTemplate>
@@ -335,11 +350,20 @@
                 <MudTd DataLabel="Inward Qty" Style="text-align: right;" Class="text-green-400 font-weight-bold">
                     @(context.InwardQty > 0 ? $"+{context.InwardQty.ToString("N2")}" : "-")
                 </MudTd>
+                <MudTd DataLabel="Inward Wt (Kg)" Style="text-align: right;" Class="text-green-400">
+                    @(context.InwardWeight > 0 ? $"+{context.InwardWeight.ToString("F3")}" : "-")
+                </MudTd>
                 <MudTd DataLabel="Outward Qty" Style="text-align: right;" Class="text-red-400 font-weight-bold">
                     @(context.OutwardQty > 0 ? $"-{context.OutwardQty.ToString("N2")}" : "-")
                 </MudTd>
-                <MudTd DataLabel="Running Balance" Style="text-align: right;" Class="text-slate-100 font-weight-bold">
+                <MudTd DataLabel="Outward Wt (Kg)" Style="text-align: right;" Class="text-red-400">
+                    @(context.OutwardWeight > 0 ? $"-{context.OutwardWeight.ToString("F3")}" : "-")
+                </MudTd>
+                <MudTd DataLabel="Running Balance Qty" Style="text-align: right;" Class="text-slate-100 font-weight-bold">
                     @context.BalanceQty.ToString("N2")
+                </MudTd>
+                <MudTd DataLabel="Running Balance Wt (Kg)" Style="text-align: right;" Class="text-slate-200 font-weight-bold">
+                    @context.BalanceWeight.ToString("F3")
                 </MudTd>
                 <MudTd DataLabel="Unit Price" Style="text-align: right;" Class="text-slate-300">₹@context.UnitPrice.ToString("N2")</MudTd>
             </RowTemplate>

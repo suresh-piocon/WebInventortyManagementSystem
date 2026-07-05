@@ -87,18 +87,22 @@
 <MudDialog @bind-Visible="_dialogOpen" Options="_dialogOptions">
     <TitleContent>
         <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
-            @(_editItem.Id == Guid.Empty ? "Create New Item" : "Edit Item")
+            @(_editItem.Id == Guid.Empty ? "Create New Design" : "Edit Design")
         </MudText>
     </TitleContent>
     <DialogContent>
         <MudForm @ref="_form" @bind-IsValid="_isFormValid">
             <MudGrid>
-                <MudItem xs="12" sm="6">
-                    <MudTextField T="string" Label="Item Code" @bind-Value="_editItem.Code" Required="true" RequiredError="Item code is required" Class="text-slate-200" />
+                <MudItem xs="12" sm="4">
+                    <MudTextField T="string" Label="Design Code" @bind-Value="_editItem.Code" Required="true" RequiredError="Design code is required" Class="text-slate-200" />
                 </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudTextField T="string" Label="Item Name" @bind-Value="_editItem.Name" Required="true" RequiredError="Item name is required" Class="text-slate-200" />
+                <MudItem xs="12" sm="4">
+                    <MudTextField T="string" Label="Design Name" @bind-Value="_editItem.Name" Required="true" RequiredError="Design name is required" Class="text-slate-200" />
                 </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="decimal" Label="Wages (₹)" @bind-Value="_editItem.Wages" Min="0" Class="text-slate-200" Format="F2" />
+                </MudItem>
+
                 <MudItem xs="12" sm="6">
                     <MudSelect T="Guid" Label="Category" @bind-Value="_editItem.CategoryId" Required="true" RequiredError="Category is required" Class="text-slate-200">
                         @foreach (var cat in _categories)
@@ -115,20 +119,67 @@
                         }
                     </MudSelect>
                 </MudItem>
-                <MudItem xs="12" sm="6">
+
+                <MudItem xs="12" sm="4">
+                    <MudTextField T="string" Label="Warp Type" @bind-Value="_editItem.WarpType" HelperText="e.g., 40*5900" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField T="string" Label="Weft Type" @bind-Value="_editItem.WeftType" HelperText="e.g., 3.200*0.950" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
                     <MudTextField T="string" Label="Brand Name" @bind-Value="_editItem.Brand" Class="text-slate-200" />
                 </MudItem>
+
+                <MudItem xs="12" sm="3">
+                    <MudNumericField T="decimal" Label="Warp Weight (Kgs)" Value="_editItem.WarpWeight" Min="0" Class="text-slate-200" Format="F3" ValueChanged="OnWarpWeightChanged" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField T="decimal" Label="Weft Weight (Kgs)" Value="_editItem.WeftWeight" Min="0" Class="text-slate-200" Format="F3" ValueChanged="OnWeftWeightChanged" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField T="decimal" Label="Zari Weight (Kgs)" Value="_editItem.ZariWeight" Min="0" Class="text-slate-200" Format="F3" ValueChanged="OnZariWeightChanged" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField T="decimal" Label="Total Weight (Kgs)" @bind-Value="_editItem.TotalWeight" Disabled="true" Class="text-slate-200" Format="F3" />
+                </MudItem>
+
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Reed" @bind-Value="_editItem.Reed" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Thread" @bind-Value="_editItem.Thread" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField T="int" Label="No of Cards" @bind-Value="_editItem.NoOfCards" Min="0" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudNumericField T="int" Label="No of Marks" @bind-Value="_editItem.NoOfMarks" Min="0" Class="text-slate-200" />
+                </MudItem>
+
                 <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Body Image URL" @bind-Value="_editItem.BodyImage" Class="text-slate-200" />
+                    @if (!string.IsNullOrEmpty(_editItem.BodyImage))
+                    {
+                        <div class="mt-2 text-center" style="border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 4px; background: rgba(0,0,0,0.2);">
+                            <img src="@_editItem.BodyImage" style="max-height: 80px; max-width: 100%; border-radius: 4px;" alt="Body Image" />
+                        </div>
+                    }
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Pallu Image URL" @bind-Value="_editItem.PalluImage" Class="text-slate-200" />
+                    @if (!string.IsNullOrEmpty(_editItem.PalluImage))
+                    {
+                        <div class="mt-2 text-center" style="border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 4px; background: rgba(0,0,0,0.2);">
+                            <img src="@_editItem.PalluImage" style="max-height: 80px; max-width: 100%; border-radius: 4px;" alt="Pallu Image" />
+                        </div>
+                    }
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
                     <MudTextField T="string" Label="HSN Code" @bind-Value="_editItem.HSNCode" Class="text-slate-200" />
                 </MudItem>
-                <MudItem xs="12" sm="6">
+                <MudItem xs="12" sm="4">
                     <MudNumericField T="decimal" Label="GST %" @bind-Value="_editItem.GSTPercent" Min="0" Max="100" Class="text-slate-200" />
-                </MudItem>
-                <MudItem xs="12" sm="4">
-                    <MudNumericField T="decimal" Label="Minimum Stock" @bind-Value="_editItem.MinimumStock" Min="0" Class="text-slate-200" />
-                </MudItem>
-                <MudItem xs="12" sm="4">
-                    <MudNumericField T="decimal" Label="Reorder Level" @bind-Value="_editItem.ReorderLevel" Min="0" Class="text-slate-200" />
                 </MudItem>
                 <MudItem xs="12" sm="4">
                     <MudSelect T="string" Label="Barcode Tracking Type" @bind-Value="_editItem.BarcodeType" Required="true" Class="text-slate-200">
@@ -240,6 +291,19 @@
             MinimumStock = item.MinimumStock,
             ReorderLevel = item.ReorderLevel,
             BarcodeType = item.BarcodeType,
+            WarpType = item.WarpType,
+            WeftType = item.WeftType,
+            Wages = item.Wages,
+            WarpWeight = item.WarpWeight,
+            WeftWeight = item.WeftWeight,
+            ZariWeight = item.ZariWeight,
+            TotalWeight = item.TotalWeight,
+            Reed = item.Reed,
+            Thread = item.Thread,
+            NoOfCards = item.NoOfCards,
+            NoOfMarks = item.NoOfMarks,
+            BodyImage = item.BodyImage,
+            PalluImage = item.PalluImage,
             CreatedAt = item.CreatedAt
         };
         _dialogOpen = true;
@@ -289,6 +353,29 @@
         {
             _saving = false;
         }
+    }
+
+    private void OnWarpWeightChanged(decimal val)
+    {
+        _editItem.WarpWeight = val;
+        RecalculateTotalWeight();
+    }
+
+    private void OnWeftWeightChanged(decimal val)
+    {
+        _editItem.WeftWeight = val;
+        RecalculateTotalWeight();
+    }
+
+    private void OnZariWeightChanged(decimal val)
+    {
+        _editItem.ZariWeight = val;
+        RecalculateTotalWeight();
+    }
+
+    private void RecalculateTotalWeight()
+    {
+        _editItem.TotalWeight = _editItem.WarpWeight + _editItem.WeftWeight + _editItem.ZariWeight;
     }
 
     private async Task ConfirmDelete(Item item)

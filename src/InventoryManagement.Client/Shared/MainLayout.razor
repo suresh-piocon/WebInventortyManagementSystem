@@ -58,7 +58,9 @@
                         
                         <AuthorizeView Roles="Admin,StoreManager" Context="managerContext">
                             <MudNavGroup Title="Masters" Icon="@Icons.Material.Filled.Settings" Expanded="false">
-                                <MudNavLink Href="masters/items" Icon="@Icons.Material.Filled.Layers">Item Master</MudNavLink>
+                                <MudNavLink Href="masters/items" Icon="@Icons.Material.Filled.Layers">Design Master</MudNavLink>
+                                <MudNavLink Href="masters/jobworkers" Icon="@Icons.Material.Filled.Badge">JobWorker Master</MudNavLink>
+                                <MudNavLink Href="masters/looms" Icon="@Icons.Material.Filled.Router">Loom Master</MudNavLink>
                                 <MudNavLink Href="masters/firms" Icon="@Icons.Material.Filled.CorporateFare">Firm Master</MudNavLink>
                                 <MudNavLink Href="masters/customers" Icon="@Icons.Material.Filled.People">Customer Master</MudNavLink>
                                 <MudNavLink Href="masters/suppliers" Icon="@Icons.Material.Filled.Business">Supplier Master</MudNavLink>
@@ -66,7 +68,13 @@
                                 <MudNavLink Href="masters/units" Icon="@Icons.Material.Filled.Straighten">Unit Master</MudNavLink>
                             </MudNavGroup>
 
-                            <MudNavLink Href="stock-inward" Icon="@Icons.Material.Filled.MoveToInbox">Stock Inward</MudNavLink>
+                            <MudNavGroup Title="Job Work Module" Icon="@Icons.Material.Filled.PrecisionManufacturing" Expanded="true">
+                                <MudNavLink Href="production/loom-setup" Icon="@Icons.Material.Filled.SettingsSuggest">Loom Design Setup</MudNavLink>
+                                <MudNavLink Href="stock/dyeing-issue" Icon="@Icons.Material.Filled.ArrowUpward">Dyeing Issue</MudNavLink>
+                                <MudNavLink Href="stock/dyeing-receive" Icon="@Icons.Material.Filled.ArrowDownward">Dyeing Receive</MudNavLink>
+                                <MudNavLink Href="production/weaving" Icon="@Icons.Material.Filled.Construction">Weaving Control Center</MudNavLink>
+                            </MudNavGroup>
+
                             <MudNavLink Href="proforma-invoice" Icon="@Icons.Material.Filled.Description">Proforma Invoice</MudNavLink>
                             <MudNavLink Href="barcode-printer" Icon="@Icons.Material.Filled.Print">Print Barcodes</MudNavLink>
                             <MudNavLink Href="capture-photos" Icon="@Icons.Material.Filled.PhotoCamera">Capture Photos</MudNavLink>
@@ -74,7 +82,9 @@
 
                         <MudNavGroup Title="Reports" Icon="@Icons.Material.Filled.Assessment" Expanded="false">
                             <MudNavLink Href="reports/firm-wise" Icon="@Icons.Material.Filled.PieChart">Firm-wise Reports</MudNavLink>
-                            <MudNavLink Href="reports/ledger" Icon="@Icons.Material.Filled.Book">Stock Ledger</MudNavLink>
+                            <MudNavLink Href="reports/ledger" Icon="@Icons.Material.Filled.Book">Stock Ledger (Qty+Kgs)</MudNavLink>
+                            <MudNavLink Href="reports/jobwork-ledger" Icon="@Icons.Material.Filled.AutoStories">JobWorker Ledger</MudNavLink>
+                            <MudNavLink Href="reports/weaver-account" Icon="@Icons.Material.Filled.AccountBalanceWallet">Weaver Accounts</MudNavLink>
                             <MudNavLink Href="reports/supplier-stock" Icon="@Icons.Material.Filled.Assignment">Supplier Stock</MudNavLink>
                             <MudNavLink Href="reports/supplier-purchase" Icon="@Icons.Material.Filled.ReceiptLong">Purchase History</MudNavLink>
                             <MudNavLink Href="reports/barcode-tracking" Icon="@Icons.Material.Filled.QrCodeScanner">Barcode History</MudNavLink>

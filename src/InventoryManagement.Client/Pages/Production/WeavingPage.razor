@@ -1,0 +1,614 @@
+@page "/production/weaving"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Weaving Issue and Receive - AG Loom Control</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="mb-6 d-flex justify-between align-center">
+        <div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+                Weaving Issue and Receive
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-slate-400">
+                Loom control dashboard for yarn allocation, saree receipts, payments, and weaver accounts
+            </MudText>
+        </div>
+        <div class="d-flex align-center gap-4">
+            <MudSelect T="Guid" Label="Select Loom No" Value="@_selectedLoomId" ValueChanged="OnLoomChanged" Variant="Variant.Outlined" Style="color: white; width: 220px;" Dense="true">
+                @foreach (var l in _looms)
+                {
+                    <MudSelectItem Value="@l.Id">Loom @l.LoomNo - @l.Weaver?.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+    </div>
+
+    @if (_activeAllocation == null)
+    {
+        <div class="d-flex flex-column align-center justify-center py-16 text-center text-slate-500 glass-panel">
+            <MudIcon Icon="@Icons.Material.Filled.Router" Size="Size.Large" Class="mb-4" />
+            <MudText Typo="Typo.h6">No active loom design allocation selected</MudText>
+            <MudText Typo="Typo.body2" Class="text-slate-500">Please select a loom from the dropdown at the top right.</MudText>
+        </div>
+    }
+    else
+    {
+        <!-- Loom Allocation Header Panels (Matching screen mockup) -->
+        <MudPaper Class="glass-panel pa-6 mb-6">
+            <MudGrid>
+                <!-- First Row of Metadata -->
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Weaver Name" Value="@_activeAllocation.Loom?.Weaver?.Name" ReadOnly="true" Variant="Variant.Outlined" Class="mb-2 text-slate-100" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Sub Weaver" Value="@_activeAllocation.SubWeaver" ReadOnly="true" Variant="Variant.Outlined" Class="mb-2 text-slate-100" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Design" Value="@_activeAllocation.Design?.Name" ReadOnly="true" Variant="Variant.Outlined" Class="mb-2 text-slate-100" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Mark" Value="@($"{_activeAllocation.Design?.NoOfMarks} Mark")" ReadOnly="true" Variant="Variant.Outlined" Class="mb-2 text-slate-100" />
+                </MudItem>
+
+                <!-- Second Row of Metadata -->
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Loom No" Value="@_activeAllocation.Loom?.LoomNo" ReadOnly="true" Variant="Variant.Outlined" Class="mb-2 text-slate-100" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Wages" Value="@($"₹{_activeAllocation.Design?.Wages:N2}")" ReadOnly="true" Variant="Variant.Outlined" Class="mb-2 text-yellow-500 font-weight-bold" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Warp Type" Value="@_activeAllocation.Design?.WarpType" ReadOnly="true" Variant="Variant.Outlined" Class="mb-2 text-slate-100" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Reed" Value="@_activeAllocation.Design?.Reed" ReadOnly="true" Variant="Variant.Outlined" Class="mb-2 text-slate-100" />
+                </MudItem>
+
+                <!-- Third Row of Metadata -->
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Warp RefNo" Value="@_activeAllocation.WarpRefNo" ReadOnly="true" Variant="Variant.Outlined" Class="mb-2 text-slate-100" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Weight" Value="@($"{_activeAllocation.Design?.TotalWeight:F3} Kgs")" ReadOnly="true" Variant="Variant.Outlined" Class="mb-2 text-slate-100" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Weft Type" Value="@_activeAllocation.Design?.WeftType" ReadOnly="true" Variant="Variant.Outlined" Class="mb-2 text-slate-100" />
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Thread" Value="@_activeAllocation.Design?.Thread" ReadOnly="true" Variant="Variant.Outlined" Class="mb-2 text-slate-100" />
+                </MudItem>
+
+                <!-- Image View Button & Status -->
+                <MudItem xs="12" sm="3">
+                    <MudTextField T="string" Label="Cards" Value="@($"{_activeAllocation.Design?.NoOfCards} card")" ReadOnly="true" Variant="Variant.Outlined" Class="mb-2 text-slate-100" />
+                </MudItem>
+                <MudItem xs="12" sm="3" Class="d-flex align-center justify-center">
+                    <MudButton StartIcon="@Icons.Material.Filled.PhotoCamera" Variant="Variant.Filled" Color="Color.Info" OnClick="OpenImageViewDialog" FullWidth="true" Style="font-family: 'Outfit';">
+                        Image View
+                    </MudButton>
+                </MudItem>
+                <MudItem xs="12" sm="3" Class="d-flex align-center justify-center">
+                    <div style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; width: 100%; height: 56px;" class="d-flex align-center justify-center">
+                        <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Success" Class="mr-2" />
+                        <MudText Typo="Typo.h6" Color="Color.Success" Style="font-weight: 700; font-family: 'Outfit';">Running</MudText>
+                    </div>
+                </MudItem>
+                <MudItem xs="12" sm="3" Class="d-flex align-center justify-center">
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; width: 100%; height: 56px;" class="d-flex align-center justify-center">
+                        <MudText Typo="Typo.body2" Class="text-slate-400">Since: @(_activeAllocation.StartDate.LocalDateTime.ToString("dd-MM-yyyy"))</MudText>
+                    </div>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <!-- Balance Metrics and Weaver Outstanding Panels -->
+        <MudGrid Class="mb-6">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="glass-panel pa-6 text-center">
+                    <MudText Typo="Typo.subtitle2" Class="text-slate-400">Balance Saree Qty</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Secondary" Style="font-family: 'Outfit'; font-weight: 800;">
+                        @_balanceSareeQty Pcs
+                    </MudText>
+                    <MudText Typo="Typo.caption" Class="text-slate-500">Issued: @_issuedWarpQty | Received: @_receivedSareeQty</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="glass-panel pa-6 text-center">
+                    <MudText Typo="Typo.subtitle2" Class="text-slate-400">Balance Weight</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Info" Style="font-family: 'Outfit'; font-weight: 800;">
+                        @_balanceWeight.ToString("F3") Kg
+                    </MudText>
+                    <MudText Typo="Typo.caption" Class="text-slate-500">Issued: @_issuedWeight.ToString("F3") | Received: @_receivedWeight.ToString("F3")</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="glass-panel pa-6 text-center">
+                    <MudText Typo="Typo.subtitle2" Class="text-slate-400">Outstanding Balance</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Warning" Style="font-family: 'Outfit'; font-weight: 800;">
+                        ₹@_outstandingBalance.ToString("N2")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Class="text-slate-500">Debits: ₹@_totalDebit.ToString("N2") | Credits: ₹@_totalCredit.ToString("N2")</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3" Class="d-flex align-stretch">
+                <MudButton FullWidth="true" Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenEntryDialog" Style="font-size: 16px; font-weight: 700; font-family: 'Outfit'; background: linear-gradient(135deg, #10B981 0%, #059669 100%);">
+                    Add Transaction (Ctrl+A)
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Ledger Grid -->
+        <MudTable Items="@_ledgerEntries" Hover="true" Loading="@_loadingLedger" Dense="true" Striped="true" Class="glass-panel text-slate-200">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">Loom Ledger Statement</MudText>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh Style="color: #94A3B8; text-align: center; width: 50px;">SNo</MudTh>
+                <MudTh Style="color: #94A3B8; width: 100px;">Date</MudTh>
+                <MudTh Style="color: #94A3B8; width: 120px;">Entry Type</MudTh>
+                <MudTh Style="color: #94A3B8; width: 180px;">Details</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 90px;">Warp Qty</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 100px;">Issued Wt</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 90px;">Rod Qty</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 100px;">Rod Wt</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 120px;">Debit (₹)</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 120px;">Credit (₹)</MudTh>
+                <MudTh Style="color: #94A3B8; width: 200px;">Narration</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: center; width: 60px;">Status</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: center; width: 50px;"></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="SNo" Style="text-align: center;" Class="text-slate-400">@((_ledgerEntries.IndexOf(context) + 1))</MudTd>
+                <MudTd DataLabel="Date" Class="text-slate-300">@context.Date.LocalDateTime.ToString("dd-MM-yyyy")</MudTd>
+                <MudTd DataLabel="Entry Type" Class="font-weight-bold text-slate-100">
+                    <MudChip T="string" Color="@GetEntryTypeColor(context.EntryType)" Size="Size.Small" Variant="Variant.Text">@context.EntryType</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Details" Class="text-slate-300">@context.Details</MudTd>
+                <MudTd DataLabel="Warp Qty" Style="text-align: right;" Class="text-slate-200">@(context.WarpQty > 0 ? context.WarpQty.ToString("N0") : "-")</MudTd>
+                <MudTd DataLabel="Issued Wt" Style="text-align: right;" Class="text-slate-200">@(context.IssuedWt > 0 ? context.IssuedWt.ToString("F3") : "-")</MudTd>
+                <MudTd DataLabel="Rod Qty" Style="text-align: right;" Class="text-yellow-500 font-weight-bold">@(context.RodQty > 0 ? context.RodQty.ToString("N0") : "-")</MudTd>
+                <MudTd DataLabel="Rod Wt" Style="text-align: right;" Class="text-slate-200">@(context.RodWt > 0 ? context.RodWt.ToString("F3") : "-")</MudTd>
+                <MudTd DataLabel="Debit" Style="text-align: right;" Class="text-red-400">@(context.Debit > 0 ? $"₹{context.Debit:N2}" : "-")</MudTd>
+                <MudTd DataLabel="Credit" Style="text-align: right;" Class="text-green-400 font-weight-bold">@(context.Credit > 0 ? $"₹{context.Credit:N2}" : "-")</MudTd>
+                <MudTd DataLabel="Narration" Class="text-slate-400">@context.Narration</MudTd>
+                <MudTd DataLabel="Status" Style="text-align: center;">
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">@context.Status</MudChip>
+                </MudTd>
+                <MudTd Style="text-align: center;">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteLedgerEntry(context.Id))" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Class="text-slate-400 pa-4">No weaving entries found for this design allocation.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    }
+</MudContainer>
+
+<!-- Unified Weaving Item Entry Modal -->
+<MudDialog @bind-Visible="_entryDialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
+            Weaving Item Entry
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_entryForm" @bind-IsValid="_isEntryValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Date" @bind-Date="_entryDate" Required="true" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" Label="Entry Type" Value="_editEntry.EntryType" Required="true" Class="text-slate-200" ValueChanged="OnEntryTypeChanged">
+                        <MudSelectItem Value="@("Dyed Warp")">Dyed Warp</MudSelectItem>
+                        <MudSelectItem Value="@("Dyed Weft")">Dyed Weft</MudSelectItem>
+                        <MudSelectItem Value="@("Zari")">Zari</MudSelectItem>
+                        <MudSelectItem Value="@("Saree")">Saree</MudSelectItem>
+                        <MudSelectItem Value="@("Cash")">Cash</MudSelectItem>
+                        <MudSelectItem Value="@("NEFT")">NEFT</MudSelectItem>
+                        <MudSelectItem Value="@("DebitTransfer")">DebitTransfer</MudSelectItem>
+                        <MudSelectItem Value="@("CreditTransfer")">CreditTransfer</MudSelectItem>
+                        <MudSelectItem Value="@("TDS")">TDS</MudSelectItem>
+                        <MudSelectItem Value="@("Requirement")">Requirement</MudSelectItem>
+                        <MudSelectItem Value="@("LnoChange")">LnoChange</MudSelectItem>
+                        <MudSelectItem Value="@("WtAdjust")">WtAdjust</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField T="string" Label="Details" @bind-Value="_editEntry.Details" Class="text-slate-200" HelperText="e.g. yarn spec, payment ref, design name" />
+                </MudItem>
+
+                @if (_showQtyField)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="decimal" Label="@_qtyLabel" @bind-Value="_entryQty" Min="0" Class="text-slate-200" HideSpinButtons="true" />
+                    </MudItem>
+                }
+                @if (_showWeightField)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="decimal" Label="@_weightLabel" @bind-Value="_entryWeight" Min="0" Class="text-slate-200" HideSpinButtons="true" Format="F3" />
+                    </MudItem>
+                }
+
+                @if (_showFinancialFields)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="decimal" Label="Debit Amount (₹)" @bind-Value="_editEntry.Debit" Min="0" Class="text-slate-200" HideSpinButtons="true" Format="F2" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="decimal" Label="Credit Amount (₹)" @bind-Value="_editEntry.Credit" Min="0" Class="text-slate-200" HideSpinButtons="true" Format="F2" Disabled="@(_editEntry.EntryType == "Saree")" HelperText="@(_editEntry.EntryType == "Saree" ? "Auto-computed from wages" : "")" />
+                    </MudItem>
+                }
+
+                <MudItem xs="12">
+                    <MudTextField T="string" Label="Narration" @bind-Value="_editEntry.Narration" Class="text-slate-200" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseEntryDialog" Variant="Variant.Text" Color="Color.Secondary">Cancel</MudButton>
+        <MudButton OnClick="SaveEntry" Variant="Variant.Filled" Color="Color.Primary" Disabled="@_savingEntry">
+            @if (_savingEntry)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                <MudText>Save Transaction</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Design Image View Dialog -->
+<MudDialog @bind-Visible="_imageViewOpen" Options="_imageDialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
+            Design Images: @(_activeAllocation?.Design?.Name)
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" sm="6" Class="text-center">
+                <MudText Typo="Typo.subtitle1" Class="text-slate-200 mb-2 font-weight-bold">Body Image</MudText>
+                @if (!string.IsNullOrEmpty(_activeAllocation?.Design?.BodyImage))
+                {
+                    <img src="@_activeAllocation.Design.BodyImage" style="max-height: 250px; max-width: 100%; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);" alt="Body Image" />
+                }
+                else
+                {
+                    <div style="height: 250px; background: rgba(255,255,255,0.02); border-radius: 8px;" class="d-flex align-center justify-center text-slate-500">
+                        No Body Image Uploaded
+                    </div>
+                }
+            </MudItem>
+            <MudItem xs="12" sm="6" Class="text-center">
+                <MudText Typo="Typo.subtitle1" Class="text-slate-200 mb-2 font-weight-bold">Pallu Image</MudText>
+                @if (!string.IsNullOrEmpty(_activeAllocation?.Design?.PalluImage))
+                {
+                    <img src="@_activeAllocation.Design.PalluImage" style="max-height: 250px; max-width: 100%; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);" alt="Pallu Image" />
+                }
+                else
+                {
+                    <div style="height: 250px; background: rgba(255,255,255,0.02); border-radius: 8px;" class="d-flex align-center justify-center text-slate-500">
+                        No Pallu Image Uploaded
+                    </div>
+                }
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseImageViewDialog" Variant="Variant.Filled" Color="Color.Primary">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<LoomMaster> _looms = new();
+    private Guid _selectedLoomId = Guid.Empty;
+    private LoomAllocation? _activeAllocation = null;
+    private List<WeavingLedgerEntry> _ledgerEntries = new();
+
+    private bool _loading = true;
+    private bool _loadingLedger = false;
+
+    // Balance indicators
+    private decimal _issuedWarpQty = 0;
+    private decimal _receivedSareeQty = 0;
+    private decimal _balanceSareeQty = 0;
+    private decimal _issuedWeight = 0;
+    private decimal _receivedWeight = 0;
+    private decimal _balanceWeight = 0;
+    private decimal _outstandingBalance = 0;
+    private decimal _totalDebit = 0;
+    private decimal _totalCredit = 0;
+
+    // Transaction dialog
+    private bool _entryDialogOpen = false;
+    private bool _isEntryValid = false;
+    private MudForm? _entryForm;
+    private WeavingLedgerEntry _editEntry = new();
+    private DateTime? _entryDate = DateTime.Today;
+    private decimal _entryQty = 0;
+    private decimal _entryWeight = 0;
+    private bool _savingEntry = false;
+
+    // UI visibility flags for dialog fields
+    private bool _showQtyField = true;
+    private bool _showWeightField = true;
+    private bool _showFinancialFields = true;
+    private string _qtyLabel = "Quantity";
+    private string _weightLabel = "Weight in Kgs";
+
+    // Image view dialog
+    private bool _imageViewOpen = false;
+
+    private readonly DialogOptions _dialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+    private readonly DialogOptions _imageDialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLooms();
+    }
+
+    private async Task LoadLooms()
+    {
+        _loading = true;
+        try
+        {
+            _looms = await Http.GetFromJsonAsync<List<LoomMaster>>("api/jobwork/looms") ?? new();
+            _looms = _looms.Where(l => l.Active).ToList();
+
+            if (_looms.Any())
+            {
+                _selectedLoomId = _looms.First().Id;
+                await OnLoomChanged(_selectedLoomId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading looms: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnLoomChanged(Guid loomId)
+    {
+        _selectedLoomId = loomId;
+        _activeAllocation = null;
+        _ledgerEntries.Clear();
+        StateHasChanged();
+
+        try
+        {
+            var alloc = await Http.GetFromJsonAsync<LoomAllocation>($"api/jobwork/allocations/active/{loomId}");
+            _activeAllocation = alloc;
+            if (_activeAllocation != null)
+            {
+                await LoadLedger();
+            }
+        }
+        catch
+        {
+            // Silently fail if no active allocation
+            _activeAllocation = null;
+        }
+    }
+
+    private async Task LoadLedger()
+    {
+        if (_activeAllocation == null) return;
+
+        _loadingLedger = true;
+        try
+        {
+            _ledgerEntries = await Http.GetFromJsonAsync<List<WeavingLedgerEntry>>($"api/jobwork/weaving/ledger/{_activeAllocation.Id}") ?? new();
+            RecalculateBalances();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading ledger: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingLedger = false;
+        }
+    }
+
+    private void RecalculateBalances()
+    {
+        _issuedWarpQty = _ledgerEntries.Where(w => w.EntryType.Contains("Warp")).Sum(w => w.WarpQty);
+        _receivedSareeQty = _ledgerEntries.Where(w => w.EntryType.Contains("Saree")).Sum(w => w.RodQty);
+        _balanceSareeQty = _issuedWarpQty - _receivedSareeQty;
+
+        _issuedWeight = _ledgerEntries.Sum(w => w.IssuedWt);
+        _receivedWeight = _ledgerEntries.Sum(w => w.RodWt);
+        _balanceWeight = _issuedWeight - _receivedWeight;
+
+        _totalDebit = _ledgerEntries.Sum(w => w.Debit);
+        _totalCredit = _ledgerEntries.Sum(w => w.Credit);
+        _outstandingBalance = _totalDebit - _totalCredit;
+    }
+
+    private void OpenEntryDialog()
+    {
+        _editEntry = new WeavingLedgerEntry
+        {
+            LoomAllocationId = _activeAllocation?.Id ?? Guid.Empty,
+            EntryType = "Dyed Warp",
+            Status = "S"
+        };
+        _entryDate = DateTime.Today;
+        _entryQty = 0;
+        _entryWeight = 0;
+        OnEntryTypeChanged("Dyed Warp");
+        _entryDialogOpen = true;
+    }
+
+    private void OnEntryTypeChanged(string val)
+    {
+        _editEntry.EntryType = val;
+
+        // Configure input visibility
+        if (val == "Dyed Warp")
+        {
+            _showQtyField = true;
+            _showWeightField = true;
+            _showFinancialFields = false;
+            _qtyLabel = "Warp Qty (Sarees)";
+            _weightLabel = "Warp Weight in Kgs";
+            _editEntry.Details = _activeAllocation?.Design?.WarpType;
+        }
+        else if (val == "Dyed Weft")
+        {
+            _showQtyField = false;
+            _showWeightField = true;
+            _showFinancialFields = false;
+            _weightLabel = "Weft Weight in Kgs";
+            _editEntry.Details = _activeAllocation?.Design?.WeftType;
+        }
+        else if (val == "Zari" || val == "Silk" || val == "Others")
+        {
+            _showQtyField = false;
+            _showWeightField = true;
+            _showFinancialFields = false;
+            _weightLabel = $"{val} Weight in Kgs";
+            _editEntry.Details = $"{val} Issued";
+        }
+        else if (val == "Saree")
+        {
+            _showQtyField = true;
+            _showWeightField = true;
+            _showFinancialFields = true;
+            _qtyLabel = "Received Saree Qty";
+            _weightLabel = "Received Saree Weight (Kgs)";
+            _editEntry.Details = _activeAllocation?.Design?.Name;
+            _editEntry.Credit = _entryQty * (_activeAllocation?.Design?.Wages ?? 0);
+        }
+        else
+        {
+            // Cash, NEFT, TDS, transfers
+            _showQtyField = false;
+            _showWeightField = false;
+            _showFinancialFields = true;
+            _editEntry.Details = val == "Cash" ? "Cash Paid" : "Bank Transfer";
+        }
+    }
+
+    private void CloseEntryDialog()
+    {
+        _entryDialogOpen = false;
+    }
+
+    private async Task SaveEntry()
+    {
+        if (_entryForm == null) return;
+        await _entryForm.Validate();
+        if (!_entryForm.IsValid) return;
+
+        _savingEntry = true;
+        try
+        {
+            _editEntry.Date = _entryDate ?? DateTimeOffset.UtcNow;
+            
+            // Map qty and weights
+            if (_editEntry.EntryType == "Dyed Warp")
+            {
+                _editEntry.WarpQty = _entryQty;
+                _editEntry.IssuedWt = _entryWeight;
+            }
+            else if (_editEntry.EntryType == "Dyed Weft" || _editEntry.EntryType == "Zari" || _editEntry.EntryType == "Silk" || _editEntry.EntryType == "Others")
+            {
+                _editEntry.IssuedWt = _entryWeight;
+            }
+            else if (_editEntry.EntryType == "Saree")
+            {
+                _editEntry.RodQty = _entryQty;
+                _editEntry.RodWt = _entryWeight;
+            }
+
+            var response = await Http.PostAsJsonAsync("api/jobwork/weaving/ledger", _editEntry);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Weaving transaction saved successfully!", Severity.Success);
+                _entryDialogOpen = false;
+                await LoadLedger();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Save failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving entry: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _savingEntry = false;
+        }
+    }
+
+    private async Task DeleteLedgerEntry(Guid entryId)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Delete Transaction",
+            "Are you sure you want to delete this weaving transaction? This will reverse stock changes and ledger balances.",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/jobwork/weaving/ledger/{entryId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Transaction deleted and reversed successfully.", Severity.Success);
+                    await LoadLedger();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Deletion failed: {error}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting transaction: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private Color GetEntryTypeColor(string type)
+    {
+        return type switch
+        {
+            "Dyed Warp" => Color.Primary,
+            "Dyed Weft" => Color.Secondary,
+            "Zari" => Color.Info,
+            "Saree" => Color.Success,
+            "Cash" => Color.Warning,
+            "NEFT" => Color.Warning,
+            _ => Color.Default
+        };
+    }
+
+    private void OpenImageViewDialog()
+    {
+        _imageViewOpen = true;
+    }
+
+    private void CloseImageViewDialog()
+    {
+        _imageViewOpen = false;
+    }
+}

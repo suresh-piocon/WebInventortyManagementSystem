@@ -267,6 +267,21 @@ namespace InventoryManagement.Api.Controllers
             entity.MinimumStock = item.MinimumStock;
             entity.ReorderLevel = item.ReorderLevel;
             entity.BarcodeType = item.BarcodeType;
+            
+            // Design master fields
+            entity.WarpType = item.WarpType;
+            entity.WeftType = item.WeftType;
+            entity.Wages = item.Wages;
+            entity.WarpWeight = item.WarpWeight;
+            entity.WeftWeight = item.WeftWeight;
+            entity.ZariWeight = item.ZariWeight;
+            entity.TotalWeight = item.TotalWeight;
+            entity.Reed = item.Reed;
+            entity.Thread = item.Thread;
+            entity.NoOfCards = item.NoOfCards;
+            entity.NoOfMarks = item.NoOfMarks;
+            entity.BodyImage = item.BodyImage;
+            entity.PalluImage = item.PalluImage;
 
             _context.Items.Update(entity);
             await _context.SaveChangesAsync();

@@ -1,0 +1,270 @@
+@page "/masters/looms"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Loom Master - Inventory Management</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="d-flex justify-between align-center mb-6">
+        <div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+                Loom Master
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-slate-400">
+                Register loom numbers and allocate them to weavers
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog"
+                   Style="background: linear-gradient(135deg, #5C5CFF 0%, #00E5FF 100%); font-family: 'Outfit'; font-weight: 600;">
+            Add Loom
+        </MudButton>
+    </div>
+
+    <MudTable Items="@_looms" 
+              Hover="true" 
+              Loading="@_loading" 
+              SearchString="@_searchString" 
+              Filter="new Func<LoomMaster, bool>(FilterFunc)"
+              Class="glass-panel text-slate-200">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">Looms list</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString" 
+                          Placeholder="Search looms..." 
+                          Adornment="Adornment.Start" 
+                          AdornmentIcon="@Icons.Material.Filled.Search" 
+                          IconSize="Size.Medium" 
+                          Class="mt-0 text-slate-200" 
+                          Style="color: white;"/>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh Style="color: #94A3B8;">Loom No</MudTh>
+            <MudTh Style="color: #94A3B8;">Weaver Name</MudTh>
+            <MudTh Style="color: #94A3B8;">Status</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right; width: 120px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Loom No" Class="text-slate-100 font-weight-bold">@context.LoomNo</MudTd>
+            <MudTd DataLabel="Weaver Name" Class="text-slate-200 font-weight-bold">@context.Weaver?.Name</MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.Active)
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Active</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small">Inactive</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Actions" Style="text-align: right;">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => ConfirmDelete(context))" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+<!-- Dialog for Add/Edit -->
+<MudDialog @bind-Visible="_dialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
+            @(_editLoom.Id == Guid.Empty ? "Register New Loom" : "Edit Loom Details")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isFormValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Loom Number" @bind-Value="_editLoom.LoomNo" Required="true" RequiredError="Loom number is required" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="Guid" Label="Assign Weaver" @bind-Value="_editLoom.WeaverId" Required="true" RequiredError="Weaver assignment is required" Class="text-slate-200">
+                        @foreach (var w in _weavers)
+                        {
+                            <MudSelectItem Value="@w.Id">@w.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" Class="d-flex align-center">
+                    <MudSwitch @bind-Value="_editLoom.Active" Label="Active" Color="Color.Success" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog" Variant="Variant.Text" Color="Color.Secondary">Cancel</MudButton>
+        <MudButton OnClick="SaveLoom" Variant="Variant.Filled" Color="Color.Primary" Disabled="@_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<LoomMaster> _looms = new();
+    private List<JobWorkMaster> _weavers = new();
+    private bool _loading = true;
+    private bool _saving = false;
+    private string _searchString = "";
+
+    // Dialog state
+    private bool _dialogOpen = false;
+    private bool _isFormValid = false;
+    private MudForm? _form;
+    private LoomMaster _editLoom = new();
+    private readonly DialogOptions _dialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDropdowns();
+        await LoadLooms();
+    }
+
+    private async Task LoadDropdowns()
+    {
+        try
+        {
+            var workers = await Http.GetFromJsonAsync<List<JobWorkMaster>>("api/jobwork/workers") ?? new();
+            _weavers = workers.Where(w => w.Type == "Weaver" && w.Active).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading weavers list: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadLooms()
+    {
+        _loading = true;
+        try
+        {
+            _looms = await Http.GetFromJsonAsync<List<LoomMaster>>("api/jobwork/looms") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading looms: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool FilterFunc(LoomMaster element) => 
+        string.IsNullOrWhiteSpace(_searchString) || 
+        element.LoomNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        (element.Weaver != null && element.Weaver.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+
+    private void OpenAddDialog()
+    {
+        _editLoom = new LoomMaster
+        {
+            Id = Guid.Empty,
+            Active = true,
+            WeaverId = _weavers.FirstOrDefault()?.Id ?? Guid.Empty
+        };
+        _dialogOpen = true;
+    }
+
+    private void OpenEditDialog(LoomMaster loom)
+    {
+        _editLoom = new LoomMaster
+        {
+            Id = loom.Id,
+            LoomNo = loom.LoomNo,
+            WeaverId = loom.WeaverId,
+            Active = loom.Active,
+            CreatedAt = loom.CreatedAt
+        };
+        _dialogOpen = true;
+    }
+
+    private void CloseDialog()
+    {
+        _dialogOpen = false;
+    }
+
+    private async Task SaveLoom()
+    {
+        if (_form == null) return;
+        await _form.Validate();
+        if (!_form.IsValid) return;
+
+        _saving = true;
+        try
+        {
+            HttpResponseMessage response;
+            if (_editLoom.Id == Guid.Empty)
+            {
+                response = await Http.PostAsJsonAsync("api/jobwork/looms", _editLoom);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"api/jobwork/looms/{_editLoom.Id}", _editLoom);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Loom details saved successfully!", Severity.Success);
+                _dialogOpen = false;
+                await LoadLooms();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Save failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ConfirmDelete(LoomMaster loom)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Delete Loom", 
+            $"Are you sure you want to delete loom '{loom.LoomNo}'?", 
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/jobwork/looms/{loom.Id}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Loom deleted successfully!", Severity.Success);
+                    await LoadLooms();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Delete failed: {error}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

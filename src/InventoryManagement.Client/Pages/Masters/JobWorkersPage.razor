@@ -1,0 +1,294 @@
+@page "/masters/jobworkers"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>JobWork Master - Inventory Management</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="d-flex justify-between align-center mb-6">
+        <div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+                JobWork Master
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-slate-400">
+                Manage weavers, dyers, zari workers, and other contract job workers
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog"
+                   Style="background: linear-gradient(135deg, #5C5CFF 0%, #00E5FF 100%); font-family: 'Outfit'; font-weight: 600;">
+            Add JobWorker
+        </MudButton>
+    </div>
+
+    <MudTable Items="@_workers" 
+              Hover="true" 
+              Loading="@_loading" 
+              SearchString="@_searchString" 
+              Filter="new Func<JobWorkMaster, bool>(FilterFunc)"
+              Class="glass-panel text-slate-200">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">Job Workers list</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString" 
+                          Placeholder="Search workers..." 
+                          Adornment="Adornment.Start" 
+                          AdornmentIcon="@Icons.Material.Filled.Search" 
+                          IconSize="Size.Medium" 
+                          Class="mt-0 text-slate-200" 
+                          Style="color: white;"/>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh Style="color: #94A3B8;">Name</MudTh>
+            <MudTh Style="color: #94A3B8;">Type</MudTh>
+            <MudTh Style="color: #94A3B8;">Mobile</MudTh>
+            <MudTh Style="color: #94A3B8;">GSTIN</MudTh>
+            <MudTh Style="color: #94A3B8;">Ledger Account</MudTh>
+            <MudTh Style="color: #94A3B8;">Status</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right; width: 120px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Name" Class="text-slate-100 font-weight-bold">@context.Name</MudTd>
+            <MudTd DataLabel="Type" Class="text-slate-200 font-weight-bold">
+                <MudChip T="string" Color="@GetTypeColor(context.Type)" Size="Size.Small" Variant="Variant.Text">@context.Type</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Mobile" Class="text-slate-300">@(string.IsNullOrEmpty(context.Mobile) ? "N/A" : context.Mobile)</MudTd>
+            <MudTd DataLabel="GSTIN" Class="text-slate-300">@(string.IsNullOrEmpty(context.GSTIN) ? "N/A" : context.GSTIN)</MudTd>
+            <MudTd DataLabel="Ledger Account" Class="text-slate-300">@(string.IsNullOrEmpty(context.LedgerAccount) ? "N/A" : context.LedgerAccount)</MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.Active)
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Active</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small">Inactive</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Actions" Style="text-align: right;">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => ConfirmDelete(context))" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+<!-- Dialog for Add/Edit -->
+<MudDialog @bind-Visible="_dialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
+            @(_editWorker.Id == Guid.Empty ? "Create New JobWorker" : "Edit JobWorker")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isFormValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Name" @bind-Value="_editWorker.Name" Required="true" RequiredError="Worker name is required" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" Label="Worker Type" @bind-Value="_editWorker.Type" Required="true" RequiredError="Worker type is required" Class="text-slate-200">
+                        <MudSelectItem Value="@("Dyer")">Dyer</MudSelectItem>
+                        <MudSelectItem Value="@("Weaver")">Weaver</MudSelectItem>
+                        <MudSelectItem Value="@("Zari Worker")">Zari Worker</MudSelectItem>
+                        <MudSelectItem Value="@("Finishing Worker")">Finishing Worker</MudSelectItem>
+                        <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Mobile Number" @bind-Value="_editWorker.Mobile" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="GSTIN" @bind-Value="_editWorker.GSTIN" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Ledger Account" @bind-Value="_editWorker.LedgerAccount" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6" Class="d-flex align-center">
+                    <MudSwitch @bind-Value="_editWorker.Active" Label="Active" Color="Color.Success" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField T="string" Label="Address" @bind-Value="_editWorker.Address" Lines="3" Class="text-slate-200" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog" Variant="Variant.Text" Color="Color.Secondary">Cancel</MudButton>
+        <MudButton OnClick="SaveWorker" Variant="Variant.Filled" Color="Color.Primary" Disabled="@_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                <MudText>Save</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<JobWorkMaster> _workers = new();
+    private bool _loading = true;
+    private bool _saving = false;
+    private string _searchString = "";
+
+    // Dialog state
+    private bool _dialogOpen = false;
+    private bool _isFormValid = false;
+    private MudForm? _form;
+    private JobWorkMaster _editWorker = new();
+    private readonly DialogOptions _dialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWorkers();
+    }
+
+    private async Task LoadWorkers()
+    {
+        _loading = true;
+        try
+        {
+            _workers = await Http.GetFromJsonAsync<List<JobWorkMaster>>("api/jobwork/workers") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading jobworkers: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool FilterFunc(JobWorkMaster element) => 
+        string.IsNullOrWhiteSpace(_searchString) || 
+        element.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        element.Type.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        (element.Mobile != null && element.Mobile.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) ||
+        (element.GSTIN != null && element.GSTIN.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+
+    private void OpenAddDialog()
+    {
+        _editWorker = new JobWorkMaster
+        {
+            Id = Guid.Empty,
+            Type = "Weaver",
+            Active = true
+        };
+        _dialogOpen = true;
+    }
+
+    private void OpenEditDialog(JobWorkMaster worker)
+    {
+        _editWorker = new JobWorkMaster
+        {
+            Id = worker.Id,
+            Name = worker.Name,
+            Type = worker.Type,
+            Address = worker.Address,
+            Mobile = worker.Mobile,
+            GSTIN = worker.GSTIN,
+            LedgerAccount = worker.LedgerAccount,
+            Active = worker.Active,
+            CreatedAt = worker.CreatedAt
+        };
+        _dialogOpen = true;
+    }
+
+    private void CloseDialog()
+    {
+        _dialogOpen = false;
+    }
+
+    private async Task SaveWorker()
+    {
+        if (_form == null) return;
+        await _form.Validate();
+        if (!_form.IsValid) return;
+
+        _saving = true;
+        try
+        {
+            HttpResponseMessage response;
+            if (_editWorker.Id == Guid.Empty)
+            {
+                response = await Http.PostAsJsonAsync("api/jobwork/workers", _editWorker);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"api/jobwork/workers/{_editWorker.Id}", _editWorker);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("JobWorker saved successfully!", Severity.Success);
+                _dialogOpen = false;
+                await LoadWorkers();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Save failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ConfirmDelete(JobWorkMaster worker)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Delete JobWorker", 
+            $"Are you sure you want to delete worker '{worker.Name}'?", 
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/jobwork/workers/{worker.Id}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("JobWorker deleted successfully!", Severity.Success);
+                    await LoadWorkers();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Delete failed: {error}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private Color GetTypeColor(string type)
+    {
+        return type switch
+        {
+            "Dyer" => Color.Primary,
+            "Weaver" => Color.Secondary,
+            "Zari Worker" => Color.Info,
+            "Finishing Worker" => Color.Warning,
+            _ => Color.Default
+        };
+    }
+}

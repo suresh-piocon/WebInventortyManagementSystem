@@ -1,0 +1,274 @@
+@page "/stock/dyeing-receive"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<PageTitle>Dyeing Receive - Dyed Yarn Inward</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="mb-6">
+        <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+            Dyeing Material Receive
+        </MudText>
+        <MudText Typo="Typo.body2" Class="text-slate-400">
+            Receive dyed warp and weft yarn from dyers, record wastage, and update dyed yarn stock
+        </MudText>
+    </div>
+
+    <EditForm Model="@_receive" OnValidSubmit="SaveReceive">
+        <DataAnnotationsValidator />
+        <MudGrid>
+            <!-- Header Panel -->
+            <MudItem xs="12" md="4">
+                <MudPaper Class="glass-panel pa-6 mb-4">
+                    <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" /> Header Info
+                    </MudText>
+
+                    <MudDatePicker Label="Receive Date" @bind-Date="_receiveDate" Required="true" Variant="Variant.Outlined" Class="mb-4 text-slate-200" />
+
+                    <MudSelect T="Guid" Label="Select Dyer" Value="_receive.DyerId" Required="true" RequiredError="Dyer is required" Variant="Variant.Outlined" Class="mb-4 text-slate-200" ValueChanged="OnDyerChanged">
+                        @foreach (var d in _dyers)
+                        {
+                            <MudSelectItem Value="@d.Id">@d.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudSelect T="string" Label="Issue Reference No" @bind-Value="_receive.IssueReferenceNo" Variant="Variant.Outlined" Class="mb-4 text-slate-200" Placeholder="Select Issue Reference">
+                        @foreach (var refNo in _dyeingIssueRefs)
+                        {
+                            <MudSelectItem Value="@refNo">@refNo</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudPaper>
+
+                <!-- Actions -->
+                <MudPaper Class="glass-panel pa-4 d-flex justify-between">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="ResetForm">
+                        Reset
+                    </MudButton>
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Save" Disabled="@(!_lineItems.Any() || _saving)" Style="font-family: 'Outfit'; font-weight: 600;">
+                        @if (_saving)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        }
+                        else
+                        {
+                            <MudText>Save Receive</MudText>
+                        }
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Line Items Grid -->
+            <MudItem xs="12" md="8">
+                <MudPaper Class="glass-panel pa-6 mb-4">
+                    <div class="d-flex justify-between align-center mb-4">
+                        <MudText Typo="Typo.h6" Class="text-slate-200" Style="font-family: 'Outfit';">
+                            <MudIcon Icon="@Icons.Material.Filled.List" Class="mr-2" /> Receipt Details
+                        </MudText>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddRow" Size="Size.Small">
+                            Add Row
+                        </MudButton>
+                    </div>
+
+                    @if (!_lineItems.Any())
+                    {
+                        <div class="d-flex flex-column align-center justify-center py-8 text-center text-slate-500">
+                            <MudIcon Icon="@Icons.Material.Filled.AssignmentReturned" Size="Size.Large" Class="mb-2" />
+                            <MudText>No items added yet. Click "Add Row" above.</MudText>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="overflow-x: auto;">
+                            <table class="w-100 mud-table" style="border-collapse: collapse;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 220px;">Design / Item</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 120px;">Yarn Type</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: left; width: 120px;">Dyed Color</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 100px;">Qty Received</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 110px;">Wt Received (Kg)</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: right; width: 110px;">Waste Wt (Kg)</th>
+                                        <th style="color: #94A3B8; padding: 8px; text-align: center; width: 40px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (int i = 0; i < _lineItems.Count; i++)
+                                    {
+                                        var index = i;
+                                        var line = _lineItems[index];
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle;">
+                                            <td style="padding: 4px;">
+                                                <MudSelect T="Guid" @bind-Value="line.DesignId" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 180px;">
+                                                    @foreach (var item in _designs)
+                                                    {
+                                                        <MudSelectItem Value="@item.Id">@item.Name</MudSelectItem>
+                                                    }
+                                                </MudSelect>
+                                            </td>
+                                            <td style="padding: 4px;">
+                                                <MudSelect T="string" @bind-Value="line.YarnType" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 100px;">
+                                                    <MudSelectItem Value="@("Warp")">Warp</MudSelectItem>
+                                                    <MudSelectItem Value="@("Weft")">Weft</MudSelectItem>
+                                                </MudSelect>
+                                            </td>
+                                            <td style="padding: 4px;">
+                                                <MudTextField T="string" @bind-Value="line.DyedColor" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 100px;" />
+                                            </td>
+                                            <td style="padding: 4px;">
+                                                <MudNumericField T="decimal" @bind-Value="line.QtyReceived" Min="0.01M" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 70px;" />
+                                            </td>
+                                            <td style="padding: 4px;">
+                                                <MudNumericField T="decimal" @bind-Value="line.WeightReceived" Min="0.01M" HideSpinButtons="true" Format="F3" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 80px;" />
+                                            </td>
+                                            <td style="padding: 4px;">
+                                                <MudNumericField T="decimal" @bind-Value="line.WasteWeight" Min="0" HideSpinButtons="true" Format="F3" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 80px;" />
+                                            </td>
+                                            <td style="padding: 4px; text-align: center;">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveRow(index))" />
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </EditForm>
+</MudContainer>
+
+@code {
+    private List<JobWorkMaster> _dyers = new();
+    private List<Item> _designs = new();
+    private List<string> _dyeingIssueRefs = new();
+    private List<DyeingIssue> _allIssues = new();
+
+    private DyeingReceive _receive = new();
+    private DateTime? _receiveDate = DateTime.Today;
+    private List<DyeingReceiveDetail> _lineItems = new();
+    private bool _saving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLookups();
+        ResetForm();
+    }
+
+    private async Task LoadLookups()
+    {
+        try
+        {
+            var workers = await Http.GetFromJsonAsync<List<JobWorkMaster>>("api/jobwork/workers") ?? new();
+            _dyers = workers.Where(w => w.Type == "Dyer" && w.Active).ToList();
+
+            _designs = await Http.GetFromJsonAsync<List<Item>>("api/masters/items") ?? new();
+            
+            _allIssues = await Http.GetFromJsonAsync<List<DyeingIssue>>("api/jobwork/dyeing/issues") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading lookups: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OnDyerChanged(Guid dyerId)
+    {
+        _receive.DyerId = dyerId;
+        // Filter issue references to this Dyer only!
+        _dyeingIssueRefs = _allIssues
+            .Where(i => i.DyerId == dyerId)
+            .Select(i => i.IssueNo)
+            .Distinct()
+            .ToList();
+        
+        _receive.IssueReferenceNo = _dyeingIssueRefs.FirstOrDefault();
+    }
+
+    private void ResetForm()
+    {
+        _receive = new DyeingReceive
+        {
+            ReceiveDate = DateTimeOffset.UtcNow,
+            DyerId = _dyers.FirstOrDefault()?.Id ?? Guid.Empty
+        };
+        _receiveDate = DateTime.Today;
+        _lineItems.Clear();
+
+        if (_receive.DyerId != Guid.Empty)
+        {
+            OnDyerChanged(_receive.DyerId);
+        }
+
+        AddRow();
+    }
+
+    private void AddRow()
+    {
+        _lineItems.Add(new DyeingReceiveDetail
+        {
+            DesignId = _designs.FirstOrDefault()?.Id ?? Guid.Empty,
+            YarnType = "Warp",
+            QtyReceived = 1,
+            WeightReceived = 1,
+            WasteWeight = 0
+        });
+    }
+
+    private void RemoveRow(int index)
+    {
+        if (index >= 0 && index < _lineItems.Count)
+        {
+            _lineItems.RemoveAt(index);
+        }
+    }
+
+    private async Task SaveReceive()
+    {
+        if (!_lineItems.Any())
+        {
+            Snackbar.Add("Please add at least one receipt row.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            _receive.ReceiveDate = _receiveDate ?? DateTimeOffset.UtcNow;
+            _receive.Details = _lineItems.Select(l => new DyeingReceiveDetail
+            {
+                DesignId = l.DesignId,
+                YarnType = l.YarnType,
+                DyedColor = l.DyedColor,
+                QtyReceived = l.QtyReceived,
+                WeightReceived = l.WeightReceived,
+                WasteWeight = l.WasteWeight
+            }).ToList();
+
+            var response = await Http.PostAsJsonAsync("api/jobwork/dyeing/receives", _receive);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Dyeing receive saved successfully! Dyed yarn stock credited.", Severity.Success);
+                ResetForm();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Save failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

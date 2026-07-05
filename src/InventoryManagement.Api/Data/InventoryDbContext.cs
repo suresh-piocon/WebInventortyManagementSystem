@@ -44,6 +44,17 @@ namespace InventoryManagement.Api.Data
         public DbSet<Customer> Customers => Set<Customer>();
         public DbSet<Firm> Firms => Set<Firm>();
         public DbSet<CustomerCollection> CustomerCollections => Set<CustomerCollection>();
+        
+        // Job Work Module sets
+        public DbSet<JobWorkMaster> JobWorkMasters => Set<JobWorkMaster>();
+        public DbSet<LoomMaster> LoomMasters => Set<LoomMaster>();
+        public DbSet<LoomAllocation> LoomAllocations => Set<LoomAllocation>();
+        public DbSet<DyeingIssue> DyeingIssues => Set<DyeingIssue>();
+        public DbSet<DyeingIssueDetail> DyeingIssueDetails => Set<DyeingIssueDetail>();
+        public DbSet<DyeingReceive> DyeingReceives => Set<DyeingReceive>();
+        public DbSet<DyeingReceiveDetail> DyeingReceiveDetails => Set<DyeingReceiveDetail>();
+        public DbSet<WeavingLedgerEntry> WeavingLedgerEntries => Set<WeavingLedgerEntry>();
+        public DbSet<JobLedger> JobLedgers => Set<JobLedger>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -177,6 +188,136 @@ namespace InventoryManagement.Api.Data
 
             modelBuilder.Entity<CustomerCollection>()
                 .Property(cc => cc.Amount).HasPrecision(12, 2);
+
+            // Job Work precise decimals
+            modelBuilder.Entity<Item>()
+                .Property(i => i.Wages).HasPrecision(12, 2);
+            modelBuilder.Entity<Item>()
+                .Property(i => i.WarpWeight).HasPrecision(12, 3);
+            modelBuilder.Entity<Item>()
+                .Property(i => i.WeftWeight).HasPrecision(12, 3);
+            modelBuilder.Entity<Item>()
+                .Property(i => i.ZariWeight).HasPrecision(12, 3);
+            modelBuilder.Entity<Item>()
+                .Property(i => i.TotalWeight).HasPrecision(12, 3);
+
+            modelBuilder.Entity<StockLedger>()
+                .Property(l => l.InwardWeight).HasPrecision(12, 3);
+            modelBuilder.Entity<StockLedger>()
+                .Property(l => l.OutwardWeight).HasPrecision(12, 3);
+            modelBuilder.Entity<StockLedger>()
+                .Property(l => l.BalanceWeight).HasPrecision(12, 3);
+
+            modelBuilder.Entity<DyeingIssueDetail>()
+                .Property(d => d.Qty).HasPrecision(12, 2);
+            modelBuilder.Entity<DyeingIssueDetail>()
+                .Property(d => d.WeightKgs).HasPrecision(12, 3);
+            modelBuilder.Entity<DyeingIssueDetail>()
+                .Property(d => d.Rate).HasPrecision(12, 4);
+            modelBuilder.Entity<DyeingIssueDetail>()
+                .Property(d => d.Amount).HasPrecision(12, 2);
+
+            modelBuilder.Entity<DyeingReceiveDetail>()
+                .Property(d => d.QtyReceived).HasPrecision(12, 2);
+            modelBuilder.Entity<DyeingReceiveDetail>()
+                .Property(d => d.WeightReceived).HasPrecision(12, 3);
+            modelBuilder.Entity<DyeingReceiveDetail>()
+                .Property(d => d.WasteWeight).HasPrecision(12, 3);
+
+            modelBuilder.Entity<WeavingLedgerEntry>()
+                .Property(w => w.WarpQty).HasPrecision(12, 2);
+            modelBuilder.Entity<WeavingLedgerEntry>()
+                .Property(w => w.IssuedWt).HasPrecision(12, 3);
+            modelBuilder.Entity<WeavingLedgerEntry>()
+                .Property(w => w.RodQty).HasPrecision(12, 2);
+            modelBuilder.Entity<WeavingLedgerEntry>()
+                .Property(w => w.RodWt).HasPrecision(12, 3);
+            modelBuilder.Entity<WeavingLedgerEntry>()
+                .Property(w => w.Debit).HasPrecision(12, 2);
+            modelBuilder.Entity<WeavingLedgerEntry>()
+                .Property(w => w.Credit).HasPrecision(12, 2);
+
+            modelBuilder.Entity<JobLedger>()
+                .Property(j => j.IssueQty).HasPrecision(12, 2);
+            modelBuilder.Entity<JobLedger>()
+                .Property(j => j.ReceiveQty).HasPrecision(12, 2);
+            modelBuilder.Entity<JobLedger>()
+                .Property(j => j.IssueWeight).HasPrecision(12, 3);
+            modelBuilder.Entity<JobLedger>()
+                .Property(j => j.ReceiveWeight).HasPrecision(12, 3);
+            modelBuilder.Entity<JobLedger>()
+                .Property(j => j.Debit).HasPrecision(12, 2);
+            modelBuilder.Entity<JobLedger>()
+                .Property(j => j.Credit).HasPrecision(12, 2);
+            modelBuilder.Entity<JobLedger>()
+                .Property(j => j.Balance).HasPrecision(12, 2);
+
+            // Job Work relationships & Cascades
+            modelBuilder.Entity<LoomMaster>()
+                .HasOne(lm => lm.Weaver)
+                .WithMany()
+                .HasForeignKey(lm => lm.WeaverId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<LoomAllocation>()
+                .HasOne(la => la.Loom)
+                .WithMany()
+                .HasForeignKey(la => la.LoomId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<LoomAllocation>()
+                .HasOne(la => la.Design)
+                .WithMany()
+                .HasForeignKey(la => la.ItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DyeingIssueDetail>()
+                .HasOne(d => d.DyeingIssue)
+                .WithMany(i => i.Details)
+                .HasForeignKey(d => d.DyeingIssueId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<DyeingReceiveDetail>()
+                .HasOne(d => d.DyeingReceive)
+                .WithMany(r => r.Details)
+                .HasForeignKey(d => d.DyeingReceiveId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<WeavingLedgerEntry>()
+                .HasOne(w => w.LoomAllocation)
+                .WithMany()
+                .HasForeignKey(w => w.LoomAllocationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<JobLedger>()
+                .HasOne(j => j.JobWorker)
+                .WithMany()
+                .HasForeignKey(j => j.JobWorkerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<DyeingIssue>()
+                .HasOne(di => di.Dyer)
+                .WithMany()
+                .HasForeignKey(di => di.DyerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DyeingReceive>()
+                .HasOne(dr => dr.Dyer)
+                .WithMany()
+                .HasForeignKey(dr => dr.DyerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DyeingIssueDetail>()
+                .HasOne(d => d.Design)
+                .WithMany()
+                .HasForeignKey(d => d.DesignId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DyeingReceiveDetail>()
+                .HasOne(d => d.Design)
+                .WithMany()
+                .HasForeignKey(d => d.DesignId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

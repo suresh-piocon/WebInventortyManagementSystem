@@ -1,0 +1,126 @@
+@page "/reports/weaver-account"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Weaver Accounts Summary - Reports</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="mb-6">
+        <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+            Weaver Accounts Outstanding
+        </MudText>
+        <MudText Typo="Typo.body2" Class="text-slate-400">
+            Monitor outstanding debit and credit balances across active loom setups
+        </MudText>
+    </div>
+
+    <!-- Outstanding Summary Metrics -->
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="4">
+            <MudPaper Class="glass-panel pa-6 text-center">
+                <MudText Typo="Typo.subtitle2" Class="text-slate-400">Total Material/Cash Debited</MudText>
+                <MudText Typo="Typo.h4" Color="Color.Error" Style="font-family: 'Outfit'; font-weight: 800;">
+                    ₹@_accounts.Sum(a => a.TotalDebit).ToString("N2")
+                </MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Class="glass-panel pa-6 text-center">
+                <MudText Typo="Typo.subtitle2" Class="text-slate-400">Total Saree Wages Credited</MudText>
+                <MudText Typo="Typo.h4" Color="Color.Success" Style="font-family: 'Outfit'; font-weight: 800;">
+                    ₹@_accounts.Sum(a => a.TotalCredit).ToString("N2")
+                </MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Class="glass-panel pa-6 text-center">
+                <MudText Typo="Typo.subtitle2" Class="text-slate-400">Net Weaver Outstanding</MudText>
+                <MudText Typo="Typo.h4" Color="Color.Warning" Style="font-family: 'Outfit'; font-weight: 800;">
+                    ₹@_accounts.Sum(a => a.OutstandingBalance).ToString("N2")
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Table -->
+    <MudTable Items="@_accounts" 
+              Hover="true" 
+              Loading="@_loading" 
+              SearchString="@_searchString" 
+              Filter="new Func<WeaverAccountDto, bool>(FilterFunc)"
+              Class="glass-panel text-slate-200">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">Weaver Balances List</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString" 
+                          Placeholder="Search weavers..." 
+                          Adornment="Adornment.Start" 
+                          AdornmentIcon="@Icons.Material.Filled.Search" 
+                          IconSize="Size.Medium" 
+                          Class="mt-0 text-slate-200" 
+                          Style="color: white;"/>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh Style="color: #94A3B8;">Loom No</MudTh>
+            <MudTh Style="color: #94A3B8;">Weaver Name</MudTh>
+            <MudTh Style="color: #94A3B8;">Design Name</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Total Debit (₹)</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Total Credit (₹)</MudTh>
+            <MudTh Style="color: #94A3B8; text-align: right;">Net Outstanding (₹)</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Loom No" Class="text-slate-100 font-mono font-weight-bold">@context.LoomNo</MudTd>
+            <MudTd DataLabel="Weaver Name" Class="text-slate-200 font-weight-bold">@context.WeaverName</MudTd>
+            <MudTd DataLabel="Design Name" Class="text-slate-300">@context.DesignName</MudTd>
+            <MudTd DataLabel="Total Debit" Style="text-align: right;" Class="text-red-400">₹@context.TotalDebit.ToString("N2")</MudTd>
+            <MudTd DataLabel="Total Credit" Style="text-align: right;" Class="text-green-400">₹@context.TotalCredit.ToString("N2")</MudTd>
+            <MudTd DataLabel="Net Outstanding" Style="text-align: right;" Class="@GetBalanceClass(context.OutstandingBalance)">
+                ₹@context.OutstandingBalance.ToString("N2")
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+@code {
+    private List<WeaverAccountDto> _accounts = new();
+    private bool _loading = true;
+    private string _searchString = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWeaverAccounts();
+    }
+
+    private async Task LoadWeaverAccounts()
+    {
+        _loading = true;
+        try
+        {
+            _accounts = await Http.GetFromJsonAsync<List<WeaverAccountDto>>("api/jobwork/reports/weaver-accounts") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading weaver balances: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool FilterFunc(WeaverAccountDto element) => 
+        string.IsNullOrWhiteSpace(_searchString) || 
+        element.LoomNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        element.WeaverName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+        element.DesignName.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+
+    private string GetBalanceClass(decimal bal)
+    {
+        if (bal > 0) return "text-red-400 font-weight-bold";
+        if (bal < 0) return "text-green-400 font-weight-bold";
+        return "text-slate-300";
+    }
+}

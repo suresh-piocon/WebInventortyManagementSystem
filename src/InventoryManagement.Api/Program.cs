@@ -523,6 +523,301 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine($"Warning: Failed to run custom Proforma migrations: {ex.Message}");
         }
 
+        // Run Job Work custom migrations
+        try
+        {
+            var isSqlite = context.Database.ProviderName?.Contains("Sqlite") == true;
+            if (isSqlite)
+            {
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""JobWorkMaster"" (
+                        ""Id"" TEXT NOT NULL PRIMARY KEY,
+                        ""Name"" TEXT NOT NULL,
+                        ""Type"" TEXT NOT NULL,
+                        ""Address"" TEXT NULL,
+                        ""Mobile"" TEXT NULL,
+                        ""GSTIN"" TEXT NULL,
+                        ""LedgerAccount"" TEXT NULL,
+                        ""Active"" INTEGER NOT NULL DEFAULT 1,
+                        ""CreatedAt"" TEXT NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""LoomMaster"" (
+                        ""Id"" TEXT NOT NULL PRIMARY KEY,
+                        ""LoomNo"" TEXT NOT NULL,
+                        ""WeaverId"" TEXT NOT NULL REFERENCES ""JobWorkMaster""(""Id"") ON DELETE RESTRICT,
+                        ""Active"" INTEGER NOT NULL DEFAULT 1,
+                        ""CreatedAt"" TEXT NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""LoomAllocation"" (
+                        ""Id"" TEXT NOT NULL PRIMARY KEY,
+                        ""LoomId"" TEXT NOT NULL REFERENCES ""LoomMaster""(""Id"") ON DELETE CASCADE,
+                        ""ItemId"" TEXT NOT NULL REFERENCES ""Items""(""Id"") ON DELETE RESTRICT,
+                        ""SubWeaver"" TEXT NULL,
+                        ""WarpRefNo"" TEXT NULL,
+                        ""StartDate"" TEXT NOT NULL,
+                        ""Active"" INTEGER NOT NULL DEFAULT 1,
+                        ""CreatedAt"" TEXT NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""DyeingIssues"" (
+                        ""Id"" TEXT NOT NULL PRIMARY KEY,
+                        ""IssueNo"" TEXT NOT NULL,
+                        ""IssueDate"" TEXT NOT NULL,
+                        ""DyerId"" TEXT NOT NULL REFERENCES ""JobWorkMaster""(""Id"") ON DELETE RESTRICT,
+                        ""Narration"" TEXT NULL,
+                        ""CreatedBy"" TEXT NOT NULL,
+                        ""CreatedAt"" TEXT NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""DyeingIssueDetails"" (
+                        ""Id"" TEXT NOT NULL PRIMARY KEY,
+                        ""DyeingIssueId"" TEXT NOT NULL REFERENCES ""DyeingIssues""(""Id"") ON DELETE CASCADE,
+                        ""DesignId"" TEXT NOT NULL REFERENCES ""Items""(""Id"") ON DELETE RESTRICT,
+                        ""YarnType"" TEXT NOT NULL,
+                        ""WarpYarn"" TEXT NULL,
+                        ""WeftYarn"" TEXT NULL,
+                        ""Color"" TEXT NULL,
+                        ""Qty"" TEXT NOT NULL,
+                        ""WeightKgs"" TEXT NOT NULL,
+                        ""Rate"" TEXT NOT NULL,
+                        ""Amount"" TEXT NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""DyeingReceives"" (
+                        ""Id"" TEXT NOT NULL PRIMARY KEY,
+                        ""ReceiveNo"" TEXT NOT NULL,
+                        ""ReceiveDate"" TEXT NOT NULL,
+                        ""DyerId"" TEXT NOT NULL REFERENCES ""JobWorkMaster""(""Id"") ON DELETE RESTRICT,
+                        ""IssueReferenceNo"" TEXT NULL,
+                        ""CreatedBy"" TEXT NOT NULL,
+                        ""CreatedAt"" TEXT NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""DyeingReceiveDetails"" (
+                        ""Id"" TEXT NOT NULL PRIMARY KEY,
+                        ""DyeingReceiveId"" TEXT NOT NULL REFERENCES ""DyeingReceives""(""Id"") ON DELETE CASCADE,
+                        ""DesignId"" TEXT NOT NULL REFERENCES ""Items""(""Id"") ON DELETE RESTRICT,
+                        ""YarnType"" TEXT NOT NULL,
+                        ""DyedColor"" TEXT NULL,
+                        ""QtyReceived"" TEXT NOT NULL,
+                        ""WeightReceived"" TEXT NOT NULL,
+                        ""WasteWeight"" TEXT NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""WeavingLedger"" (
+                        ""Id"" TEXT NOT NULL PRIMARY KEY,
+                        ""LoomAllocationId"" TEXT NOT NULL REFERENCES ""LoomAllocation""(""Id"") ON DELETE CASCADE,
+                        ""Date"" TEXT NOT NULL,
+                        ""EntryType"" TEXT NOT NULL,
+                        ""Details"" TEXT NULL,
+                        ""WarpQty"" TEXT NOT NULL DEFAULT '0',
+                        ""IssuedWt"" TEXT NOT NULL DEFAULT '0',
+                        ""RodQty"" TEXT NOT NULL DEFAULT '0',
+                        ""RodWt"" TEXT NOT NULL DEFAULT '0',
+                        ""Debit"" TEXT NOT NULL DEFAULT '0',
+                        ""Credit"" TEXT NOT NULL DEFAULT '0',
+                        ""Narration"" TEXT NULL,
+                        ""Status"" TEXT NOT NULL DEFAULT 'S',
+                        ""CreatedBy"" TEXT NOT NULL,
+                        ""CreatedAt"" TEXT NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""JobLedger"" (
+                        ""Id"" TEXT NOT NULL PRIMARY KEY,
+                        ""JobWorkerId"" TEXT NOT NULL REFERENCES ""JobWorkMaster""(""Id"") ON DELETE CASCADE,
+                        ""TransactionDate"" TEXT NOT NULL,
+                        ""VoucherNo"" TEXT NOT NULL,
+                        ""Particulars"" TEXT NOT NULL,
+                        ""IssueQty"" TEXT NOT NULL DEFAULT '0',
+                        ""ReceiveQty"" TEXT NOT NULL DEFAULT '0',
+                        ""IssueWeight"" TEXT NOT NULL DEFAULT '0',
+                        ""ReceiveWeight"" TEXT NOT NULL DEFAULT '0',
+                        ""Debit"" TEXT NOT NULL DEFAULT '0',
+                        ""Credit"" TEXT NOT NULL DEFAULT '0',
+                        ""Balance"" TEXT NOT NULL DEFAULT '0',
+                        ""CreatedAt"" TEXT NOT NULL
+                    );
+                ");
+
+                // Alter Items Table
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""WarpType"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""WeftType"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""Wages"" TEXT NOT NULL DEFAULT '0';"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""WarpWeight"" TEXT NOT NULL DEFAULT '0';"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""WeftWeight"" TEXT NOT NULL DEFAULT '0';"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""ZariWeight"" TEXT NOT NULL DEFAULT '0';"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""TotalWeight"" TEXT NOT NULL DEFAULT '0';"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""Reed"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""Thread"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""NoOfCards"" INTEGER NOT NULL DEFAULT 0;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""NoOfMarks"" INTEGER NOT NULL DEFAULT 0;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""BodyImage"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""PalluImage"" TEXT NULL;"); } catch {}
+
+                // Alter StockLedger Table
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""StockLedger"" ADD COLUMN ""InwardWeight"" TEXT NOT NULL DEFAULT '0';"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""StockLedger"" ADD COLUMN ""OutwardWeight"" TEXT NOT NULL DEFAULT '0';"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""StockLedger"" ADD COLUMN ""BalanceWeight"" TEXT NOT NULL DEFAULT '0';"); } catch {}
+            }
+            else
+            {
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""JobWorkMaster"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""Name"" varchar(150) NOT NULL,
+                        ""Type"" varchar(50) NOT NULL,
+                        ""Address"" text NULL,
+                        ""Mobile"" varchar(20) NULL,
+                        ""GSTIN"" varchar(15) NULL,
+                        ""LedgerAccount"" varchar(100) NULL,
+                        ""Active"" boolean NOT NULL DEFAULT true,
+                        ""CreatedAt"" timestamptz NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""LoomMaster"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""LoomNo"" varchar(50) NOT NULL,
+                        ""WeaverId"" uuid NOT NULL REFERENCES ""JobWorkMaster""(""Id"") ON DELETE RESTRICT,
+                        ""Active"" boolean NOT NULL DEFAULT true,
+                        ""CreatedAt"" timestamptz NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""LoomAllocation"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""LoomId"" uuid NOT NULL REFERENCES ""LoomMaster""(""Id"") ON DELETE CASCADE,
+                        ""ItemId"" uuid NOT NULL REFERENCES ""Items""(""Id"") ON DELETE RESTRICT,
+                        ""SubWeaver"" varchar(100) NULL,
+                        ""WarpRefNo"" varchar(50) NULL,
+                        ""StartDate"" timestamptz NOT NULL,
+                        ""Active"" boolean NOT NULL DEFAULT true,
+                        ""CreatedAt"" timestamptz NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""DyeingIssues"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""IssueNo"" varchar(50) NOT NULL,
+                        ""IssueDate"" timestamptz NOT NULL,
+                        ""DyerId"" uuid NOT NULL REFERENCES ""JobWorkMaster""(""Id"") ON DELETE RESTRICT,
+                        ""Narration"" text NULL,
+                        ""CreatedBy"" uuid NOT NULL,
+                        ""CreatedAt"" timestamptz NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""DyeingIssueDetails"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""DyeingIssueId"" uuid NOT NULL REFERENCES ""DyeingIssues""(""Id"") ON DELETE CASCADE,
+                        ""DesignId"" uuid NOT NULL REFERENCES ""Items""(""Id"") ON DELETE RESTRICT,
+                        ""YarnType"" varchar(20) NOT NULL,
+                        ""WarpYarn"" varchar(100) NULL,
+                        ""WeftYarn"" varchar(100) NULL,
+                        ""Color"" varchar(50) NULL,
+                        ""Qty"" numeric(12,2) NOT NULL,
+                        ""WeightKgs"" numeric(12,3) NOT NULL,
+                        ""Rate"" numeric(12,4) NOT NULL,
+                        ""Amount"" numeric(12,2) NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""DyeingReceives"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""ReceiveNo"" varchar(50) NOT NULL,
+                        ""ReceiveDate"" timestamptz NOT NULL,
+                        ""DyerId"" uuid NOT NULL REFERENCES ""JobWorkMaster""(""Id"") ON DELETE RESTRICT,
+                        ""IssueReferenceNo"" varchar(50) NULL,
+                        ""CreatedBy"" uuid NOT NULL,
+                        ""CreatedAt"" timestamptz NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""DyeingReceiveDetails"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""DyeingReceiveId"" uuid NOT NULL REFERENCES ""DyeingReceives""(""Id"") ON DELETE CASCADE,
+                        ""DesignId"" uuid NOT NULL REFERENCES ""Items""(""Id"") ON DELETE RESTRICT,
+                        ""YarnType"" varchar(20) NOT NULL,
+                        ""DyedColor"" varchar(50) NULL,
+                        ""QtyReceived"" numeric(12,2) NOT NULL,
+                        ""WeightReceived"" numeric(12,3) NOT NULL,
+                        ""WasteWeight"" numeric(12,3) NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""WeavingLedger"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""LoomAllocationId"" uuid NOT NULL REFERENCES ""LoomAllocation""(""Id"") ON DELETE CASCADE,
+                        ""Date"" timestamptz NOT NULL,
+                        ""EntryType"" varchar(50) NOT NULL,
+                        ""Details"" varchar(250) NULL,
+                        ""WarpQty"" numeric(12,2) NOT NULL DEFAULT 0,
+                        ""IssuedWt"" numeric(12,3) NOT NULL DEFAULT 0,
+                        ""RodQty"" numeric(12,2) NOT NULL DEFAULT 0,
+                        ""RodWt"" numeric(12,3) NOT NULL DEFAULT 0,
+                        ""Debit"" numeric(12,2) NOT NULL DEFAULT 0,
+                        ""Credit"" numeric(12,2) NOT NULL DEFAULT 0,
+                        ""Narration"" varchar(500) NULL,
+                        ""Status"" varchar(10) NOT NULL DEFAULT 'S',
+                        ""CreatedBy"" uuid NOT NULL,
+                        ""CreatedAt"" timestamptz NOT NULL
+                    );
+                ");
+                context.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS ""JobLedger"" (
+                        ""Id"" uuid NOT NULL PRIMARY KEY,
+                        ""JobWorkerId"" uuid NOT NULL REFERENCES ""JobWorkMaster""(""Id"") ON DELETE CASCADE,
+                        ""TransactionDate"" timestamptz NOT NULL,
+                        ""VoucherNo"" varchar(50) NOT NULL,
+                        ""Particulars"" varchar(250) NOT NULL,
+                        ""IssueQty"" numeric(12,2) NOT NULL DEFAULT 0,
+                        ""ReceiveQty"" numeric(12,2) NOT NULL DEFAULT 0,
+                        ""IssueWeight"" numeric(12,3) NOT NULL DEFAULT 0,
+                        ""ReceiveWeight"" numeric(12,3) NOT NULL DEFAULT 0,
+                        ""Debit"" numeric(12,2) NOT NULL DEFAULT 0,
+                        ""Credit"" numeric(12,2) NOT NULL DEFAULT 0,
+                        ""Balance"" numeric(12,2) NOT NULL DEFAULT 0,
+                        ""CreatedAt"" timestamptz NOT NULL
+                    );
+                ");
+
+                // Alter Items Table
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""WarpType"" varchar(100) NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""WeftType"" varchar(100) NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""Wages"" numeric(12,2) NOT NULL DEFAULT 0;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""WarpWeight"" numeric(12,3) NOT NULL DEFAULT 0;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""WeftWeight"" numeric(12,3) NOT NULL DEFAULT 0;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""ZariWeight"" numeric(12,3) NOT NULL DEFAULT 0;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""TotalWeight"" numeric(12,3) NOT NULL DEFAULT 0;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""Reed"" varchar(50) NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""Thread"" varchar(50) NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""NoOfCards"" integer NOT NULL DEFAULT 0;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""NoOfMarks"" integer NOT NULL DEFAULT 0;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""BodyImage"" text NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""Items"" ADD COLUMN ""PalluImage"" text NULL;"); } catch {}
+
+                // Alter StockLedger Table
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""StockLedger"" ADD COLUMN ""InwardWeight"" numeric(12,3) NOT NULL DEFAULT 0;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""StockLedger"" ADD COLUMN ""OutwardWeight"" numeric(12,3) NOT NULL DEFAULT 0;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""StockLedger"" ADD COLUMN ""BalanceWeight"" numeric(12,3) NOT NULL DEFAULT 0;"); } catch {}
+            }
+            Console.WriteLine("Job Work database tables and schema verified successfully.");
+        }
+        catch (Exception jwEx)
+        {
+            Console.WriteLine($"Warning: Failed to run custom Job Work migrations: {jwEx.Message}");
+        }
+
         DbInitializer.Initialize(context);
     }
     catch (Exception ex)

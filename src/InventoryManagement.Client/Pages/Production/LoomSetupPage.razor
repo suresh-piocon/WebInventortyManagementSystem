@@ -1,0 +1,290 @@
+@page "/production/loom-setup"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Loom Setup & Allocation - Production</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="d-flex justify-between align-center mb-6">
+        <div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+                Loom Setup & Design Allocation
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-slate-400">
+                Allocate active designs to looms, designate sub-weavers, and check technical specs
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog"
+                   Style="background: linear-gradient(135deg, #5C5CFF 0%, #00E5FF 100%); font-family: 'Outfit'; font-weight: 600;">
+            Allocate Design
+        </MudButton>
+    </div>
+
+    <MudTable Items="@_allocations" 
+              Hover="true" 
+              Loading="@_loading" 
+              SearchString="@_searchString" 
+              Filter="new Func<LoomAllocation, bool>(FilterFunc)"
+              Class="glass-panel text-slate-200">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">Active Allocations</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString" 
+                          Placeholder="Search allocations..." 
+                          Adornment="Adornment.Start" 
+                          AdornmentIcon="@Icons.Material.Filled.Search" 
+                          IconSize="Size.Medium" 
+                          Class="mt-0 text-slate-200" 
+                          Style="color: white;"/>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh Style="color: #94A3B8;">Loom No</MudTh>
+            <MudTh Style="color: #94A3B8;">Weaver Name</MudTh>
+            <MudTh Style="color: #94A3B8;">Design Name</MudTh>
+            <MudTh Style="color: #94A3B8;">Warp Type</MudTh>
+            <MudTh Style="color: #94A3B8;">Weft Type</MudTh>
+            <MudTh Style="color: #94A3B8;">Wages (₹)</MudTh>
+            <MudTh Style="color: #94A3B8;">Sub Weaver</MudTh>
+            <MudTh Style="color: #94A3B8;">Warp RefNo</MudTh>
+            <MudTh Style="color: #94A3B8;">Start Date</MudTh>
+            <MudTh Style="color: #94A3B8;">Status</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Loom No" Class="text-slate-100 font-weight-bold">@context.Loom?.LoomNo</MudTd>
+            <MudTd DataLabel="Weaver Name" Class="text-slate-200">@context.Loom?.Weaver?.Name</MudTd>
+            <MudTd DataLabel="Design Name" Class="text-slate-200 font-weight-bold">@context.Design?.Name</MudTd>
+            <MudTd DataLabel="Warp Type" Class="text-slate-300">@context.Design?.WarpType</MudTd>
+            <MudTd DataLabel="Weft Type" Class="text-slate-300">@context.Design?.WeftType</MudTd>
+            <MudTd DataLabel="Wages" Class="text-yellow-500 font-weight-bold">₹@context.Design?.Wages.ToString("N2")</MudTd>
+            <MudTd DataLabel="Sub Weaver" Class="text-slate-300">@(string.IsNullOrEmpty(context.SubWeaver) ? "None" : context.SubWeaver)</MudTd>
+            <MudTd DataLabel="Warp RefNo" Class="text-slate-300 font-mono">@(string.IsNullOrEmpty(context.WarpRefNo) ? "N/A" : context.WarpRefNo)</MudTd>
+            <MudTd DataLabel="Start Date" Class="text-slate-300">@context.StartDate.LocalDateTime.ToString("dd-MM-yyyy")</MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.Active)
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Active</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Text">Replaced</MudChip>
+                }
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+<!-- Setup Allocation Dialog -->
+<MudDialog @bind-Visible="_dialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
+            Assign Design To Loom
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isFormValid">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="Guid" Label="Select Loom No" Value="_editAllocation.LoomId" Required="true" RequiredError="Loom is required" Class="text-slate-200" ValueChanged="OnLoomChanged">
+                        @foreach (var l in _looms)
+                        {
+                            <MudSelectItem Value="@l.Id">Loom @l.LoomNo - @l.Weaver?.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="Guid" Label="Select Design" Value="_editAllocation.ItemId" Required="true" RequiredError="Design is required" Class="text-slate-200" ValueChanged="OnDesignChanged">
+                        @foreach (var d in _designs)
+                        {
+                            <MudSelectItem Value="@d.Id">@d.Code - @d.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                @if (_selectedDesign != null)
+                {
+                    <!-- Specs fetched from selected Design -->
+                    <MudItem xs="12">
+                        <MudPaper Class="pa-4" Style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">
+                            <MudText Typo="Typo.subtitle2" Class="text-slate-400 mb-2">Design Technical Specifications (Auto-Fetched)</MudText>
+                            <MudGrid>
+                                <MudItem xs="6" sm="3">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Warp Type</MudText>
+                                    <MudText Typo="Typo.body2" Class="text-slate-100 font-weight-bold">@_selectedDesign.WarpType</MudText>
+                                </MudItem>
+                                <MudItem xs="6" sm="3">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Weft Type</MudText>
+                                    <MudText Typo="Typo.body2" Class="text-slate-100 font-weight-bold">@_selectedDesign.WeftType</MudText>
+                                </MudItem>
+                                <MudItem xs="6" sm="3">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Wages</MudText>
+                                    <MudText Typo="Typo.body2" Class="text-yellow-500 font-weight-bold">₹@_selectedDesign.Wages.ToString("N2")</MudText>
+                                </MudItem>
+                                <MudItem xs="6" sm="3">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Total Weight</MudText>
+                                    <MudText Typo="Typo.body2" Class="text-slate-100 font-weight-bold">@_selectedDesign.TotalWeight.ToString("F3") Kgs</MudText>
+                                </MudItem>
+                            </MudGrid>
+                        </MudPaper>
+                    </MudItem>
+                }
+
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Sub Weaver Name" @bind-Value="_editAllocation.SubWeaver" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Warp RefNo" @bind-Value="_editAllocation.WarpRefNo" Class="text-slate-200" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Start Date" @bind-Date="_startDate" Required="true" Class="text-slate-200" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog" Variant="Variant.Text" Color="Color.Secondary">Cancel</MudButton>
+        <MudButton OnClick="SaveAllocation" Variant="Variant.Filled" Color="Color.Primary" Disabled="@_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                <MudText>Allocate</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<LoomAllocation> _allocations = new();
+    private List<LoomMaster> _looms = new();
+    private List<Item> _designs = new();
+    private bool _loading = true;
+    private bool _saving = false;
+    private string _searchString = "";
+
+    // Dialog state
+    private bool _dialogOpen = false;
+    private bool _isFormValid = false;
+    private MudForm? _form;
+    private LoomAllocation _editAllocation = new();
+    private DateTime? _startDate = DateTime.Today;
+    private Item? _selectedDesign = null;
+    private readonly DialogOptions _dialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDropdowns();
+        await LoadAllocations();
+    }
+
+    private async Task LoadDropdowns()
+    {
+        try
+        {
+            _looms = await Http.GetFromJsonAsync<List<LoomMaster>>("api/jobwork/looms") ?? new();
+            _looms = _looms.Where(l => l.Active).ToList();
+            
+            _designs = await Http.GetFromJsonAsync<List<Item>>("api/masters/items") ?? new();
+            // Filter to Design category or keep all designs
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading lookup details: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadAllocations()
+    {
+        _loading = true;
+        try
+        {
+            _allocations = await Http.GetFromJsonAsync<List<LoomAllocation>>("api/jobwork/allocations") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading allocations: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool FilterFunc(LoomAllocation element) => 
+        string.IsNullOrWhiteSpace(_searchString) || 
+        (element.Loom != null && element.Loom.LoomNo.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) ||
+        (element.Loom?.Weaver != null && element.Loom.Weaver.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) ||
+        (element.Design != null && element.Design.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+
+    private void OpenAddDialog()
+    {
+        _editAllocation = new LoomAllocation
+        {
+            Id = Guid.Empty,
+            Active = true,
+            LoomId = _looms.FirstOrDefault()?.Id ?? Guid.Empty,
+            ItemId = _designs.FirstOrDefault()?.Id ?? Guid.Empty
+        };
+        _startDate = DateTime.Today;
+        _selectedDesign = _designs.FirstOrDefault(d => d.Id == _editAllocation.ItemId);
+        _dialogOpen = true;
+    }
+
+    private void OnLoomChanged(Guid loomId)
+    {
+        _editAllocation.LoomId = loomId;
+    }
+
+    private void OnDesignChanged(Guid itemId)
+    {
+        _editAllocation.ItemId = itemId;
+        _selectedDesign = _designs.FirstOrDefault(d => d.Id == itemId);
+    }
+
+    private void CloseDialog()
+    {
+        _dialogOpen = false;
+    }
+
+    private async Task SaveAllocation()
+    {
+        if (_form == null) return;
+        await _form.Validate();
+        if (!_form.IsValid) return;
+
+        _saving = true;
+        try
+        {
+            _editAllocation.StartDate = _startDate ?? DateTimeOffset.UtcNow;
+            var response = await Http.PostAsJsonAsync("api/jobwork/allocations", _editAllocation);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Design allocated to loom successfully!", Severity.Success);
+                _dialogOpen = false;
+                await LoadAllocations();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Allocation failed: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error allocating: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

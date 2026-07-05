@@ -1,0 +1,156 @@
+@page "/reports/jobwork-ledger"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>JobWork Ledger - Reports</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="mb-6 d-flex justify-between align-center">
+        <div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+                JobWorker Ledger Statement
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-slate-400">
+                View statement history of yarn issues, saree receipts, debit payments, and credit wages for any worker
+            </MudText>
+        </div>
+        <div style="width: 250px;">
+            <MudSelect T="Guid" Label="Select Job Worker" Value="@_selectedWorkerId" ValueChanged="OnWorkerChanged" Variant="Variant.Outlined" Style="color: white;" Dense="true">
+                @foreach (var w in _workers)
+                {
+                    <MudSelectItem Value="@w.Id">@w.Name (@w.Type)</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+    </div>
+
+    @if (_selectedWorkerId == Guid.Empty)
+    {
+        <div class="d-flex flex-column align-center justify-center py-16 text-center text-slate-500 glass-panel">
+            <MudIcon Icon="@Icons.Material.Filled.Book" Size="Size.Large" Class="mb-4" />
+            <MudText Typo="Typo.h6">Select a job worker to load ledger statement</MudText>
+        </div>
+    }
+    else
+    {
+        <!-- Summary Cards -->
+        <MudGrid Class="mb-6">
+            <MudItem xs="12" sm="4">
+                <MudPaper Class="glass-panel pa-6 text-center">
+                    <MudText Typo="Typo.subtitle2" Class="text-slate-400">Total Debit (Material/Cash Issued)</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Error" Style="font-family: 'Outfit'; font-weight: 800;">
+                        ₹@_totalDebit.ToString("N2")
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudPaper Class="glass-panel pa-6 text-center">
+                    <MudText Typo="Typo.subtitle2" Class="text-slate-400">Total Credit (Saree Wages Earned)</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Success" Style="font-family: 'Outfit'; font-weight: 800;">
+                        ₹@_totalCredit.ToString("N2")
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudPaper Class="glass-panel pa-6 text-center">
+                    <MudText Typo="Typo.subtitle2" Class="text-slate-400">Outstanding Balance</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Warning" Style="font-family: 'Outfit'; font-weight: 800;">
+                        ₹@_outstandingBalance.ToString("N2")
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Statement Grid -->
+        <MudTable Items="@_ledgerEntries" Hover="true" Loading="@_loading" Dense="true" Striped="true" Class="glass-panel text-slate-200">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: #E2E8F0;">Statement History</MudText>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh Style="color: #94A3B8; width: 110px;">Date</MudTh>
+                <MudTh Style="color: #94A3B8; width: 130px;">Voucher No</MudTh>
+                <MudTh Style="color: #94A3B8; width: 220px;">Particulars</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 90px;">Issue Qty</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 90px;">Recd Qty</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 100px;">Issue Wt</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 100px;">Recd Wt</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 120px;">Debit (₹)</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 120px;">Credit (₹)</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 130px;">Balance (₹)</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Date" Class="text-slate-300">@context.TransactionDate.LocalDateTime.ToString("dd-MM-yyyy")</MudTd>
+                <MudTd DataLabel="Voucher No" Class="text-slate-200 font-mono">@context.VoucherNo</MudTd>
+                <MudTd DataLabel="Particulars" Class="text-slate-200">@context.Particulars</MudTd>
+                <MudTd DataLabel="Issue Qty" Style="text-align: right;" Class="text-slate-300">@(context.IssueQty > 0 ? context.IssueQty.ToString("N2") : "-")</MudTd>
+                <MudTd DataLabel="Recd Qty" Style="text-align: right;" Class="text-slate-300">@(context.ReceiveQty > 0 ? context.ReceiveQty.ToString("N2") : "-")</MudTd>
+                <MudTd DataLabel="Issue Wt" Style="text-align: right;" Class="text-slate-300">@(context.IssueWeight > 0 ? context.IssueWeight.ToString("F3") : "-")</MudTd>
+                <MudTd DataLabel="Recd Wt" Style="text-align: right;" Class="text-slate-300">@(context.ReceiveWeight > 0 ? context.ReceiveWeight.ToString("F3") : "-")</MudTd>
+                <MudTd DataLabel="Debit" Style="text-align: right;" Class="text-red-400">@(context.Debit > 0 ? $"₹{context.Debit:N2}" : "-")</MudTd>
+                <MudTd DataLabel="Credit" Style="text-align: right;" Class="text-green-400">@(context.Credit > 0 ? $"₹{context.Credit:N2}" : "-")</MudTd>
+                <MudTd DataLabel="Balance" Style="text-align: right;" Class="font-weight-bold text-slate-100">₹@context.Balance.ToString("N2")</MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Class="text-slate-400 pa-4">No transactions found for this worker.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    private List<JobWorkMaster> _workers = new();
+    private Guid _selectedWorkerId = Guid.Empty;
+    private List<JobLedger> _ledgerEntries = new();
+    private bool _loading = false;
+
+    // Balances
+    private decimal _totalDebit = 0;
+    private decimal _totalCredit = 0;
+    private decimal _outstandingBalance = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _workers = await Http.GetFromJsonAsync<List<JobWorkMaster>>("api/jobwork/workers") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading workers list: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OnWorkerChanged(Guid workerId)
+    {
+        _selectedWorkerId = workerId;
+        _ledgerEntries.Clear();
+        _totalDebit = 0;
+        _totalCredit = 0;
+        _outstandingBalance = 0;
+        StateHasChanged();
+
+        if (workerId == Guid.Empty) return;
+
+        _loading = true;
+        try
+        {
+            _ledgerEntries = await Http.GetFromJsonAsync<List<JobLedger>>($"api/jobwork/reports/jobwork-ledger/{workerId}") ?? new();
+            
+            _totalDebit = _ledgerEntries.Sum(j => j.Debit);
+            _totalCredit = _ledgerEntries.Sum(j => j.Credit);
+            
+            if (_ledgerEntries.Any())
+            {
+                _outstandingBalance = _ledgerEntries.Last().Balance;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading ledger: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

@@ -29,177 +29,304 @@
             <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
         </div>
     }
-    else if (_data != null)
+    else
     {
-        <!-- Metrics Row -->
-        <MudGrid Class="mb-6">
-            <MudItem xs="12" sm="6" md="4" lg="2">
-                <MudPaper Class="glass-card pa-4 d-flex align-center justify-between">
-                    <div>
-                        <MudText Typo="Typo.caption" Class="text-slate-400">Total Suppliers</MudText>
-                        <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-slate-100">@_data.TotalSuppliers</MudText>
-                    </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Primary" Size="Size.Large" />
-                </MudPaper>
-            </MudItem>
+        <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="mt-6" Class="glass-panel" Style="font-family: 'Outfit';">
+            <MudTabPanel Text="General Inventory Overview" Icon="@Icons.Material.Filled.Warehouse">
+                @if (_data != null)
+                {
+                    <!-- Metrics Row -->
+                    <MudGrid Class="mb-6">
+                        <MudItem xs="12" sm="6" md="4" lg="2">
+                            <MudPaper Class="glass-card pa-4 d-flex align-center justify-between">
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="text-slate-400">Total Suppliers</MudText>
+                                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-slate-100">@_data.TotalSuppliers</MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Primary" Size="Size.Large" />
+                            </MudPaper>
+                        </MudItem>
 
-            <MudItem xs="12" sm="6" md="4" lg="2">
-                <MudPaper Class="glass-card pa-4 d-flex align-center justify-between">
-                    <div>
-                        <MudText Typo="Typo.caption" Class="text-slate-400">Total Items</MudText>
-                        <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-slate-100">@_data.TotalItems</MudText>
-                    </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Layers" Color="Color.Secondary" Size="Size.Large" />
-                </MudPaper>
-            </MudItem>
+                        <MudItem xs="12" sm="6" md="4" lg="2">
+                            <MudPaper Class="glass-card pa-4 d-flex align-center justify-between">
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="text-slate-400">Total Items</MudText>
+                                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-slate-100">@_data.TotalItems</MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.Layers" Color="Color.Secondary" Size="Size.Large" />
+                            </MudPaper>
+                        </MudItem>
 
-            <MudItem xs="12" sm="6" md="4" lg="2">
-                <MudPaper Class="glass-card pa-4 d-flex align-center justify-between">
-                    <div>
-                        <MudText Typo="Typo.caption" Class="text-slate-400">Today's Inward</MudText>
-                        <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-slate-100">@_data.TodayInward</MudText>
-                    </div>
-                    <MudIcon Icon="@Icons.Material.Filled.MoveToInbox" Color="Color.Success" Size="Size.Large" />
-                </MudPaper>
-            </MudItem>
+                        <MudItem xs="12" sm="6" md="4" lg="2">
+                            <MudPaper Class="glass-card pa-4 d-flex align-center justify-between">
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="text-slate-400">Today's Inward</MudText>
+                                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-slate-100">@_data.TodayInward</MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.MoveToInbox" Color="Color.Success" Size="Size.Large" />
+                            </MudPaper>
+                        </MudItem>
 
-            <MudItem xs="12" sm="6" md="4" lg="2">
-                <MudPaper Class="glass-card pa-4 d-flex align-center justify-between">
-                    <div>
-                        <MudText Typo="Typo.caption" Class="text-slate-400">Today's Outward</MudText>
-                        <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-slate-100">@_data.TodayOutward</MudText>
-                    </div>
-                    <MudIcon Icon="@Icons.Material.Filled.Outbox" Color="Color.Error" Size="Size.Large" />
-                </MudPaper>
-            </MudItem>
+                        <MudItem xs="12" sm="6" md="4" lg="2">
+                            <MudPaper Class="glass-card pa-4 d-flex align-center justify-between">
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="text-slate-400">Today's Outward</MudText>
+                                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-slate-100">@_data.TodayOutward</MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.Outbox" Color="Color.Error" Size="Size.Large" />
+                            </MudPaper>
+                        </MudItem>
 
-            <MudItem xs="12" sm="12" md="8" lg="4">
-                <MudPaper Class="glass-card pa-4 d-flex align-center justify-between" Style="border: 1px solid rgba(0, 229, 255, 0.2) !important;">
-                    <div>
-                        <MudText Typo="Typo.caption" Class="text-slate-400">Current Stock Value (@_valuationMethod)</MudText>
-                        <MudText Typo="Typo.h5" Class="font-weight-bold mt-1" Style="color: #00E5FF; font-family: 'Outfit';">
-                            ₹@_data.CurrentStockValue.ToString("N2")
-                        </MudText>
-                    </div>
-                    <MudIcon Icon="@Icons.Material.Filled.MonetizationOn" Color="Color.Secondary" Size="Size.Large" />
-                </MudPaper>
-            </MudItem>
-        </MudGrid>
+                        <MudItem xs="12" sm="12" md="8" lg="4">
+                            <MudPaper Class="glass-card pa-4 d-flex align-center justify-between" Style="border: 1px solid rgba(0, 229, 255, 0.2) !important;">
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="text-slate-400">Current Stock Value (@_valuationMethod)</MudText>
+                                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1" Style="color: #00E5FF; font-family: 'Outfit';">
+                                        ₹@_data.CurrentStockValue.ToString("N2")
+                                    </MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.MonetizationOn" Color="Color.Secondary" Size="Size.Large" />
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
 
-        <!-- Charts Row -->
-        <MudGrid Class="mb-6">
-            <MudItem xs="12" md="8">
-                <MudPaper Class="glass-panel pa-6">
-                    <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
-                        Monthly Stock Movement (Volume)
-                    </MudText>
-                    @if (_chartSeries.Any())
-                    {
-                        <MudChart T="double" 
-                                  ChartType="ChartType.Line" 
-                                  ChartSeries="@_chartSeries" 
-                                  XAxisLabels="@_chartLabels" 
-                                  Width="100%" 
-                                  Height="300px" 
-                                  ChartOptions="@_chartOptions" />
-                    }
-                    else
-                    {
-                        <div class="d-flex align-center justify-center" style="height: 300px;">
-                            <MudText Class="text-slate-500">No chart data available</MudText>
-                        </div>
-                    }
-                </MudPaper>
-            </MudItem>
+                    <!-- Charts Row -->
+                    <MudGrid Class="mb-6">
+                        <MudItem xs="12" md="8">
+                            <MudPaper Class="glass-panel pa-6">
+                                <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                                    Monthly Stock Movement (Volume)
+                                </MudText>
+                                @if (_chartSeries.Any())
+                                {
+                                    <MudChart T="double" ChartType="ChartType.Line" 
+                                              ChartSeries="@_chartSeries" 
+                                              XAxisLabels="@_chartLabels" 
+                                              Width="100%" 
+                                              Height="300px" 
+                                              ChartOptions="@_chartOptions" />
+                                }
+                                else
+                                {
+                                    <div class="d-flex align-center justify-center" style="height: 300px;">
+                                        <MudText Class="text-slate-500">No chart data available</MudText>
+                                    </div>
+                                }
+                            </MudPaper>
+                        </MudItem>
 
-            <MudItem xs="12" md="4">
-                <MudPaper Class="glass-panel pa-6 d-flex flex-column" Style="height: 100%;">
-                    <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
-                        Top Suppliers (Qty Purchased)
-                    </MudText>
-                    @if (_donutData.Any())
-                    {
-                        <div class="d-flex align-center justify-center flex-grow-1">
-                            <MudChart T="double" 
-                                      ChartType="ChartType.Donut" 
-                                      InputData="@_donutData.ToArray()" 
-                                      InputLabels="@_donutLabels.ToArray()" 
-                                      Width="250px" 
-                                      Height="250px" />
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="d-flex align-center justify-center flex-grow-1">
-                            <MudText Class="text-slate-500">No supplier data available</MudText>
-                        </div>
-                    }
-                </MudPaper>
-            </MudItem>
-        </MudGrid>
+                        <MudItem xs="12" md="4">
+                            <MudPaper Class="glass-panel pa-6 d-flex flex-column" Style="height: 100%;">
+                                <MudText Typo="Typo.h6" Class="text-slate-200 mb-4" Style="font-family: 'Outfit';">
+                                    Top Suppliers (Qty Purchased)
+                                </MudText>
+                                @if (_donutData.Any())
+                                {
+                                    <div class="d-flex align-center justify-center flex-grow-1">
+                                        <MudChart T="double" ChartType="ChartType.Donut" 
+                                                  InputData="@_donutData.ToArray()" 
+                                                  InputLabels="@_donutLabels.ToArray()" 
+                                                  Width="250px" 
+                                                  Height="250px" />
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="d-flex align-center justify-center flex-grow-1">
+                                        <MudText Class="text-slate-500">No supplier data available</MudText>
+                                    </div>
+                                }
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
 
-        <!-- Warnings / Low Stock Grid -->
-        <MudGrid>
-            <MudItem xs="12">
-                <MudCard Class="glass-panel">
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6" Color="Color.Warning" Class="font-weight-bold" Style="font-family: 'Outfit';">
-                                <MudIcon Icon="@Icons.Material.Filled.Warning" Class="mr-2" /> Low Stock & Reorder Alerts
-                            </MudText>
-                        </CardHeaderContent>
-                        <CardHeaderActions>
-                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Text">
-                                @_data.LowStockItems.Count Items Require Reorder
-                            </MudChip>
-                        </CardHeaderActions>
-                    </MudCardHeader>
-                    <MudCardContent Class="pa-0">
-                        @if (_data.LowStockItems.Any())
-                        {
-                            <MudTable Items="@_data.LowStockItems" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0" Style="background: transparent;">
-                                <HeaderContent>
-                                    <MudTh Style="color: #94A3B8;">Item Code</MudTh>
-                                    <MudTh Style="color: #94A3B8;">Item Name</MudTh>
-                                    <MudTh Style="color: #94A3B8;">Min Stock</MudTh>
-                                    <MudTh Style="color: #94A3B8;">Reorder Level</MudTh>
-                                    <MudTh Style="color: #94A3B8;">Current Stock</MudTh>
-                                    <MudTh Style="color: #94A3B8; text-align: right;">Status</MudTh>
-                                </HeaderContent>
-                                <RowTemplate>
-                                    <MudTd DataLabel="Item Code" Class="text-slate-300">@context.ItemCode</MudTd>
-                                    <MudTd DataLabel="Item Name" Class="text-slate-200 font-weight-bold">@context.ItemName</MudTd>
-                                    <MudTd DataLabel="Min Stock" Class="text-slate-300">@context.MinStock.ToString("N2") @context.UnitCode</MudTd>
-                                    <MudTd DataLabel="Reorder Level" Class="text-slate-300">@context.ReorderLevel.ToString("N2") @context.UnitCode</MudTd>
-                                    <MudTd DataLabel="Current Stock" Class="text-slate-100 font-weight-bold">
-                                        <span class="@(context.CurrentStock <= context.MinStock ? "text-red-500 font-bold" : "text-yellow-500")">
-                                            @context.CurrentStock.ToString("N2") @context.UnitCode
-                                        </span>
-                                    </MudTd>
-                                    <MudTd DataLabel="Status" Style="text-align: right;">
-                                        @if (context.CurrentStock <= context.MinStock)
-                                        {
-                                            <MudChip T="string" Color="Color.Error" Size="Size.Small">CRITICAL</MudChip>
-                                        }
-                                        else
-                                        {
-                                            <MudChip T="string" Color="Color.Warning" Size="Size.Small">REORDER</MudChip>
-                                        }
-                                    </MudTd>
-                                </RowTemplate>
-                            </MudTable>
-                        }
-                        else
-                        {
-                            <div class="d-flex align-center justify-center py-6">
-                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Class="mr-2" />
-                                <MudText Class="text-slate-400">All item stock levels are healthy.</MudText>
-                            </div>
-                        }
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
-        </MudGrid>
+                    <!-- Warnings / Low Stock Grid -->
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <MudCard Class="glass-panel">
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6" Color="Color.Warning" Class="font-weight-bold" Style="font-family: 'Outfit';">
+                                            <MudIcon Icon="@Icons.Material.Filled.Warning" Class="mr-2" /> Low Stock & Reorder Alerts
+                                        </MudText>
+                                    </CardHeaderContent>
+                                    <CardHeaderActions>
+                                        <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Text">
+                                            @_data.LowStockItems.Count Items Require Reorder
+                                        </MudChip>
+                                    </CardHeaderActions>
+                                </MudCardHeader>
+                                <MudCardContent Class="pa-0">
+                                    @if (_data.LowStockItems.Any())
+                                    {
+                                        <MudTable Items="@_data.LowStockItems" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0" Style="background: transparent;">
+                                            <HeaderContent>
+                                                <MudTh Style="color: #94A3B8;">Item Code</MudTh>
+                                                <MudTh Style="color: #94A3B8;">Item Name</MudTh>
+                                                <MudTh Style="color: #94A3B8;">Min Stock</MudTh>
+                                                <MudTh Style="color: #94A3B8;">Reorder Level</MudTh>
+                                                <MudTh Style="color: #94A3B8;">Current Stock</MudTh>
+                                                <MudTh Style="color: #94A3B8; text-align: right;">Status</MudTh>
+                                            </HeaderContent>
+                                            <RowTemplate>
+                                                <MudTd DataLabel="Item Code" Class="text-slate-300">@context.ItemCode</MudTd>
+                                                <MudTd DataLabel="Item Name" Class="text-slate-200 font-weight-bold">@context.ItemName</MudTd>
+                                                <MudTd DataLabel="Min Stock" Class="text-slate-300">@context.MinStock.ToString("N2") @context.UnitCode</MudTd>
+                                                <MudTd DataLabel="Reorder Level" Class="text-slate-300">@context.ReorderLevel.ToString("N2") @context.UnitCode</MudTd>
+                                                <MudTd DataLabel="Current Stock" Class="text-slate-100 font-weight-bold">
+                                                    <span class="@(context.CurrentStock <= context.MinStock ? "text-red-500 font-bold" : "text-yellow-500")">
+                                                        @context.CurrentStock.ToString("N2") @context.UnitCode
+                                                    </span>
+                                                </MudTd>
+                                                <MudTd DataLabel="Status" Style="text-align: right;">
+                                                    @if (context.CurrentStock <= context.MinStock)
+                                                    {
+                                                        <MudChip T="string" Color="Color.Error" Size="Size.Small">CRITICAL</MudChip>
+                                                    }
+                                                    else
+                                                    {
+                                                        <MudChip T="string" Color="Color.Warning" Size="Size.Small">REORDER</MudChip>
+                                                    }
+                                                </MudTd>
+                                            </RowTemplate>
+                                        </MudTable>
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex align-center justify-center py-6">
+                                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Class="mr-2" />
+                                            <MudText Class="text-slate-400">All item stock levels are healthy.</MudText>
+                                        </div>
+                                    }
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    </MudGrid>
+                }
+            </MudTabPanel>
+
+            <MudTabPanel Text="Job Work Production Module" Icon="@Icons.Material.Filled.PrecisionManufacturing">
+                @if (_jwData != null)
+                {
+                    <!-- Job Work Metrics -->
+                    <MudGrid Class="mb-6">
+                        <MudItem xs="12" sm="6" md="4" lg="2">
+                            <MudPaper Class="glass-card pa-4 d-flex align-center justify-between">
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="text-slate-400">Dyer Outstanding</MudText>
+                                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-slate-100">₹@_jwData.DyerOutstanding.ToString("N2")</MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.ColorLens" Color="Color.Primary" Size="Size.Large" />
+                            </MudPaper>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6" md="4" lg="2">
+                            <MudPaper Class="glass-card pa-4 d-flex align-center justify-between">
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="text-slate-400">Weaver Outstanding</MudText>
+                                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-slate-100">₹@_jwData.WeaverOutstanding.ToString("N2")</MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Color="Color.Secondary" Size="Size.Large" />
+                            </MudPaper>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6" md="4" lg="2">
+                            <MudPaper Class="glass-card pa-4 d-flex align-center justify-between">
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="text-slate-400">Pending Dyeing Yarn</MudText>
+                                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-slate-100 font-mono">@_jwData.PendingDyeingQty.ToString("N0") Kg</MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.Input" Color="Color.Info" Size="Size.Large" />
+                            </MudPaper>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6" md="4" lg="2">
+                            <MudPaper Class="glass-card pa-4 d-flex align-center justify-between">
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="text-slate-400">Pending Weaving</MudText>
+                                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-slate-100 font-mono">@_jwData.PendingWeavingQty.ToString("N0") Pc</MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.Settings" Color="Color.Warning" Size="Size.Large" />
+                            </MudPaper>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="12" md="8" lg="4">
+                            <MudPaper Class="glass-card pa-4 d-flex align-center justify-between" Style="border: 1px solid rgba(16, 185, 129, 0.2) !important;">
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="text-slate-400">Finished Saree Stock</MudText>
+                                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-green-400 font-mono">
+                                        @_jwData.FinishedSareeStock.ToString("N0") Pc
+                                    </MudText>
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.Store" Color="Color.Success" Size="Size.Large" />
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudGrid>
+                        <!-- Loom Balances Table -->
+                        <MudItem xs="12" md="7">
+                            <MudCard Class="glass-panel">
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6" Class="text-slate-200" Style="font-family: 'Outfit';">
+                                            Active Loom Material Balances
+                                        </MudText>
+                                    </CardHeaderContent>
+                                </MudCardHeader>
+                                <MudCardContent Class="pa-0">
+                                    <MudTable Items="@_jwData.LoomBalances" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" Style="background: transparent;">
+                                        <HeaderContent>
+                                            <MudTh Style="color: #94A3B8;">Loom No</MudTh>
+                                            <MudTh Style="color: #94A3B8;">Weaver Name</MudTh>
+                                            <MudTh Style="color: #94A3B8;">Design Name</MudTh>
+                                            <MudTh Style="color: #94A3B8; text-align: right;">Bal Warp Qty</MudTh>
+                                            <MudTh Style="color: #94A3B8; text-align: right;">Bal Weight</MudTh>
+                                        </HeaderContent>
+                                        <RowTemplate>
+                                            <MudTd DataLabel="Loom No" Class="text-slate-100 font-weight-bold font-mono">@context.LoomNo</MudTd>
+                                            <MudTd DataLabel="Weaver" Class="text-slate-200">@context.WeaverName</MudTd>
+                                            <MudTd DataLabel="Design" Class="text-slate-300">@context.DesignName</MudTd>
+                                            <MudTd DataLabel="Bal Qty" Style="text-align: right;" Class="text-yellow-500 font-weight-bold">@context.BalanceSareeQty Pcs</MudTd>
+                                            <MudTd DataLabel="Bal Wt" Style="text-align: right;" Class="text-slate-100 font-weight-bold">@context.BalanceWeight.ToString("F3") Kg</MudTd>
+                                        </RowTemplate>
+                                    </MudTable>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+
+                        <!-- Design-wise Balances Table -->
+                        <MudItem xs="12" md="5">
+                            <MudCard Class="glass-panel">
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6" Class="text-slate-200" Style="font-family: 'Outfit';">
+                                            Design-wise Balance Control
+                                        </MudText>
+                                    </CardHeaderContent>
+                                </MudCardHeader>
+                                <MudCardContent Class="pa-0">
+                                    <MudTable Items="@_jwData.DesignBalances" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" Style="background: transparent;">
+                                        <HeaderContent>
+                                            <MudTh Style="color: #94A3B8;">Design Name</MudTh>
+                                            <MudTh Style="color: #94A3B8; text-align: right;">Pending Dyeing</MudTh>
+                                            <MudTh Style="color: #94A3B8; text-align: right;">Pending Weaving</MudTh>
+                                            <MudTh Style="color: #94A3B8; text-align: right;">Finished Stock</MudTh>
+                                        </HeaderContent>
+                                        <RowTemplate>
+                                            <MudTd DataLabel="Design" Class="text-slate-200 font-weight-bold">@context.DesignName</MudTd>
+                                            <MudTd DataLabel="Pending Dyeing" Style="text-align: right;" Class="text-slate-300">@context.PendingDyeingQty.ToString("N0")</MudTd>
+                                            <MudTd DataLabel="Pending Weaving" Style="text-align: right;" Class="text-yellow-500">@context.PendingWeavingQty.ToString("N0")</MudTd>
+                                            <MudTd DataLabel="Finished Stock" Style="text-align: right;" Class="text-green-400 font-weight-bold">@context.FinishedSareeStock.ToString("N0")</MudTd>
+                                        </RowTemplate>
+                                    </MudTable>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    </MudGrid>
+                }
+            </MudTabPanel>
+        </MudTabs>
     }
 </MudContainer>
 
@@ -207,6 +334,7 @@
     private bool _loading = true;
     private string _valuationMethod = "WeightedAverage";
     private DashboardDto? _data;
+    private JobWorkDashboardDto? _jwData;
 
     private List<ChartSeries<double>> _chartSeries = new();
     private string[] _chartLabels = Array.Empty<string>();
@@ -233,6 +361,8 @@
         try
         {
             _data = await Http.GetFromJsonAsync<DashboardDto>($"api/reports/dashboard?valuationMethod={_valuationMethod}");
+            _jwData = await Http.GetFromJsonAsync<JobWorkDashboardDto>("api/jobwork/dashboard");
+
             if (_data != null)
             {
                 // Format Monthly Movements Chart
