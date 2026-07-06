@@ -398,6 +398,7 @@
         {
             ReceiveDate = DateTimeOffset.UtcNow,
             DyerId = _dyers.FirstOrDefault()?.Id ?? Guid.Empty,
+            ReceiveNo = "Auto",
             WastePercentage = 0,
             AllowManualWaste = false
         };

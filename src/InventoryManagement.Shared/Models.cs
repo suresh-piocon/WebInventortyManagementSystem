@@ -1362,7 +1362,7 @@ namespace InventoryManagement.Shared
 
         [Required]
         [StringLength(50)]
-        public string ReceiveNo { get; set; } = string.Empty;
+        public string ReceiveNo { get; set; } = "Auto";
 
         [Required]
         public DateTimeOffset ReceiveDate { get; set; } = DateTimeOffset.UtcNow;
