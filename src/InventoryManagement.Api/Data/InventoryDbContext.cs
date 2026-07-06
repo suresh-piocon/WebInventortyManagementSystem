@@ -225,6 +225,18 @@ namespace InventoryManagement.Api.Data
                 .Property(d => d.WeightReceived).HasPrecision(12, 3);
             modelBuilder.Entity<DyeingReceiveDetail>()
                 .Property(d => d.WasteWeight).HasPrecision(12, 3);
+            modelBuilder.Entity<DyeingReceiveDetail>()
+                .Property(d => d.IssuedQty).HasPrecision(12, 2);
+            modelBuilder.Entity<DyeingReceiveDetail>()
+                .Property(d => d.IssuedWeight).HasPrecision(12, 3);
+            modelBuilder.Entity<DyeingReceiveDetail>()
+                .Property(d => d.Rate).HasPrecision(12, 4);
+
+            modelBuilder.Entity<DyeingReceive>()
+                .Property(d => d.WastePercentage).HasPrecision(5, 2);
+
+            modelBuilder.Entity<JobWorkMaster>()
+                .Property(w => w.WastePercentage).HasPrecision(5, 2);
 
             modelBuilder.Entity<WeavingLedgerEntry>()
                 .Property(w => w.WarpQty).HasPrecision(12, 2);

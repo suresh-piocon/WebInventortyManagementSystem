@@ -61,57 +61,121 @@
             <!-- Date Filter Panel -->
             <MudPaper Class="glass-panel pa-6 mb-6">
                 <MudText Typo="Typo.subtitle1" Class="text-slate-200 font-weight-bold mb-4" Style="font-family: 'Outfit';">
-                    <MudIcon Icon="@Icons.Material.Filled.FilterList" Class="mr-2 text-primary" /> Filter Inward Invoices
+                    <MudIcon Icon="@Icons.Material.Filled.FilterList" Class="mr-2 text-primary" /> Filter Transactions
                 </MudText>
                 <div class="d-flex align-center gap-4 flex-wrap">
-                    <MudDatePicker Label="From Date" @bind-Date="_fromDate" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 220px; color: white;" />
-                    <MudDatePicker Label="To Date" @bind-Date="_toDate" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 220px; color: white;" />
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Search" OnClick="LoadInwards" Class="mt-1" Style="height: 40px;">
-                        Fetch Inward Invoices
+                    <MudDatePicker Label="From Date" @bind-Date="_fromDate" DateFormat="dd/MM/yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 220px; color: white;" />
+                    <MudDatePicker Label="To Date" @bind-Date="_toDate" DateFormat="dd/MM/yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 220px; color: white;" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Search" OnClick="FetchData" Class="mt-1" Style="height: 40px;">
+                        Fetch Transactions
                     </MudButton>
                 </div>
             </MudPaper>
 
-            <!-- Stock Inwards Table -->
-            <MudPaper Class="glass-panel pa-6 mb-6">
-                <MudTable T="StockInward" Items="@_inwards" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0" 
-                          Filter="new Func<StockInward, bool>(FilterInwardsFunc)"
-                          SelectedItem="@_selectedInward" SelectedItemChanged="OnInwardSelected"
-                          Style="background: transparent;">
-                    <ToolBarContent>
-                        <MudText Typo="Typo.h6" Class="text-slate-200" Style="font-family: 'Outfit';">
-                            <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2 text-primary" /> 1. Select Inward Invoice
-                        </MudText>
-                        <MudSpacer />
-                        <MudTextField @bind-Value="InwardSearchQuery" Placeholder="Search Supplier, Invoice No..." 
-                                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
-                                      IconSize="Size.Medium" Class="mt-0 text-slate-200" Style="color: white; max-width: 320px;" />
-                    </ToolBarContent>
-                    <HeaderContent>
-                        <MudTh Style="color: #94A3B8; width: 60px;">Select</MudTh>
-                        <MudTh Style="color: #94A3B8;">Supplier Name</MudTh>
-                        <MudTh Style="color: #94A3B8;">Invoice No</MudTh>
-                        <MudTh Style="color: #94A3B8;">Invoice Date</MudTh>
-                        <MudTh Style="color: #94A3B8; text-align: right;">Total Qty</MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd>
-                            <MudCheckBox T="bool" 
-                                         Value="@(_selectedInward?.Id == context.Id)" 
-                                         ValueChanged="@((bool val) => OnInwardCheckboxChanged(val, context))" 
-                                         Color="Color.Primary" 
-                                         Size="Size.Small" />
-                        </MudTd>
-                        <MudTd DataLabel="Supplier Name" Class="text-slate-100 font-weight-bold">@context.Supplier?.Name</MudTd>
-                        <MudTd DataLabel="Invoice No" Class="text-slate-200">@context.InvoiceNo</MudTd>
-                        <MudTd DataLabel="Invoice Date" Class="text-slate-300">@(context.InvoiceDate?.LocalDateTime.ToString("yyyy-MM-dd") ?? "N/A")</MudTd>
-                        <MudTd DataLabel="Total Qty" Style="text-align: right;" Class="text-cyan font-weight-bold">@context.Details?.Sum(d => d.Quantity).ToString("N0")</MudTd>
-                    </RowTemplate>
-                    <PagerContent>
-                        <MudTablePager PageSizeOptions="new int[]{5, 10, 20}" />
-                    </PagerContent>
-                </MudTable>
+            <!-- Source Toggle Panel -->
+            <MudPaper Class="glass-panel pa-3 mb-4 d-flex justify-center gap-4">
+                <MudButton Variant="@(_activeSource == BarcodeSource.SupplierInward ? Variant.Filled : Variant.Text)" 
+                           Color="Color.Primary" 
+                           OnClick="@(() => OnSourceChanged(BarcodeSource.SupplierInward))"
+                           Style="font-family: 'Outfit'; font-weight: 600;">
+                    Supplier Inwards
+                </MudButton>
+                <MudButton Variant="@(_activeSource == BarcodeSource.WeavingReceipt ? Variant.Filled : Variant.Text)" 
+                           Color="Color.Primary" 
+                           OnClick="@(() => OnSourceChanged(BarcodeSource.WeavingReceipt))"
+                           Style="font-family: 'Outfit'; font-weight: 600;">
+                    Weaving Receipts
+                </MudButton>
             </MudPaper>
+
+            @if (_activeSource == BarcodeSource.SupplierInward)
+            {
+                <!-- Stock Inwards Table -->
+                <MudPaper Class="glass-panel pa-6 mb-6">
+                    <MudTable T="StockInward" Items="@_inwards" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0" 
+                              Filter="new Func<StockInward, bool>(FilterInwardsFunc)"
+                              SelectedItem="@_selectedInward" SelectedItemChanged="OnInwardSelected"
+                              Style="background: transparent;">
+                        <ToolBarContent>
+                            <MudText Typo="Typo.h6" Class="text-slate-200" Style="font-family: 'Outfit';">
+                                <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2 text-primary" /> 1. Select Inward Invoice
+                            </MudText>
+                            <MudSpacer />
+                            <MudTextField @bind-Value="InwardSearchQuery" Placeholder="Search Supplier, Invoice No..." 
+                                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                                          IconSize="Size.Medium" Class="mt-0 text-slate-200" Style="color: white; max-width: 320px;" />
+                        </ToolBarContent>
+                        <HeaderContent>
+                            <MudTh Style="color: #94A3B8; width: 60px;">Select</MudTh>
+                            <MudTh Style="color: #94A3B8;">Supplier Name</MudTh>
+                            <MudTh Style="color: #94A3B8;">Invoice No</MudTh>
+                            <MudTh Style="color: #94A3B8;">Invoice Date</MudTh>
+                            <MudTh Style="color: #94A3B8; text-align: right;">Total Qty</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>
+                                <MudCheckBox T="bool" 
+                                             Value="@(_selectedInward?.Id == context.Id)" 
+                                             ValueChanged="@((bool val) => OnInwardCheckboxChanged(val, context))" 
+                                             Color="Color.Primary" 
+                                             Size="Size.Small" />
+                            </MudTd>
+                            <MudTd DataLabel="Supplier Name" Class="text-slate-100 font-weight-bold">@context.Supplier?.Name</MudTd>
+                            <MudTd DataLabel="Invoice No" Class="text-slate-200">@context.InvoiceNo</MudTd>
+                            <MudTd DataLabel="Invoice Date" Class="text-slate-300">@(context.InvoiceDate?.LocalDateTime.ToString("yyyy-MM-dd") ?? "N/A")</MudTd>
+                            <MudTd DataLabel="Total Qty" Style="text-align: right;" Class="text-cyan font-weight-bold">@context.Details?.Sum(d => d.Quantity).ToString("N0")</MudTd>
+                        </RowTemplate>
+                        <PagerContent>
+                            <MudTablePager PageSizeOptions="new int[]{5, 10, 20}" />
+                        </PagerContent>
+                    </MudTable>
+                </MudPaper>
+            }
+            else
+            {
+                <!-- Weaving Receipts Table -->
+                <MudPaper Class="glass-panel pa-6 mb-6">
+                    <MudTable T="WeavingLedgerEntry" Items="@_weavingReceipts" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0" 
+                              Filter="new Func<WeavingLedgerEntry, bool>(FilterWeavingReceiptsFunc)"
+                              SelectedItem="@_selectedWeavingReceipt" SelectedItemChanged="OnWeavingReceiptSelected"
+                              Style="background: transparent;">
+                        <ToolBarContent>
+                            <MudText Typo="Typo.h6" Class="text-slate-200" Style="font-family: 'Outfit';">
+                                <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2 text-primary" /> 1. Select Weaving Receipt
+                            </MudText>
+                            <MudSpacer />
+                            <MudTextField @bind-Value="WeavingSearchQuery" Placeholder="Search Weaver, Design..." 
+                                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                                          IconSize="Size.Medium" Class="mt-0 text-slate-200" Style="color: white; max-width: 320px;" />
+                        </ToolBarContent>
+                        <HeaderContent>
+                            <MudTh Style="color: #94A3B8; width: 60px;">Select</MudTh>
+                            <MudTh Style="color: #94A3B8;">Weaver Name</MudTh>
+                            <MudTh Style="color: #94A3B8;">Design / Item Name</MudTh>
+                            <MudTh Style="color: #94A3B8;">Loom No</MudTh>
+                            <MudTh Style="color: #94A3B8;">Receive Date</MudTh>
+                            <MudTh Style="color: #94A3B8; text-align: right;">Received Qty</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>
+                                <MudCheckBox T="bool" 
+                                             Value="@(_selectedWeavingReceipt?.Id == context.Id)" 
+                                             ValueChanged="@((bool val) => OnWeavingReceiptCheckboxChanged(val, context))" 
+                                             Color="Color.Primary" 
+                                             Size="Size.Small" />
+                            </MudTd>
+                            <MudTd DataLabel="Weaver Name" Class="text-slate-100 font-weight-bold">@context.LoomAllocation?.Loom?.Weaver?.Name</MudTd>
+                            <MudTd DataLabel="Design / Item Name" Class="text-slate-200">@context.LoomAllocation?.Design?.Name</MudTd>
+                            <MudTd DataLabel="Loom No" Class="text-slate-300">Loom @context.LoomAllocation?.Loom?.LoomNo</MudTd>
+                            <MudTd DataLabel="Receive Date" Class="text-slate-300">@context.Date.LocalDateTime.ToString("yyyy-MM-dd")</MudTd>
+                            <MudTd DataLabel="Received Qty" Style="text-align: right;" Class="text-cyan font-weight-bold">@context.RodQty.ToString("N0")</MudTd>
+                        </RowTemplate>
+                        <PagerContent>
+                            <MudTablePager PageSizeOptions="new int[]{5, 10, 20}" />
+                        </PagerContent>
+                    </MudTable>
+                </MudPaper>
+            }
  
              <!-- Barcodes Table -->
              <MudPaper Class="glass-panel pa-6">
@@ -139,15 +203,30 @@
                  {
                      <div class="d-flex flex-column align-center justify-center py-8 text-center text-slate-500">
                          <MudIcon Icon="@Icons.Material.Filled.QrCode" Size="Size.Large" Class="mb-2" />
-                         @if (_selectedInward == null)
+                         @if (_activeSource == BarcodeSource.SupplierInward)
                          {
-                             <MudText>Select an inward invoice from the list above to display its corresponding barcodes.</MudText>
+                             @if (_selectedInward == null)
+                             {
+                                 <MudText>Select an inward invoice from the list above to display its corresponding barcodes.</MudText>
+                             }
+                             else
+                             {
+                                 <MudText>No barcodes registered for this stock inward invoice.</MudText>
+                             }
                          }
                          else
                          {
-                             <MudText>No barcodes registered for this stock inward invoice.</MudText>
+                             @if (_selectedWeavingReceipt == null)
+                             {
+                                 <MudText>Select a weaving receipt from the list above to display its corresponding barcodes.</MudText>
+                             }
+                             else
+                             {
+                                 <MudText>No barcodes registered for this weaving receipt.</MudText>
+                             }
                          }
                      </div>
+                 }
                  }
                  else
                  {
@@ -160,6 +239,7 @@
                                  <MudTh Style="color: #94A3B8;">Tracking No</MudTh>
                                  <MudTh Style="color: #94A3B8;">Type</MudTh>
                                  <MudTh Style="color: #94A3B8;">Status</MudTh>
+                                 <MudTh Style="color: #94A3B8;">Printed</MudTh>
                                  <MudTh Style="color: #94A3B8; text-align: center; width: 60px;">Actions</MudTh>
                              </HeaderContent>
                              <RowTemplate>
@@ -176,6 +256,16 @@
                                      else
                                      {
                                          <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text">Available</MudChip>
+                                     }
+                                 </MudTd>
+                                 <MudTd DataLabel="Printed">
+                                     @if (context.IsPrinted)
+                                     {
+                                         <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Filled">Printed</MudChip>
+                                     }
+                                     else
+                                     {
+                                         <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">Not Printed</MudChip>
                                      }
                                  </MudTd>
                                  <MudTd DataLabel="Actions" Style="text-align: center;">
@@ -382,6 +472,14 @@
 </style>
 
 @code {
+    private enum BarcodeSource
+    {
+        SupplierInward,
+        WeavingReceipt
+    }
+
+    private BarcodeSource _activeSource = BarcodeSource.SupplierInward;
+
     private List<BarcodeMaster> _barcodes = new();
     private HashSet<BarcodeMaster> _selectedBarcodes = new();
     
@@ -392,9 +490,15 @@
     private DateTime? _fromDate = DateTime.Today.AddMonths(-1);
     private DateTime? _toDate = DateTime.Today;
 
+    // Supplier Source variables
     private List<StockInward> _inwards = new();
     private StockInward? _selectedInward = null;
     private string _inwardSearchQuery = "";
+
+    // Weaving Source variables
+    private List<WeavingLedgerEntry> _weavingReceipts = new();
+    private WeavingLedgerEntry? _selectedWeavingReceipt = null;
+    private string _weavingSearchQuery = "";
 
     private string InwardSearchQuery
     {
@@ -414,9 +518,58 @@
         }
     }
 
+    private string WeavingSearchQuery
+    {
+        get => _weavingSearchQuery;
+        set
+        {
+            if (_weavingSearchQuery != value)
+            {
+                _weavingSearchQuery = value;
+                if (_selectedWeavingReceipt != null && !FilterWeavingReceiptsFunc(_selectedWeavingReceipt))
+                {
+                    _selectedWeavingReceipt = null;
+                    _barcodes.Clear();
+                    _selectedBarcodes.Clear();
+                }
+            }
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
-        await LoadInwards();
+        await FetchData();
+    }
+
+    private async Task FetchData()
+    {
+        if (_activeSource == BarcodeSource.SupplierInward)
+        {
+            await LoadInwards();
+        }
+        else
+        {
+            await LoadWeavingReceipts();
+        }
+    }
+
+    private async Task OnSourceChanged(BarcodeSource source)
+    {
+        _activeSource = source;
+        _selectedInward = null;
+        _selectedWeavingReceipt = null;
+        _barcodes.Clear();
+        _selectedBarcodes.Clear();
+        StateHasChanged();
+
+        if (source == BarcodeSource.SupplierInward)
+        {
+            await LoadInwards();
+        }
+        else
+        {
+            await LoadWeavingReceipts();
+        }
     }
 
     private async Task LoadInwards()
@@ -439,6 +592,34 @@
         catch (Exception ex)
         {
             Snackbar.Add($"Error loading stock inwards: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadWeavingReceipts()
+    {
+        _loading = true;
+        _selectedWeavingReceipt = null;
+        _barcodes.Clear();
+        _selectedBarcodes.Clear();
+        StateHasChanged();
+
+        try
+        {
+            var startQuery = _fromDate.HasValue ? $"startDate={_fromDate.Value:yyyy-MM-dd}" : "";
+            var endQuery = _toDate.HasValue ? $"endDate={_toDate.Value:yyyy-MM-dd}" : "";
+            var query = string.Join("&", new[] { startQuery, endQuery }.Where(s => !string.IsNullOrEmpty(s)));
+            var url = string.IsNullOrEmpty(query) ? "api/jobwork/weaving/receipts" : $"api/jobwork/weaving/receipts?{query}";
+
+            _weavingReceipts = await Http.GetFromJsonAsync<List<WeavingLedgerEntry>>(url) ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading weaving receipts: {ex.Message}", Severity.Error);
         }
         finally
         {
@@ -476,6 +657,35 @@
         }
     }
 
+    private async Task OnWeavingReceiptSelected(WeavingLedgerEntry? receipt)
+    {
+        _selectedWeavingReceipt = receipt;
+        if (receipt != null)
+        {
+            await LoadBarcodesForWeavingReceipt(receipt.Id);
+        }
+        else
+        {
+            _barcodes.Clear();
+            _selectedBarcodes.Clear();
+        }
+    }
+
+    private async Task OnWeavingReceiptCheckboxChanged(bool val, WeavingLedgerEntry receipt)
+    {
+        if (val)
+        {
+            await OnWeavingReceiptSelected(receipt);
+        }
+        else
+        {
+            if (_selectedWeavingReceipt?.Id == receipt.Id)
+            {
+                await OnWeavingReceiptSelected(null);
+            }
+        }
+    }
+
     private async Task ConfirmDeleteBarcode(BarcodeMaster barcode)
     {
         bool? confirm = await DialogService.ShowMessageBoxAsync(
@@ -492,18 +702,27 @@
                 {
                     Snackbar.Add("Barcode and associated inward detail updated/deleted successfully!", Severity.Success);
                     
-                    // Keep track of the selected inward ID before loadingwards
                     var prevInwardId = _selectedInward?.Id;
+                    var prevWeavingId = _selectedWeavingReceipt?.Id;
                     
-                    await LoadInwards();
+                    await FetchData();
                     
-                    if (prevInwardId.HasValue)
+                    if (_activeSource == BarcodeSource.SupplierInward && prevInwardId.HasValue)
                     {
                         var stillExists = _inwards.FirstOrDefault(i => i.Id == prevInwardId.Value);
                         if (stillExists != null)
                         {
                             _selectedInward = stillExists;
                             await LoadBarcodesForInward(_selectedInward.Id);
+                        }
+                    }
+                    else if (_activeSource == BarcodeSource.WeavingReceipt && prevWeavingId.HasValue)
+                    {
+                        var stillExists = _weavingReceipts.FirstOrDefault(r => r.Id == prevWeavingId.Value);
+                        if (stillExists != null)
+                        {
+                            _selectedWeavingReceipt = stillExists;
+                            await LoadBarcodesForWeavingReceipt(_selectedWeavingReceipt.Id);
                         }
                     }
                 }
@@ -541,6 +760,27 @@
         }
     }
 
+    private async Task LoadBarcodesForWeavingReceipt(Guid receiptId)
+    {
+        _loading = true;
+        _selectedBarcodes.Clear();
+        StateHasChanged();
+
+        try
+        {
+            _barcodes = await Http.GetFromJsonAsync<List<BarcodeMaster>>($"api/jobwork/weaving/receipts/{receiptId}/barcodes") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading barcodes for weaving receipt: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
     private bool FilterInwardsFunc(StockInward element)
     {
         if (string.IsNullOrWhiteSpace(_inwardSearchQuery))
@@ -556,6 +796,26 @@
             return true;
 
         if (element.InwardNo.Contains(_inwardSearchQuery, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    }
+
+    private bool FilterWeavingReceiptsFunc(WeavingLedgerEntry element)
+    {
+        if (string.IsNullOrWhiteSpace(_weavingSearchQuery))
+            return true;
+
+        if (element.LoomAllocation?.Loom?.Weaver?.Name?.Contains(_weavingSearchQuery, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+
+        if (element.LoomAllocation?.Design?.Name?.Contains(_weavingSearchQuery, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+
+        if (element.Details?.Contains(_weavingSearchQuery, StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+
+        if (element.Narration?.Contains(_weavingSearchQuery, StringComparison.OrdinalIgnoreCase) == true)
             return true;
 
         return false;

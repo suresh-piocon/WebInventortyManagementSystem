@@ -34,6 +34,28 @@
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="_framework/blazor.webassembly.js"></script>
 
+    <!-- Shortcut Interop Code -->
+    <script>
+        window.shortcutInterop = {
+            registerSaveShortcut: function (dotNetHelper) {
+                const handler = function (e) {
+                    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                        e.preventDefault();
+                        dotNetHelper.invokeMethodAsync('TriggerSaveFromShortcut');
+                    }
+                };
+                window._saveShortcutHandler = handler;
+                window.addEventListener('keydown', handler);
+            },
+            unregisterSaveShortcut: function () {
+                if (window._saveShortcutHandler) {
+                    window.removeEventListener('keydown', window._saveShortcutHandler);
+                    window._saveShortcutHandler = null;
+                }
+            }
+        };
+    </script>
+
     <!-- Webcam Interop Code -->
     <script>
         window.webcamInterop = {

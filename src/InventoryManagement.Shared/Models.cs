@@ -360,6 +360,8 @@ namespace InventoryManagement.Shared
 
         public bool IsUsed { get; set; } = false;
 
+        public bool IsPrinted { get; set; } = false;
+
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     }
 
@@ -1213,6 +1215,9 @@ namespace InventoryManagement.Shared
         [StringLength(100)]
         public string? LedgerAccount { get; set; }
 
+        [Column(TypeName = "decimal(5, 2)")]
+        public decimal WastePercentage { get; set; } = 0;
+
         public bool Active { get; set; } = true;
 
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -1371,6 +1376,11 @@ namespace InventoryManagement.Shared
         [StringLength(50)]
         public string? IssueReferenceNo { get; set; }
 
+        [Column(TypeName = "decimal(5, 2)")]
+        public decimal WastePercentage { get; set; } = 0;
+
+        public bool AllowManualWaste { get; set; } = false;
+
         public Guid CreatedBy { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -1409,6 +1419,15 @@ namespace InventoryManagement.Shared
 
         [StringLength(50)]
         public string? DyedColor { get; set; }
+
+        [Column(TypeName = "decimal(12, 2)")]
+        public decimal IssuedQty { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 3)")]
+        public decimal IssuedWeight { get; set; } = 0;
+
+        [Column(TypeName = "decimal(12, 4)")]
+        public decimal Rate { get; set; } = 0;
 
         [Column(TypeName = "decimal(12, 2)")]
         public decimal QtyReceived { get; set; }

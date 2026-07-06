@@ -176,6 +176,13 @@ using (var scope = app.Services.CreateScope())
                 
                 context.Database.ExecuteSqlRaw("DROP INDEX IF EXISTS \"IX_QRCodeMaster_TrackingNo\";");
                 context.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS \"IX_QRCodeMaster_TrackingNo\" ON \"QRCodeMaster\"(\"TrackingNo\");");
+
+                // Dynamically add IsPrinted column if not exists
+                try
+                {
+                    context.Database.ExecuteSqlRaw("ALTER TABLE \"BarcodeMasters\" ADD COLUMN \"IsPrinted\" INTEGER NOT NULL DEFAULT 0;");
+                }
+                catch { /* Column already exists */ }
             }
             else
             {
@@ -187,6 +194,13 @@ using (var scope = app.Services.CreateScope())
                 context.Database.ExecuteSqlRaw("ALTER TABLE \"QRCodeMaster\" DROP CONSTRAINT IF EXISTS \"IX_QRCodeMaster_TrackingNo\";");
                 context.Database.ExecuteSqlRaw("DROP INDEX IF EXISTS \"IX_QRCodeMaster_TrackingNo\";");
                 context.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS \"IX_QRCodeMaster_TrackingNo\" ON \"QRCodeMaster\"(\"TrackingNo\");");
+
+                // Dynamically add IsPrinted column if not exists
+                try
+                {
+                    context.Database.ExecuteSqlRaw("ALTER TABLE \"BarcodeMasters\" ADD COLUMN IF NOT EXISTS \"IsPrinted\" BOOLEAN NOT NULL DEFAULT FALSE;");
+                }
+                catch { /* Column already exists */ }
             }
             Console.WriteLine("Database unique index constraints on TrackingNo adjusted successfully.");
             
@@ -562,6 +576,7 @@ using (var scope = app.Services.CreateScope())
                         ""Mobile"" TEXT NULL,
                         ""GSTIN"" TEXT NULL,
                         ""LedgerAccount"" TEXT NULL,
+                        ""WastePercentage"" TEXT NULL DEFAULT '0',
                         ""Active"" INTEGER NOT NULL DEFAULT 1,
                         ""CreatedAt"" TEXT NOT NULL
                     );
@@ -622,6 +637,8 @@ using (var scope = app.Services.CreateScope())
                         ""ReceiveDate"" TEXT NOT NULL,
                         ""DyerId"" TEXT NOT NULL REFERENCES ""JobWorkMaster""(""Id"") ON DELETE RESTRICT,
                         ""IssueReferenceNo"" TEXT NULL,
+                        ""WastePercentage"" TEXT NULL DEFAULT '0',
+                        ""AllowManualWaste"" INTEGER NOT NULL DEFAULT 0,
                         ""CreatedBy"" TEXT NOT NULL,
                         ""CreatedAt"" TEXT NOT NULL
                     );
@@ -635,6 +652,9 @@ using (var scope = app.Services.CreateScope())
                         ""WeftTypeId"" TEXT NULL REFERENCES ""WeftTypeMaster""(""Id"") ON DELETE RESTRICT,
                         ""YarnType"" TEXT NOT NULL,
                         ""DyedColor"" TEXT NULL,
+                        ""IssuedQty"" TEXT NULL,
+                        ""IssuedWeight"" TEXT NULL,
+                        ""Rate"" TEXT NULL,
                         ""QtyReceived"" TEXT NOT NULL,
                         ""WeightReceived"" TEXT NOT NULL,
                         ""WasteWeight"" TEXT NOT NULL
@@ -704,6 +724,12 @@ using (var scope = app.Services.CreateScope())
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingIssueDetails"" ADD COLUMN ""WeftTypeId"" TEXT NULL;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""WarpTypeId"" TEXT NULL;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""WeftTypeId"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""JobWorkMaster"" ADD COLUMN ""WastePercentage"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceives"" ADD COLUMN ""WastePercentage"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceives"" ADD COLUMN ""AllowManualWaste"" INTEGER NOT NULL DEFAULT 0;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""IssuedQty"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""IssuedWeight"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""Rate"" TEXT NULL;"); } catch {}
             }
             else
             {
@@ -740,6 +766,7 @@ using (var scope = app.Services.CreateScope())
                         ""Mobile"" varchar(20) NULL,
                         ""GSTIN"" varchar(15) NULL,
                         ""LedgerAccount"" varchar(100) NULL,
+                        ""WastePercentage"" numeric(5,2) NOT NULL DEFAULT 0,
                         ""Active"" boolean NOT NULL DEFAULT true,
                         ""CreatedAt"" timestamptz NOT NULL
                     );
@@ -800,6 +827,8 @@ using (var scope = app.Services.CreateScope())
                         ""ReceiveDate"" timestamptz NOT NULL,
                         ""DyerId"" uuid NOT NULL REFERENCES ""JobWorkMaster""(""Id"") ON DELETE RESTRICT,
                         ""IssueReferenceNo"" varchar(50) NULL,
+                        ""WastePercentage"" numeric(5,2) NOT NULL DEFAULT 0,
+                        ""AllowManualWaste"" boolean NOT NULL DEFAULT false,
                         ""CreatedBy"" uuid NOT NULL,
                         ""CreatedAt"" timestamptz NOT NULL
                     );
@@ -813,6 +842,9 @@ using (var scope = app.Services.CreateScope())
                         ""WeftTypeId"" uuid NULL REFERENCES ""WeftTypeMaster""(""Id"") ON DELETE RESTRICT,
                         ""YarnType"" varchar(20) NOT NULL,
                         ""DyedColor"" varchar(50) NULL,
+                        ""IssuedQty"" numeric(12,2) NULL,
+                        ""IssuedWeight"" numeric(12,3) NULL,
+                        ""Rate"" numeric(12,4) NULL,
                         ""QtyReceived"" numeric(12,2) NOT NULL,
                         ""WeightReceived"" numeric(12,3) NOT NULL,
                         ""WasteWeight"" numeric(12,3) NOT NULL
@@ -884,6 +916,12 @@ using (var scope = app.Services.CreateScope())
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ALTER COLUMN ""DesignId"" DROP NOT NULL;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""WarpTypeId"" uuid NULL;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""WeftTypeId"" uuid NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""JobWorkMaster"" ADD COLUMN ""WastePercentage"" numeric(5,2) NOT NULL DEFAULT 0;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceives"" ADD COLUMN ""WastePercentage"" numeric(5,2) NOT NULL DEFAULT 0;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceives"" ADD COLUMN ""AllowManualWaste"" boolean NOT NULL DEFAULT false;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""IssuedQty"" numeric(12,2) NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""IssuedWeight"" numeric(12,3) NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""Rate"" numeric(12,4) NULL;"); } catch {}
             }
             Console.WriteLine("Job Work database tables and schema verified successfully.");
         }

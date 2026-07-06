@@ -3,6 +3,8 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@implements IDisposable
 
 <PageTitle>Dyeing Issue - Grey Yarn Outward</PageTitle>
 
@@ -100,7 +102,7 @@
                                         var line = _lineItems[index];
                                         <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle;">
                                             <td style="padding: 4px;">
-                                                <MudSelect @ref="_yarnTypeRefs[index]" T="string" Value="line.YarnType" ValueChanged="@((string val) => OnYarnTypeChanged(index, val))" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 90px;">
+                                                <MudSelect @ref="_yarnTypeRefs[line.Id]" @onkeydown="@((KeyboardEventArgs e) => OnYarnTypeKeyDown(e, line.Id))" T="string" Value="line.YarnType" ValueChanged="@((string val) => OnYarnTypeChanged(index, val))" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 90px;">
                                                     <MudSelectItem Value="@("Warp")">Warp</MudSelectItem>
                                                     <MudSelectItem Value="@("Weft")">Weft</MudSelectItem>
                                                 </MudSelect>
@@ -108,7 +110,7 @@
                                             <td style="padding: 4px;">
                                                 @if (line.YarnType == "Warp")
                                                 {
-                                                    <MudSelect T="Guid?" @bind-Value="line.WarpTypeId" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 200px;">
+                                                    <MudSelect @ref="_warpTypeRefs[line.Id]" @onkeydown="@((KeyboardEventArgs e) => OnWarpWeftKeyDown(e, line.Id))" T="Guid?" @bind-Value="line.WarpTypeId" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 200px;">
                                                         @foreach (var wt in _warpTypes)
                                                         {
                                                             <MudSelectItem Value="@((Guid?)wt.Id)">@wt.WarpType</MudSelectItem>
@@ -117,7 +119,7 @@
                                                 }
                                                 else
                                                 {
-                                                    <MudSelect T="Guid?" @bind-Value="line.WeftTypeId" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 200px;">
+                                                    <MudSelect @ref="_weftTypeRefs[line.Id]" @onkeydown="@((KeyboardEventArgs e) => OnWarpWeftKeyDown(e, line.Id))" T="Guid?" @bind-Value="line.WeftTypeId" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 200px;">
                                                         @foreach (var wt in _weftTypes)
                                                         {
                                                             <MudSelectItem Value="@((Guid?)wt.Id)">@wt.WeftType</MudSelectItem>
@@ -126,16 +128,16 @@
                                                 }
                                             </td>
                                             <td style="padding: 4px;">
-                                                <MudTextField T="string" @bind-Value="line.Color" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 90px;" />
+                                                <MudTextField @ref="_colorRefs[line.Id]" @onkeydown="@((KeyboardEventArgs e) => OnColorKeyDown(e, line.Id))" T="string" @bind-Value="line.Color" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; min-width: 90px;" />
                                             </td>
                                             <td style="padding: 4px;">
-                                                <MudNumericField T="decimal" @bind-Value="line.Qty" Min="0.01M" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 60px;" />
+                                                <MudNumericField @ref="_qtyRefs[line.Id]" @onkeydown="@((KeyboardEventArgs e) => OnQtyKeyDown(e, line.Id))" T="decimal" @bind-Value="line.Qty" Min="0.01M" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 60px;" />
                                             </td>
                                             <td style="padding: 4px;">
-                                                <MudNumericField T="decimal" @bind-Value="line.WeightKgs" Min="0.01M" HideSpinButtons="true" Format="F3" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 70px;" />
+                                                <MudNumericField @ref="_weightRefs[line.Id]" @onkeydown="@((KeyboardEventArgs e) => OnWeightKeyDown(e, line.Id))" T="decimal" @bind-Value="line.WeightKgs" Min="0.01M" HideSpinButtons="true" Format="F3" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 70px;" />
                                             </td>
                                             <td style="padding: 4px;">
-                                                <MudNumericField T="decimal" @bind-Value="line.Rate" Min="0" HideSpinButtons="true" Format="F2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 80px;" @onkeydown="@((KeyboardEventArgs e) => OnRateKeyDown(e, index))" />
+                                                <MudNumericField @ref="_rateRefs[line.Id]" @onkeydown="@((KeyboardEventArgs e) => OnRateKeyDown(e, line.Id))" T="decimal" @bind-Value="line.Rate" Min="0" HideSpinButtons="true" Format="F2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="color: white; text-align: right; min-width: 80px;" />
                                             </td>
                                             <td style="padding: 4px; text-align: right;" class="text-slate-300 font-weight-bold">
                                                 ₹@((line.Qty * line.Rate).ToString("N2"))
@@ -168,13 +170,48 @@
     private DyeingIssue _issue = new();
     private DateTime? _issueDate = DateTime.Today;
     private List<DyeingIssueDetail> _lineItems = new();
-    private Dictionary<int, MudSelect<string>> _yarnTypeRefs = new();
+    
+    // References for keyboard navigation flow
+    private Dictionary<Guid, MudSelect<string>> _yarnTypeRefs = new();
+    private Dictionary<Guid, MudSelect<Guid?>> _warpTypeRefs = new();
+    private Dictionary<Guid, MudSelect<Guid?>> _weftTypeRefs = new();
+    private Dictionary<Guid, MudTextField<string>> _colorRefs = new();
+    private Dictionary<Guid, MudNumericField<decimal>> _qtyRefs = new();
+    private Dictionary<Guid, MudNumericField<decimal>> _weightRefs = new();
+    private Dictionary<Guid, MudNumericField<decimal>> _rateRefs = new();
+
+    private DotNetObjectReference<DyeingIssuePage>? _dotNetRef;
     private bool _saving = false;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadLookups();
         await ResetForm();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("shortcutInterop.registerSaveShortcut", _dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public async Task TriggerSaveFromShortcut()
+    {
+        if (!_saving && _lineItems.Any())
+        {
+            await SaveIssue();
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
+        _ = JSRuntime.InvokeVoidAsync("shortcutInterop.unregisterSaveShortcut");
     }
 
     private async Task LoadLookups()
@@ -206,7 +243,14 @@
         };
         _issueDate = DateTime.Today;
         _lineItems.Clear();
+        
         _yarnTypeRefs.Clear();
+        _warpTypeRefs.Clear();
+        _weftTypeRefs.Clear();
+        _colorRefs.Clear();
+        _qtyRefs.Clear();
+        _weightRefs.Clear();
+        _rateRefs.Clear();
 
         try
         {
@@ -244,19 +288,115 @@
             line.WeftTypeId = _weftTypes.FirstOrDefault()?.Id;
             line.WarpTypeId = null;
         }
+        
+        // Auto-move cursor to Warp/Weft Type field
+        _ = FocusField("WarpWeftType", line.Id);
     }
 
-    private async Task OnRateKeyDown(KeyboardEventArgs e, int index)
+    private async Task FocusField(string field, Guid lineId)
+    {
+        await Task.Delay(50);
+        if (field == "YarnType")
+        {
+            if (_yarnTypeRefs.TryGetValue(lineId, out var refObj) && refObj != null)
+                await refObj.FocusAsync();
+        }
+        else if (field == "WarpWeftType")
+        {
+            var line = _lineItems.FirstOrDefault(l => l.Id == lineId);
+            if (line != null)
+            {
+                if (line.YarnType == "Warp")
+                {
+                    if (_warpTypeRefs.TryGetValue(lineId, out var refObj) && refObj != null)
+                        await refObj.FocusAsync();
+                }
+                else
+                {
+                    if (_weftTypeRefs.TryGetValue(lineId, out var refObj) && refObj != null)
+                        await refObj.FocusAsync();
+                }
+            }
+        }
+        else if (field == "Color")
+        {
+            if (_colorRefs.TryGetValue(lineId, out var refObj) && refObj != null)
+                await refObj.FocusAsync();
+        }
+        else if (field == "Quantity")
+        {
+            if (_qtyRefs.TryGetValue(lineId, out var refObj) && refObj != null)
+                await refObj.FocusAsync();
+        }
+        else if (field == "Weight")
+        {
+            if (_weightRefs.TryGetValue(lineId, out var refObj) && refObj != null)
+                await refObj.FocusAsync();
+        }
+        else if (field == "Rate")
+        {
+            if (_rateRefs.TryGetValue(lineId, out var refObj) && refObj != null)
+                await refObj.FocusAsync();
+        }
+    }
+
+    private async Task OnYarnTypeKeyDown(KeyboardEventArgs e, Guid lineId)
     {
         if (e.Key == "Enter")
         {
-            AddRow();
-            await Task.Delay(50);
-            int nextIndex = _lineItems.Count - 1;
-            if (_yarnTypeRefs.TryGetValue(nextIndex, out var select))
+            await FocusField("WarpWeftType", lineId);
+        }
+    }
+
+    private async Task OnWarpWeftKeyDown(KeyboardEventArgs e, Guid lineId)
+    {
+        if (e.Key == "Enter")
+        {
+            await FocusField("Color", lineId);
+        }
+    }
+
+    private async Task OnColorKeyDown(KeyboardEventArgs e, Guid lineId)
+    {
+        if (e.Key == "Enter")
+        {
+            await FocusField("Quantity", lineId);
+        }
+    }
+
+    private async Task OnQtyKeyDown(KeyboardEventArgs e, Guid lineId)
+    {
+        if (e.Key == "Enter")
+        {
+            await FocusField("Weight", lineId);
+        }
+    }
+
+    private async Task OnWeightKeyDown(KeyboardEventArgs e, Guid lineId)
+    {
+        if (e.Key == "Enter")
+        {
+            await FocusField("Rate", lineId);
+        }
+    }
+
+    private async Task OnRateKeyDown(KeyboardEventArgs e, Guid lineId)
+    {
+        if (e.Key == "Enter")
+        {
+            var newLine = new DyeingIssueDetail
             {
-                await select.FocusAsync();
-            }
+                YarnType = "Warp",
+                WarpTypeId = _warpTypes.FirstOrDefault()?.Id,
+                Qty = 1,
+                WeightKgs = 1,
+                Rate = 0
+            };
+            _lineItems.Add(newLine);
+            StateHasChanged();
+            
+            // Move cursor to the next empty row's Yarn Type
+            await FocusField("YarnType", newLine.Id);
         }
     }
 

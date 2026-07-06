@@ -779,6 +779,31 @@ namespace InventoryManagement.Api.Controllers
                     .ThenInclude(si => si!.Supplier)
                 .ToListAsync();
 
+            // Fetch Weaving Ledger entries to resolve Weaver Name and Weaving Date
+            var weavingEntries = await _context.WeavingLedgerEntries
+                .Include(w => w.LoomAllocation)
+                    .ThenInclude(a => a!.Loom)
+                        .ThenInclude(l => l!.Weaver)
+                .Where(w => w.EntryType == "Saree")
+                .ToListAsync();
+
+            var weavingLookup = new Dictionary<string, WeavingLedgerEntry>();
+            foreach (var we in weavingEntries)
+            {
+                var loomNo = we.LoomAllocation?.Loom?.LoomNo;
+                if (!string.IsNullOrEmpty(loomNo))
+                {
+                    var refNo = $"LOM-{loomNo}";
+                    var matchedLedger = ledgers.FirstOrDefault(l => l.ReferenceNo == refNo 
+                                                                 && l.TransactionDate == we.Date 
+                                                                 && l.InwardQty == we.RodQty);
+                    if (matchedLedger != null && !string.IsNullOrEmpty(matchedLedger.TrackingNo))
+                    {
+                        weavingLookup[matchedLedger.TrackingNo] = we;
+                    }
+                }
+            }
+
             // Create lookups
             var inwardDetailsLookup = inwardDetails
                 .GroupBy(d => d.TrackingNo)
@@ -803,13 +828,18 @@ namespace InventoryManagement.Api.Controllers
                 var trackingNo = grp.Key.TrackingNo;
                 var batchNo = grp.Key.BatchNo;
                 
-                // Get supplier & inward date from inward details lookup
+                // Get supplier & inward date from inward details lookup or weaving lookup
                 string supplierName = "N/A";
                 DateTimeOffset inwardDate = DateTimeOffset.MinValue;
                 if (inwardDetailsLookup.TryGetValue(trackingNo, out var inwardDetail))
                 {
                     supplierName = inwardDetail.StockInward?.Supplier?.Name ?? "N/A";
                     inwardDate = inwardDetail.StockInward?.InwardDate ?? inwardDetail.StockInward?.CreatedAt ?? DateTimeOffset.MinValue;
+                }
+                else if (weavingLookup.TryGetValue(trackingNo, out var weavingEntry))
+                {
+                    supplierName = weavingEntry.LoomAllocation?.Loom?.Weaver?.Name ?? "N/A";
+                    inwardDate = weavingEntry.Date;
                 }
 
                 // If inward date is after the upToDate filter, skip this group entirely

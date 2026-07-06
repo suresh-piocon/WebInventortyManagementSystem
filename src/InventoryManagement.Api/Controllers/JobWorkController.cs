@@ -73,6 +73,40 @@ namespace InventoryManagement.Api.Controllers
             return item.Id;
         }
 
+        private async Task<string> GenerateUniqueBarcodeAsync()
+        {
+            var dbBarcodes = await _context.BarcodeMasters
+                .Where(b => b.Barcode.ToUpper().StartsWith("ITEM"))
+                .Select(b => b.Barcode)
+                .ToListAsync();
+
+            var localBarcodes = _context.BarcodeMasters.Local
+                .Where(b => b.Barcode != null && b.Barcode.ToUpper().StartsWith("ITEM"))
+                .Select(b => b.Barcode)
+                .ToList();
+
+            var allBarcodes = dbBarcodes
+                .Concat(localBarcodes)
+                .Where(b => !string.IsNullOrEmpty(b))
+                .Distinct();
+
+            int maxSeq = 0;
+            foreach (var bc in allBarcodes)
+            {
+                var numStr = bc.ToUpper().Replace("ITEM", "");
+                if (int.TryParse(numStr, out var num))
+                {
+                    if (num > maxSeq)
+                    {
+                        maxSeq = num;
+                    }
+                }
+            }
+
+            int nextNum = maxSeq + 1;
+            return $"ITEM{nextNum:D6}";
+        }
+
         // ==========================================
         // JOB WORK MASTER API
         // ==========================================
@@ -113,6 +147,7 @@ namespace InventoryManagement.Api.Controllers
             entity.Mobile = worker.Mobile;
             entity.GSTIN = worker.GSTIN;
             entity.LedgerAccount = worker.LedgerAccount;
+            entity.WastePercentage = worker.WastePercentage;
             entity.Active = worker.Active;
 
             _context.JobWorkMasters.Update(entity);
@@ -521,8 +556,8 @@ namespace InventoryManagement.Api.Controllers
                     decimal prevWeight = currentStockBal?.BalanceWeight ?? 0;
 
                     // Find rate from referenced Dyeing Issue (if available) to record inventory cost
-                    decimal dyeingRate = 0;
-                    if (!string.IsNullOrEmpty(receive.IssueReferenceNo))
+                    decimal dyeingRate = detail.Rate;
+                    if (dyeingRate == 0 && !string.IsNullOrEmpty(receive.IssueReferenceNo))
                     {
                         dyeingRate = await _context.DyeingIssueDetails
                             .Include(d => d.DyeingIssue)
@@ -754,6 +789,8 @@ namespace InventoryManagement.Api.Controllers
                     decimal prevQty = lastBal?.BalanceQty ?? 0;
                     decimal prevWeight = lastBal?.BalanceWeight ?? 0;
 
+                    var trackingNo = $"TRK-SAREE-{Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper()}";
+
                     var slRecord = new StockLedger
                     {
                         Id = Guid.NewGuid(),
@@ -762,7 +799,7 @@ namespace InventoryManagement.Api.Controllers
                         TransactionType = "Purchase", // Inward Saree
                         ReferenceNo = $"LOM-{allocation.Loom!.LoomNo}",
                         BatchNo = "SAREE-BATCH",
-                        TrackingNo = $"TRK-SAREE-{Guid.NewGuid().ToString("N").Substring(0,8).ToUpper()}",
+                        TrackingNo = trackingNo,
                         InwardQty = entry.RodQty,
                         OutwardQty = 0,
                         BalanceQty = prevQty + entry.RodQty,
@@ -773,6 +810,26 @@ namespace InventoryManagement.Api.Controllers
                         CreatedAt = DateTimeOffset.UtcNow
                     };
                     _context.StockLedgers.Add(slRecord);
+
+                    // Generate unique barcodes for each saree received
+                    int qtyInt = (int)Math.Ceiling(entry.RodQty);
+                    for (int i = 1; i <= qtyInt; i++)
+                    {
+                        var uniqueBarcode = await GenerateUniqueBarcodeAsync();
+                        var barcodeMaster = new BarcodeMaster
+                        {
+                            Id = Guid.NewGuid(),
+                            Barcode = uniqueBarcode,
+                            ItemId = itemId,
+                            BatchNo = "SAREE-BATCH",
+                            TrackingNo = trackingNo,
+                            Type = "Unique",
+                            ImageUrl = allocation.Design?.BodyImage,
+                            IsUsed = false,
+                            CreatedAt = DateTimeOffset.UtcNow
+                        };
+                        _context.BarcodeMasters.Add(barcodeMaster);
+                    }
 
                     // 2. Calculate Wages Credit amount
                     creditAmt = entry.RodQty * allocation.Design!.Wages;
@@ -835,6 +892,21 @@ namespace InventoryManagement.Api.Controllers
                 var stockLedgers = await _context.StockLedgers
                     .Where(s => s.ReferenceNo == $"LOM-{entry.LoomAllocation!.Loom!.LoomNo}" && s.TransactionDate == entry.Date)
                     .ToListAsync();
+
+                // Delete associated barcodes and check usage
+                var trackingNos = stockLedgers.Select(s => s.TrackingNo).ToList();
+                if (trackingNos.Any())
+                {
+                    var isAnyBarcodeUsed = await _context.BarcodeMasters.AnyAsync(b => trackingNos.Contains(b.TrackingNo) && b.IsUsed);
+                    if (isAnyBarcodeUsed)
+                    {
+                        return BadRequest("Cannot delete this weaving entry because some barcodes have already been issued in a proforma invoice/outward transaction.");
+                    }
+
+                    var barcodesToDelete = await _context.BarcodeMasters.Where(b => trackingNos.Contains(b.TrackingNo)).ToListAsync();
+                    _context.BarcodeMasters.RemoveRange(barcodesToDelete);
+                }
+
                 _context.StockLedgers.RemoveRange(stockLedgers);
 
                 // Reverse Job Ledger entries
@@ -853,6 +925,69 @@ namespace InventoryManagement.Api.Controllers
                 await trans.RollbackAsync();
                 return StatusCode(500, ex.Message);
             }
+        }
+
+        [HttpGet("weaving/receipts")]
+        public async Task<IActionResult> GetWeavingReceipts(
+            [FromQuery] DateTimeOffset? startDate,
+            [FromQuery] DateTimeOffset? endDate)
+        {
+            var query = _context.WeavingLedgerEntries
+                .Include(w => w.LoomAllocation)
+                    .ThenInclude(a => a!.Loom)
+                        .ThenInclude(l => l!.Weaver)
+                .Include(w => w.LoomAllocation)
+                    .ThenInclude(a => a!.Design)
+                .Where(w => w.EntryType == "Saree")
+                .AsQueryable();
+
+            if (startDate.HasValue)
+            {
+                query = query.Where(w => w.Date >= startDate.Value);
+            }
+
+            if (endDate.HasValue)
+            {
+                query = query.Where(w => w.Date <= endDate.Value);
+            }
+
+            var receipts = await query
+                .OrderByDescending(w => w.Date)
+                .ToListAsync();
+
+            return Ok(receipts);
+        }
+
+        [HttpGet("weaving/receipts/{id}/barcodes")]
+        public async Task<IActionResult> GetWeavingReceiptBarcodes(Guid id)
+        {
+            var entry = await _context.WeavingLedgerEntries
+                .Include(w => w.LoomAllocation)
+                    .ThenInclude(a => a!.Loom)
+                .FirstOrDefaultAsync(w => w.Id == id);
+
+            if (entry == null) return NotFound("Weaving receipt not found.");
+
+            var trackingNo = await _context.StockLedgers
+                .Where(sl => sl.ItemId == entry.LoomAllocation!.ItemId 
+                          && sl.ReferenceNo == $"LOM-{entry.LoomAllocation!.Loom!.LoomNo}"
+                          && sl.TransactionDate == entry.Date
+                          && sl.InwardQty == entry.RodQty)
+                .Select(sl => sl.TrackingNo)
+                .FirstOrDefaultAsync();
+
+            if (string.IsNullOrEmpty(trackingNo))
+            {
+                return Ok(new List<BarcodeMaster>());
+            }
+
+            var barcodes = await _context.BarcodeMasters
+                .Include(b => b.Item)
+                .Where(b => b.TrackingNo == trackingNo)
+                .OrderBy(b => b.Barcode)
+                .ToListAsync();
+
+            return Ok(barcodes);
         }
 
         // ==========================================

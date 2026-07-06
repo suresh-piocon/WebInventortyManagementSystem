@@ -646,9 +646,82 @@ namespace InventoryManagement.Api.Controllers
                 }
                 else
                 {
-                    // If no detail is found (orphan barcode), just delete the barcode
-                    _context.BarcodeMasters.Remove(barcode);
-                    await _context.SaveChangesAsync();
+                    // Check if there is a StockLedger record for this tracking number
+                    var stockLedger = await _context.StockLedgers
+                        .FirstOrDefaultAsync(sl => sl.TrackingNo == trackingNo && sl.TransactionType == "Purchase");
+
+                    if (stockLedger != null)
+                    {
+                        // Find corresponding WeavingLedgerEntry
+                        var entry = await _context.WeavingLedgerEntries
+                            .Include(w => w.LoomAllocation)
+                                .ThenInclude(a => a!.Loom)
+                                    .ThenInclude(l => l!.Weaver)
+                            .Include(w => w.LoomAllocation)
+                                .ThenInclude(a => a!.Design)
+                            .FirstOrDefaultAsync(w => $"LOM-{w.LoomAllocation!.Loom!.LoomNo}" == stockLedger.ReferenceNo 
+                                                   && w.Date == stockLedger.TransactionDate 
+                                                   && w.RodQty == stockLedger.InwardQty);
+
+                        var barcodeCount = await _context.BarcodeMasters.CountAsync(b => b.TrackingNo == trackingNo);
+
+                        if (barcodeCount > 1)
+                        {
+                            // Decrement quantity by 1 in StockLedger
+                            stockLedger.InwardQty -= 1;
+                            stockLedger.BalanceQty -= 1;
+                            _context.StockLedgers.Update(stockLedger);
+
+                            // Decrement quantity by 1 in WeavingLedgerEntry
+                            if (entry != null)
+                            {
+                                entry.RodQty -= 1;
+                                entry.Credit = entry.RodQty * entry.LoomAllocation!.Design!.Wages;
+                                _context.WeavingLedgerEntries.Update(entry);
+
+                                // Update the JobLedger entry for this weaver!
+                                var weaverId = entry.LoomAllocation.Loom.WeaverId;
+                                var jobLedger = await _context.JobLedgers
+                                    .FirstOrDefaultAsync(jl => jl.JobWorkerId == weaverId 
+                                                            && jl.TransactionDate == entry.Date 
+                                                            && jl.VoucherNo == $"LOM-{entry.LoomAllocation.Loom.LoomNo}");
+                                if (jobLedger != null)
+                                {
+                                    jobLedger.ReceiveQty -= 1;
+                                    jobLedger.Credit = entry.Credit;
+                                    _context.JobLedgers.Update(jobLedger);
+                                }
+                            }
+
+                            // Remove this barcode
+                            _context.BarcodeMasters.Remove(barcode);
+                        }
+                        else
+                        {
+                            // Delete the entire receipt if it's the last barcode
+                            _context.BarcodeMasters.Remove(barcode);
+                            _context.StockLedgers.Remove(stockLedger);
+                            if (entry != null)
+                            {
+                                var weaverId = entry.LoomAllocation!.Loom!.WeaverId;
+                                var jobLedgers = await _context.JobLedgers
+                                    .Where(jl => jl.JobWorkerId == weaverId 
+                                              && jl.TransactionDate == entry.Date 
+                                              && jl.VoucherNo == $"LOM-{entry.LoomAllocation.Loom.LoomNo}")
+                                    .ToListAsync();
+                                _context.JobLedgers.RemoveRange(jobLedgers);
+
+                                _context.WeavingLedgerEntries.Remove(entry);
+                            }
+                        }
+                        await _context.SaveChangesAsync();
+                    }
+                    else
+                    {
+                        // If no detail and no stock ledger (orphan barcode), just delete the barcode
+                        _context.BarcodeMasters.Remove(barcode);
+                        await _context.SaveChangesAsync();
+                    }
                 }
 
                 await transaction.CommitAsync();
@@ -659,6 +732,27 @@ namespace InventoryManagement.Api.Controllers
                 await transaction.RollbackAsync();
                 return StatusCode(500, $"An error occurred while deleting barcode: {ex.Message}");
             }
+        }
+
+        [HttpPost("barcodes/mark-printed")]
+        public async Task<IActionResult> MarkBarcodesPrinted([FromBody] List<string> barcodes)
+        {
+            if (barcodes == null || !barcodes.Any())
+            {
+                return BadRequest("No barcodes specified.");
+            }
+
+            var dbBarcodes = await _context.BarcodeMasters
+                .Where(b => barcodes.Contains(b.Barcode))
+                .ToListAsync();
+
+            foreach (var b in dbBarcodes)
+            {
+                b.IsPrinted = true;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = $"{dbBarcodes.Count} barcodes marked as printed successfully." });
         }
     }
 }

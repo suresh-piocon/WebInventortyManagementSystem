@@ -47,6 +47,7 @@
             <MudTh Style="color: #94A3B8;">Mobile</MudTh>
             <MudTh Style="color: #94A3B8;">GSTIN</MudTh>
             <MudTh Style="color: #94A3B8;">Ledger Account</MudTh>
+            <MudTh Style="color: #94A3B8;">Waste %</MudTh>
             <MudTh Style="color: #94A3B8;">Status</MudTh>
             <MudTh Style="color: #94A3B8; text-align: right; width: 120px;">Actions</MudTh>
         </HeaderContent>
@@ -58,6 +59,7 @@
             <MudTd DataLabel="Mobile" Class="text-slate-300">@(string.IsNullOrEmpty(context.Mobile) ? "N/A" : context.Mobile)</MudTd>
             <MudTd DataLabel="GSTIN" Class="text-slate-300">@(string.IsNullOrEmpty(context.GSTIN) ? "N/A" : context.GSTIN)</MudTd>
             <MudTd DataLabel="Ledger Account" Class="text-slate-300">@(string.IsNullOrEmpty(context.LedgerAccount) ? "N/A" : context.LedgerAccount)</MudTd>
+            <MudTd DataLabel="Waste %" Class="text-slate-300">@(context.Type == "Dyer" ? $"{context.WastePercentage:F2}%" : "-")</MudTd>
             <MudTd DataLabel="Status">
                 @if (context.Active)
                 {
@@ -110,6 +112,12 @@
                 <MudItem xs="12" sm="6">
                     <MudTextField T="string" Label="Ledger Account" @bind-Value="_editWorker.LedgerAccount" Class="text-slate-200" />
                 </MudItem>
+                @if (_editWorker.Type == "Dyer")
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="decimal" Label="Waste Percentage (%)" @bind-Value="_editWorker.WastePercentage" Min="0" Max="100" Format="F2" HelperText="Default waste % for receives" Class="text-slate-200" />
+                    </MudItem>
+                }
                 <MudItem xs="12" sm="6" Class="d-flex align-center">
                     <MudSwitch @bind-Value="_editWorker.Active" Label="Active" Color="Color.Success" />
                 </MudItem>
@@ -198,6 +206,7 @@
             Mobile = worker.Mobile,
             GSTIN = worker.GSTIN,
             LedgerAccount = worker.LedgerAccount,
+            WastePercentage = worker.WastePercentage,
             Active = worker.Active,
             CreatedAt = worker.CreatedAt
         };

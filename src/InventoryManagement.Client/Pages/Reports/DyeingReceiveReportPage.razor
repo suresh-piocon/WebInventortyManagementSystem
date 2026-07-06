@@ -1,0 +1,332 @@
+@page "/reports/dyeing-receive"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Dyeing Receive History Report</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-2">
+    <div class="mb-6 d-flex justify-between align-center">
+        <div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold animated-gradient-text" Style="font-family: 'Outfit';">
+                Dyeing Receive Report
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-slate-400">
+                Track grey yarn issues, waste percentages, and received yarn weights across all dyer contracts
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Outlined" Color="Color.Info" StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadData" Style="font-family: 'Outfit';">
+            Refresh
+        </MudButton>
+    </div>
+
+    <!-- Filters Panel -->
+    <MudPaper Class="glass-panel pa-6 mb-6">
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="Guid?" Label="Filter by Dyer" Value="_selectedDyerId" ValueChanged="OnDyerFilterChanged" Variant="Variant.Outlined" Style="color: white;" Dense="true">
+                    <MudSelectItem Value="@((Guid?)null)">All Dyers</MudSelectItem>
+                    @foreach (var d in _dyers)
+                    {
+                        <MudSelectItem Value="@((Guid?)d.Id)">@d.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="_searchQuery" Placeholder="Search Receive No / Issue Ref..." Label="Search Text" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Variant="Variant.Outlined" Style="color: white;" Dense="true" />
+            </MudItem>
+            <MudItem xs="12" sm="4" Class="d-flex align-end">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ClearFilters" StartIcon="@Icons.Material.Filled.ClearAll" FullWidth="true" Style="font-family: 'Outfit';">
+                    Clear Filters
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (_loading)
+    {
+        <div class="d-flex flex-column align-center justify-center py-16">
+            <MudProgressCircular Color="Color.Info" Size="Size.Large" Indeterminate="true" Class="mb-4" />
+            <MudText Class="text-slate-400">Loading receive transactions...</MudText>
+        </div>
+    }
+    else
+    {
+        <MudTable Items="@FilteredReceives" Hover="true" Striped="true" Dense="true" Class="glass-panel text-slate-200" RowStyle="cursor: pointer;">
+            <HeaderContent>
+                <MudTh Style="color: #94A3B8; width: 110px;">Date</MudTh>
+                <MudTh Style="color: #94A3B8; width: 130px;">Receive No</MudTh>
+                <MudTh Style="color: #94A3B8; width: 180px;">Dyer Name</MudTh>
+                <MudTh Style="color: #94A3B8; width: 150px;">Issue Ref No</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 100px;">Waste %</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 120px;">Issued Weight</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 110px;">Waste Weight</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: right; width: 120px;">Received Weight</MudTh>
+                <MudTh Style="color: #94A3B8; text-align: center; width: 120px;">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Date" Class="text-slate-300">@context.ReceiveDate.LocalDateTime.ToString("dd-MM-yyyy")</MudTd>
+                <MudTd DataLabel="Receive No" Class="text-slate-100 font-mono font-weight-bold">@context.ReceiveNo</MudTd>
+                <MudTd DataLabel="Dyer Name" Class="text-slate-200">@(context.Dyer?.Name ?? "N/A")</MudTd>
+                <MudTd DataLabel="Issue Ref No" Class="text-slate-300 font-mono">@(string.IsNullOrEmpty(context.IssueReferenceNo) ? "-" : context.IssueReferenceNo)</MudTd>
+                <MudTd DataLabel="Waste %" Style="text-align: right;" Class="text-slate-200">@($"{context.WastePercentage:F2}%")</MudTd>
+                <MudTd DataLabel="Issued Weight" Style="text-align: right;" Class="text-blue-400">@($"{context.Details.Sum(d => d.IssuedWeight):F3} Kg")</MudTd>
+                <MudTd DataLabel="Waste Weight" Style="text-align: right;" Class="text-red-400">@($"{context.Details.Sum(d => d.WasteWeight):F3} Kg")</MudTd>
+                <MudTd DataLabel="Received Weight" Style="text-align: right;" Class="text-green-400 font-weight-bold">@($"{context.Details.Sum(d => d.WeightReceived):F3} Kg")</MudTd>
+                <MudTd DataLabel="Actions" Style="text-align: center;">
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Info" Size="Size.Small" OnClick="@(() => ToggleDetails(context))" Title="View details" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Print" Color="Color.Primary" Size="Size.Small" OnClick="@(() => PrintReceive(context))" Title="Print Receipt" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Class="text-slate-400 pa-4">No dyeing receive transactions found.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    }
+</MudContainer>
+
+@if (_selectedReceive != null)
+{
+    <!-- Details Dialog -->
+    <MudDialog @bind-Visible="_detailsOpen" Options="_dialogOptions">
+        <TitleContent>
+            <div class="d-flex justify-between align-center w-100 pr-4">
+                <MudText Typo="Typo.h6" Style="font-family: 'Outfit'; color: white;">
+                    Dyeing Receive Details - @_selectedReceive.ReceiveNo
+                </MudText>
+                <MudButton StartIcon="@Icons.Material.Filled.Print" Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => PrintReceive(_selectedReceive))" Size="Size.Small" Style="font-family: 'Outfit'; font-weight:600;">
+                    Print
+                </MudButton>
+            </div>
+        </TitleContent>
+        <DialogContent>
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption" Class="text-slate-400">Dyer Name</MudText>
+                    <MudText Typo="Typo.body1" Class="text-slate-100 font-weight-bold">@(_selectedReceive.Dyer?.Name ?? "N/A")</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption" Class="text-slate-400">Receive Date</MudText>
+                    <MudText Typo="Typo.body1" Class="text-slate-100 font-weight-bold">@_selectedReceive.ReceiveDate.LocalDateTime.ToString("dd-MM-yyyy HH:mm")</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption" Class="text-slate-400">Issue Ref No</MudText>
+                    <MudText Typo="Typo.body1" Class="text-slate-100 font-weight-bold font-mono">@(_selectedReceive.IssueReferenceNo ?? "-")</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="Typo.caption" Class="text-slate-400">Transaction Waste %</MudText>
+                    <MudText Typo="Typo.body1" Class="text-slate-100 font-weight-bold">@_selectedReceive.WastePercentage.ToString("F2")%</MudText>
+                </MudItem>
+            </MudGrid>
+
+            <MudTable Items="@_selectedReceive.Details" Hover="true" Striped="true" Dense="true" Elevation="0" Class="mud-table-transparent">
+                <HeaderContent>
+                    <MudTh style="color: #94A3B8;">Yarn Type</MudTh>
+                    <MudTh style="color: #94A3B8;">Warp/Weft Type</MudTh>
+                    <MudTh style="color: #94A3B8;">Dyed Color</MudTh>
+                    <MudTh style="color: #94A3B8; text-align: right;">Issued Qty</MudTh>
+                    <MudTh style="color: #94A3B8; text-align: right;">Issued Wt (Kg)</MudTh>
+                    <MudTh style="color: #94A3B8; text-align: right;">Rate</MudTh>
+                    <MudTh style="color: #94A3B8; text-align: right;">Recd Qty</MudTh>
+                    <MudTh style="color: #94A3B8; text-align: right;">Waste Wt (Kg)</MudTh>
+                    <MudTh style="color: #94A3B8; text-align: right;">Recd Wt (Kg)</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Yarn Type" style="color: white;">@context.YarnType</MudTd>
+                    <MudTd DataLabel="Warp/Weft Type" style="color: white;">@(context.YarnType == "Warp" ? context.WarpTypeSpec?.WarpType : context.WeftTypeSpec?.WeftType)</MudTd>
+                    <MudTd DataLabel="Dyed Color" style="color: white;">@(string.IsNullOrEmpty(context.DyedColor) ? "RAW" : context.DyedColor)</MudTd>
+                    <MudTd DataLabel="Issued Qty" style="color: white; text-align: right;">@context.IssuedQty.ToString("N2")</MudTd>
+                    <MudTd DataLabel="Issued Wt" style="color: white; text-align: right;">@context.IssuedWeight.ToString("F3")</MudTd>
+                    <MudTd DataLabel="Rate" style="color: white; text-align: right;">₹@context.Rate.ToString("N2")</MudTd>
+                    <MudTd DataLabel="Recd Qty" style="color: white; text-align: right;">@context.QtyReceived.ToString("N2")</MudTd>
+                    <MudTd DataLabel="Waste Wt" style="color: #EF4444; text-align: right; font-weight: bold;">@context.WasteWeight.ToString("F3")</MudTd>
+                    <MudTd DataLabel="Recd Wt" style="color: #10B981; text-align: right; font-weight: bold;">@context.WeightReceived.ToString("F3")</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="CloseDetails" Variant="Variant.Text" Color="Color.Secondary">Close</MudButton>
+        </DialogActions>
+    </MudDialog>
+}
+
+<!-- Hidden Printable Container -->
+<div id="dyeing-receive-print-container" style="display:none;">
+    @if (_printModel != null)
+    {
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; background: #fff;">
+            <div style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
+                <h2 style="margin: 0; text-transform: uppercase;">Dyeing Material Receive Receipt</h2>
+                <p style="margin: 5px 0 0 0;">Inventory Management System</p>
+            </div>
+            
+            <table style="width: 100%; margin-bottom: 20px; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 50%; padding: 5px 0; vertical-align: top;">
+                        <strong>Receive No:</strong> @_printModel.ReceiveNo<br />
+                        <strong>Receive Date:</strong> @_printModel.ReceiveDate.LocalDateTime.ToString("dd-MM-yyyy HH:mm")<br />
+                        <strong>Issue Ref No:</strong> @(_printModel.IssueReferenceNo ?? "N/A")
+                    </td>
+                    <td style="width: 50%; padding: 5px 0; vertical-align: top; text-align: right;">
+                        <strong>Dyer Name:</strong> @(_printModel.Dyer?.Name ?? "N/A")<br />
+                        <strong>Address:</strong> @(_printModel.Dyer?.Address ?? "N/A")<br />
+                        <strong>Waste Percentage:</strong> @_printModel.WastePercentage.ToString("F2")%
+                    </td>
+                </tr>
+            </table>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #333; background-color: #f5f5f5;">
+                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Yarn Type</th>
+                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Warp/Weft Type</th>
+                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Color</th>
+                        <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Issued Qty</th>
+                        <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Issued Wt (Kg)</th>
+                        <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Rate</th>
+                        <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Recd Qty</th>
+                        <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Waste Wt (Kg)</th>
+                        <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Recd Wt (Kg)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var detail in _printModel.Details)
+                    {
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;">@detail.YarnType</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">@(detail.YarnType == "Warp" ? detail.WarpTypeSpec?.WarpType : detail.WeftTypeSpec?.WeftType)</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">@(string.IsNullOrEmpty(detail.DyedColor) ? "RAW" : detail.DyedColor)</td>
+                            <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">@detail.IssuedQty.ToString("N2")</td>
+                            <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">@detail.IssuedWeight.ToString("F3")</td>
+                            <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">₹@detail.Rate.ToString("N2")</td>
+                            <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">@detail.QtyReceived.ToString("N2")</td>
+                            <td style="padding: 8px; text-align: right; border: 1px solid #ddd; font-weight: bold; color: #b91c1c;">@detail.WasteWeight.ToString("F3")</td>
+                            <td style="padding: 8px; text-align: right; border: 1px solid #ddd; font-weight: bold; color: #15803d;">@detail.WeightReceived.ToString("F3")</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr style="font-weight: bold; background-color: #f9f9f9;">
+                        <td colspan="3" style="padding: 8px; border: 1px solid #ddd; text-align: right;">Total:</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">@_printModel.Details.Sum(d => d.IssuedQty).ToString("N2")</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">@_printModel.Details.Sum(d => d.IssuedWeight).ToString("F3")</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;"></td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">@_printModel.Details.Sum(d => d.QtyReceived).ToString("N2")</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #ddd; color: #b91c1c;">@_printModel.Details.Sum(d => d.WasteWeight).ToString("F3")</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #ddd; color: #15803d;">@_printModel.Details.Sum(d => d.WeightReceived).ToString("F3")</td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <table style="width: 100%; margin-top: 50px;">
+                <tr>
+                    <td style="width: 50%; text-align: left; padding-top: 30px;">
+                        <span style="border-top: 1px solid #333; width: 200px; display: inline-block; text-align: center;">Dyer Signature</span>
+                    </td>
+                    <td style="width: 50%; text-align: right; padding-top: 30px;">
+                        <span style="border-top: 1px solid #333; width: 200px; display: inline-block; text-align: center;">Authorized Signature</span>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<JobWorkMaster> _dyers = new();
+    private List<DyeingReceive> _receives = new();
+    private bool _loading = true;
+
+    // Filters
+    private Guid? _selectedDyerId;
+    private string _searchQuery = "";
+
+    // Detail Dialog
+    private bool _detailsOpen = false;
+    private DyeingReceive? _selectedReceive;
+    private DyeingReceive? _printModel;
+    private readonly DialogOptions _dialogOptions = new() { CloseButton = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+
+    private List<WarpTypeMaster> _warpTypes = new();
+    private List<WeftTypeMaster> _weftTypes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLookups();
+        await LoadData();
+    }
+
+    private async Task LoadLookups()
+    {
+        try
+        {
+            var workers = await Http.GetFromJsonAsync<List<JobWorkMaster>>("api/jobwork/workers") ?? new();
+            _dyers = workers.Where(w => w.Type == "Dyer").ToList();
+
+            _warpTypes = await Http.GetFromJsonAsync<List<WarpTypeMaster>>("api/masters/warptypes") ?? new();
+            _weftTypes = await Http.GetFromJsonAsync<List<WeftTypeMaster>>("api/masters/wefttypes") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading lookups: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            _receives = await Http.GetFromJsonAsync<List<DyeingReceive>>("api/jobwork/dyeing/receives") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading receives: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private List<DyeingReceive> FilteredReceives => _receives
+        .Where(r => (!_selectedDyerId.HasValue || r.DyerId == _selectedDyerId.Value) &&
+                    (string.IsNullOrEmpty(_searchQuery) ||
+                     r.ReceiveNo.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                     (r.IssueReferenceNo != null && r.IssueReferenceNo.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)) ||
+                     (r.Dyer != null && r.Dyer.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))))
+        .ToList();
+
+    private void OnDyerFilterChanged(Guid? val)
+    {
+        _selectedDyerId = val;
+    }
+
+    private void ClearFilters()
+    {
+        _selectedDyerId = null;
+        _searchQuery = "";
+    }
+
+    private void ToggleDetails(DyeingReceive receive)
+    {
+        _selectedReceive = receive;
+        _detailsOpen = true;
+    }
+
+    private void CloseDetails()
+    {
+        _detailsOpen = false;
+        _selectedReceive = null;
+    }
+
+    private async Task PrintReceive(DyeingReceive receive)
+    {
+        _printModel = receive;
+        StateHasChanged();
+        
+        // Brief delay to allow print area rendering
+        await Task.Delay(100);
+        await JSRuntime.InvokeVoidAsync("webcamInterop.printElement", "dyeing-receive-print-container", $"Dyeing Receive - {receive.ReceiveNo}");
+    }
+}
