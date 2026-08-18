@@ -364,8 +364,6 @@ namespace InventoryManagement.Api.Controllers
                 issue.CreatedAt = DateTimeOffset.UtcNow;
                 issue.Dyer = null;
 
-                _context.DyeingIssues.Add(issue);
-
                 // Fetch Dyer Name for ledger
                 var dyer = await _context.JobWorkMasters.FindAsync(issue.DyerId);
                 var dyerName = dyer?.Name ?? "Dyer";
@@ -454,6 +452,7 @@ namespace InventoryManagement.Api.Controllers
                     _context.JobLedgers.Add(jobLedger);
                 }
 
+                _context.DyeingIssues.Add(issue);
                 await _context.SaveChangesAsync();
                 await trans.CommitAsync();
                 return Ok(issue);
@@ -510,8 +509,6 @@ namespace InventoryManagement.Api.Controllers
                 receive.Id = Guid.NewGuid();
                 receive.CreatedAt = DateTimeOffset.UtcNow;
                 receive.Dyer = null;
-
-                _context.DyeingReceives.Add(receive);
 
                 foreach (var detail in receive.Details)
                 {
@@ -617,6 +614,7 @@ namespace InventoryManagement.Api.Controllers
                     _context.JobLedgers.Add(jobLedger);
                 }
 
+                _context.DyeingReceives.Add(receive);
                 await _context.SaveChangesAsync();
                 await trans.CommitAsync();
                 return Ok(receive);

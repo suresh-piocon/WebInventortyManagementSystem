@@ -180,7 +180,7 @@ using (var scope = app.Services.CreateScope())
                 // Dynamically add IsPrinted column if not exists
                 try
                 {
-                    context.Database.ExecuteSqlRaw("ALTER TABLE \"BarcodeMasters\" ADD COLUMN \"IsPrinted\" INTEGER NOT NULL DEFAULT 0;");
+                    context.Database.ExecuteSqlRaw("ALTER TABLE \"BarcodeMaster\" ADD COLUMN \"IsPrinted\" INTEGER NOT NULL DEFAULT 0;");
                 }
                 catch { /* Column already exists */ }
             }
@@ -198,7 +198,7 @@ using (var scope = app.Services.CreateScope())
                 // Dynamically add IsPrinted column if not exists
                 try
                 {
-                    context.Database.ExecuteSqlRaw("ALTER TABLE \"BarcodeMasters\" ADD COLUMN IF NOT EXISTS \"IsPrinted\" BOOLEAN NOT NULL DEFAULT FALSE;");
+                    context.Database.ExecuteSqlRaw("ALTER TABLE \"BarcodeMaster\" ADD COLUMN IF NOT EXISTS \"IsPrinted\" BOOLEAN NOT NULL DEFAULT FALSE;");
                 }
                 catch { /* Column already exists */ }
             }
