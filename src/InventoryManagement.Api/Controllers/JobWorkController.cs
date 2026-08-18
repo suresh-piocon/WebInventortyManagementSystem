@@ -703,6 +703,7 @@ namespace InventoryManagement.Api.Controllers
                 receive.Id = Guid.NewGuid();
                 receive.CreatedAt = DateTimeOffset.UtcNow;
                 receive.Dyer = null;
+                receive.DyeingIssue = null;
 
                 foreach (var detail in receive.Details)
                 {
@@ -748,11 +749,11 @@ namespace InventoryManagement.Api.Controllers
 
                     // Find rate from referenced Dyeing Issue (if available) to record inventory cost
                     decimal dyeingRate = detail.Rate;
-                    if (dyeingRate == 0 && !string.IsNullOrEmpty(receive.IssueReferenceNo))
+                    if (dyeingRate == 0 && (receive.DyeingIssueId.HasValue || !string.IsNullOrEmpty(receive.IssueReferenceNo)))
                     {
                         dyeingRate = await _context.DyeingIssueDetails
                             .Include(d => d.DyeingIssue)
-                            .Where(d => d.DyeingIssue!.IssueNo == receive.IssueReferenceNo 
+                            .Where(d => (receive.DyeingIssueId.HasValue ? d.DyeingIssueId == receive.DyeingIssueId.Value : d.DyeingIssue!.IssueNo == receive.IssueReferenceNo)
                                      && d.YarnType == detail.YarnType 
                                      && (detail.YarnType == "Warp" ? d.WarpTypeId == detail.WarpTypeId : d.WeftTypeId == detail.WeftTypeId))
                             .Select(d => d.Rate)
@@ -852,6 +853,7 @@ namespace InventoryManagement.Api.Controllers
                 entry.Id = Guid.NewGuid();
                 entry.CreatedAt = DateTimeOffset.UtcNow;
                 entry.LoomAllocation = null;
+                entry.ParentWeavingEntry = null;
 
                 _context.WeavingLedgerEntries.Add(entry);
                 await _context.SaveChangesAsync();
@@ -914,7 +916,7 @@ namespace InventoryManagement.Api.Controllers
                         ItemId = itemId,
                         TransactionDate = entry.Date,
                         TransactionType = "Adjustment", // Outward
-                        ReferenceNo = $"LOM-{allocation.Loom!.LoomNo}",
+                        ReferenceNo = $"LOM-{entry.Id}",
                         BatchNo = "WEAVE-BATCH",
                         TrackingNo = $"TRK-WEAVE-{Guid.NewGuid().ToString("N").Substring(0,8).ToUpper()}",
                         InwardQty = 0,
@@ -953,7 +955,7 @@ namespace InventoryManagement.Api.Controllers
                         ItemId = itemId,
                         TransactionDate = entry.Date,
                         TransactionType = "Adjustment",
-                        ReferenceNo = $"LOM-{allocation.Loom!.LoomNo}",
+                        ReferenceNo = $"LOM-{entry.Id}",
                         BatchNo = "WEAVE-BATCH",
                         TrackingNo = $"TRK-WEAVE-{Guid.NewGuid().ToString("N").Substring(0,8).ToUpper()}",
                         InwardQty = 0,
@@ -989,7 +991,7 @@ namespace InventoryManagement.Api.Controllers
                         ItemId = itemId,
                         TransactionDate = entry.Date,
                         TransactionType = "Purchase", // Inward Saree
-                        ReferenceNo = $"LOM-{allocation.Loom!.LoomNo}",
+                        ReferenceNo = $"REC-{entry.Id}",
                         BatchNo = "SAREE-BATCH",
                         TrackingNo = trackingNo,
                         InwardQty = entry.RodQty,
@@ -1042,7 +1044,7 @@ namespace InventoryManagement.Api.Controllers
                     Id = Guid.NewGuid(),
                     JobWorkerId = allocation.Loom!.WeaverId,
                     TransactionDate = entry.Date,
-                    VoucherNo = $"LOM-{allocation.Loom.LoomNo}",
+                    VoucherNo = entry.EntryType.Trim().Equals("Saree", StringComparison.OrdinalIgnoreCase) ? $"REC-{entry.Id}" : $"LOM-{entry.Id}",
                     Particulars = $"Loom {allocation.Loom.LoomNo} - {entryType}: {entry.Details} {entry.Narration}",
                     IssueQty = entry.WarpQty,
                     ReceiveQty = entry.RodQty,
@@ -1080,9 +1082,20 @@ namespace InventoryManagement.Api.Controllers
 
                 if (entry == null) return NotFound();
 
+                // Check if any receive references this warp entry
+                if (entry.EntryType.Trim().Equals("Dyed Warp", StringComparison.OrdinalIgnoreCase))
+                {
+                    bool isReferenced = await _context.WeavingLedgerEntries
+                        .AnyAsync(w => w.ParentWeavingEntryId == entry.Id);
+                    if (isReferenced)
+                    {
+                        return BadRequest("Cannot delete this Warp Issue as finished sarees have already been received against it.");
+                    }
+                }
+
                 // Reverse Stock Ledger entries
                 var stockLedgers = await _context.StockLedgers
-                    .Where(s => s.ReferenceNo == $"LOM-{entry.LoomAllocation!.Loom!.LoomNo}" && s.TransactionDate == entry.Date)
+                    .Where(s => s.ReferenceNo == $"LOM-{entry.Id}" || s.ReferenceNo == $"REC-{entry.Id}")
                     .ToListAsync();
 
                 // Delete associated barcodes and check usage
@@ -1103,7 +1116,7 @@ namespace InventoryManagement.Api.Controllers
 
                 // Reverse Job Ledger entries
                 var jobLedgers = await _context.JobLedgers
-                    .Where(j => j.JobWorkerId == entry.LoomAllocation.Loom.WeaverId && j.TransactionDate == entry.Date && j.VoucherNo == $"LOM-{entry.LoomAllocation.Loom.LoomNo}")
+                    .Where(j => j.VoucherNo == $"LOM-{entry.Id}" || j.VoucherNo == $"REC-{entry.Id}")
                     .ToListAsync();
                 _context.JobLedgers.RemoveRange(jobLedgers);
 

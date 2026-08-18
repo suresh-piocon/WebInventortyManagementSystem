@@ -238,6 +238,20 @@
                         </MudSelect>
                     </MudItem>
                 }
+                else if (_editEntry.EntryType == "Saree")
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="Guid?" Label="Select Warp Issue*" @bind-Value="_editEntry.ParentWeavingEntryId" Required="true" RequiredError="Warp Issue is required" Variant="Variant.Outlined" Class="text-slate-200">
+                            @foreach (var w in _ledgerEntries.Where(le => le.EntryType == "Dyed Warp"))
+                            {
+                                <MudSelectItem Value="@((Guid?)w.Id)">Warp: @w.Details | Issued: @w.Date.ToString("dd/MM/yyyy") (@w.WarpQty.ToString("N0") Qty)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField T="string" Label="Details" @bind-Value="_editEntry.Details" Class="text-slate-200" HelperText="e.g. yarn spec, payment ref, design name" />
+                    </MudItem>
+                }
                 else
                 {
                     <MudItem xs="12">

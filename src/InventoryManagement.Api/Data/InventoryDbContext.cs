@@ -303,6 +303,18 @@ namespace InventoryManagement.Api.Data
                 .HasForeignKey(w => w.LoomAllocationId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<DyeingReceive>()
+                .HasOne(r => r.DyeingIssue)
+                .WithMany()
+                .HasForeignKey(r => r.DyeingIssueId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WeavingLedgerEntry>()
+                .HasOne(w => w.ParentWeavingEntry)
+                .WithMany()
+                .HasForeignKey(w => w.ParentWeavingEntryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<JobLedger>()
                 .HasOne(j => j.JobWorker)
                 .WithMany()

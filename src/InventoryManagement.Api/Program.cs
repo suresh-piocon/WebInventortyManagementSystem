@@ -730,6 +730,8 @@ using (var scope = app.Services.CreateScope())
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""IssuedQty"" TEXT NULL;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""IssuedWeight"" TEXT NULL;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""Rate"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceives"" ADD COLUMN ""DyeingIssueId"" TEXT NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""WeavingLedger"" ADD COLUMN ""ParentWeavingEntryId"" TEXT NULL;"); } catch {}
             }
             else
             {
@@ -922,6 +924,8 @@ using (var scope = app.Services.CreateScope())
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""IssuedQty"" numeric(12,2) NULL;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""IssuedWeight"" numeric(12,3) NULL;"); } catch {}
                 try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceiveDetails"" ADD COLUMN ""Rate"" numeric(12,4) NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""DyeingReceives"" ADD COLUMN ""DyeingIssueId"" uuid NULL;"); } catch {}
+                try { context.Database.ExecuteSqlRaw(@"ALTER TABLE ""WeavingLedger"" ADD COLUMN ""ParentWeavingEntryId"" uuid NULL;"); } catch {}
             }
             Console.WriteLine("Job Work database tables and schema verified successfully.");
         }

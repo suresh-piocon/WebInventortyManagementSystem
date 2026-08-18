@@ -1376,6 +1376,11 @@ namespace InventoryManagement.Shared
         [StringLength(50)]
         public string? IssueReferenceNo { get; set; }
 
+        public Guid? DyeingIssueId { get; set; }
+
+        [ForeignKey(nameof(DyeingIssueId))]
+        public DyeingIssue? DyeingIssue { get; set; }
+
         [Column(TypeName = "decimal(5, 2)")]
         public decimal WastePercentage { get; set; } = 0;
 
@@ -1489,6 +1494,11 @@ namespace InventoryManagement.Shared
         public Guid CreatedBy { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+        public Guid? ParentWeavingEntryId { get; set; }
+
+        [ForeignKey(nameof(ParentWeavingEntryId))]
+        public WeavingLedgerEntry? ParentWeavingEntry { get; set; }
     }
 
     [Table("JobLedger")]

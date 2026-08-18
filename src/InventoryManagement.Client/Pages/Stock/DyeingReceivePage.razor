@@ -287,6 +287,7 @@
         
         if (string.IsNullOrEmpty(refNo))
         {
+            _receive.DyeingIssueId = null;
             _lineItems.Clear();
             _qtyReceivedRefs.Clear();
             AddRow();
@@ -294,31 +295,42 @@
         }
 
         var issue = _allIssues.FirstOrDefault(i => i.IssueNo == refNo && i.DyerId == _receive.DyerId);
-        if (issue != null && issue.Details != null && issue.Details.Any())
+        if (issue != null)
         {
-            _lineItems.Clear();
-            _qtyReceivedRefs.Clear();
-            foreach (var detail in issue.Details)
+            _receive.DyeingIssueId = issue.Id;
+            if (issue.Details != null && issue.Details.Any())
             {
-                var line = new DyeingReceiveDetail
+                _lineItems.Clear();
+                _qtyReceivedRefs.Clear();
+                foreach (var detail in issue.Details)
                 {
-                    YarnType = detail.YarnType,
-                    WarpTypeId = detail.WarpTypeId,
-                    WeftTypeId = detail.WeftTypeId,
-                    DyedColor = detail.Color,
-                    IssuedQty = detail.Qty,
-                    IssuedWeight = detail.WeightKgs,
-                    Rate = detail.Rate,
-                    QtyReceived = detail.Qty,
-                    WasteWeight = 0,
-                    WeightReceived = detail.WeightKgs
-                };
-                _lineItems.Add(line);
-                RecalculateRow(line);
+                    var line = new DyeingReceiveDetail
+                    {
+                        YarnType = detail.YarnType,
+                        WarpTypeId = detail.WarpTypeId,
+                        WeftTypeId = detail.WeftTypeId,
+                        DyedColor = detail.Color,
+                        IssuedQty = detail.Qty,
+                        IssuedWeight = detail.WeightKgs,
+                        Rate = detail.Rate,
+                        QtyReceived = detail.Qty,
+                        WasteWeight = 0,
+                        WeightReceived = detail.WeightKgs
+                    };
+                    _lineItems.Add(line);
+                    RecalculateRow(line);
+                }
+            }
+            else
+            {
+                _lineItems.Clear();
+                _qtyReceivedRefs.Clear();
+                AddRow();
             }
         }
         else
         {
+            _receive.DyeingIssueId = null;
             _lineItems.Clear();
             _qtyReceivedRefs.Clear();
             AddRow();
