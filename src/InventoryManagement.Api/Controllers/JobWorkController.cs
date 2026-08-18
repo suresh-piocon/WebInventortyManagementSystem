@@ -464,6 +464,200 @@ namespace InventoryManagement.Api.Controllers
             }
         }
 
+        [HttpDelete("dyeing/issues/{id}")]
+        public async Task<IActionResult> DeleteDyeingIssue(Guid id)
+        {
+            var issue = await _context.DyeingIssues
+                .Include(i => i.Details)
+                .FirstOrDefaultAsync(i => i.Id == id);
+
+            if (issue == null) return NotFound("Dyeing issue not found.");
+
+            // Check if any receive references this issue
+            bool isReferenced = await _context.DyeingReceives
+                .AnyAsync(r => r.IssueReferenceNo == issue.IssueNo);
+            if (isReferenced)
+            {
+                return BadRequest("Cannot delete this dyeing issue as it is already referenced by a Dyeing Receive.");
+            }
+
+            using var trans = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // Delete associated StockLedgers
+                var stockLedgers = await _context.StockLedgers
+                    .Where(sl => sl.ReferenceNo == issue.IssueNo)
+                    .ToListAsync();
+                _context.StockLedgers.RemoveRange(stockLedgers);
+
+                // Delete associated JobLedgers
+                var jobLedgers = await _context.JobLedgers
+                    .Where(jl => jl.VoucherNo == issue.IssueNo)
+                    .ToListAsync();
+                _context.JobLedgers.RemoveRange(jobLedgers);
+
+                // Delete the issue (details will cascade delete)
+                _context.DyeingIssues.Remove(issue);
+
+                await _context.SaveChangesAsync();
+                await trans.CommitAsync();
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                await trans.RollbackAsync();
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [HttpPut("dyeing/issues/{id}")]
+        public async Task<IActionResult> UpdateDyeingIssue(Guid id, [FromBody] DyeingIssue issue)
+        {
+            if (issue == null || issue.Details == null || !issue.Details.Any())
+                return BadRequest("Issue details are required.");
+
+            if (id != issue.Id)
+                return BadRequest("ID mismatch.");
+
+            using var trans = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var existingIssue = await _context.DyeingIssues
+                    .Include(i => i.Details)
+                    .FirstOrDefaultAsync(i => i.Id == id);
+
+                if (existingIssue == null)
+                    return NotFound("Dyeing issue not found.");
+
+                // Validate IssueNo is unique if changed
+                if (existingIssue.IssueNo.ToLower() != issue.IssueNo.ToLower())
+                {
+                    if (await _context.DyeingIssues.AnyAsync(i => i.IssueNo.ToLower() == issue.IssueNo.ToLower() && i.Id != id))
+                    {
+                        return BadRequest($"Issue number {issue.IssueNo} already exists.");
+                    }
+                }
+
+                // Delete previous StockLedgers for this issue
+                var oldStockLedgers = await _context.StockLedgers
+                    .Where(sl => sl.ReferenceNo == existingIssue.IssueNo)
+                    .ToListAsync();
+                _context.StockLedgers.RemoveRange(oldStockLedgers);
+
+                // Delete previous JobLedgers for this issue
+                var oldJobLedgers = await _context.JobLedgers
+                    .Where(jl => jl.VoucherNo == existingIssue.IssueNo)
+                    .ToListAsync();
+                _context.JobLedgers.RemoveRange(oldJobLedgers);
+
+                // Update properties
+                existingIssue.IssueNo = issue.IssueNo;
+                existingIssue.IssueDate = issue.IssueDate;
+                existingIssue.DyerId = issue.DyerId;
+                existingIssue.Narration = issue.Narration;
+
+                // Delete old details
+                _context.DyeingIssueDetails.RemoveRange(existingIssue.Details);
+                existingIssue.Details.Clear();
+
+                // Process and add new details
+                foreach (var detail in issue.Details)
+                {
+                    detail.Id = Guid.NewGuid();
+                    detail.DyeingIssueId = existingIssue.Id;
+                    
+                    detail.Design = null;
+                    detail.WarpTypeSpec = null;
+                    detail.WeftTypeSpec = null;
+
+                    existingIssue.Details.Add(detail);
+
+                    // Resolve Stock Item
+                    string spec = "";
+                    if (detail.YarnType == "Warp")
+                    {
+                        var warp = await _context.WarpTypeMasters.FindAsync(detail.WarpTypeId);
+                        spec = warp?.WarpType ?? "Unknown Warp";
+                    }
+                    else
+                    {
+                        var weft = await _context.WeftTypeMasters.FindAsync(detail.WeftTypeId);
+                        spec = weft?.WeftType ?? "Unknown Weft";
+                    }
+
+                    string stockCode = $"GREY-{detail.YarnType.ToUpper()}-{spec.Replace("*","-").Replace("+","-")}";
+                    string stockName = $"Grey {detail.YarnType} Yarn | {spec}";
+                    var stockItemId = await GetOrCreateStandardItemAsync(stockCode, stockName, "Grey Yarn", "KG");
+
+                    // 1. Stock Deduct from Grey Warp/Weft Yarn Stock
+                    var currentStockBal = await _context.StockLedgers
+                        .Where(sl => sl.ItemId == stockItemId)
+                        .OrderByDescending(sl => sl.TransactionDate)
+                        .ThenByDescending(sl => sl.CreatedAt)
+                        .Select(sl => new { sl.BalanceQty, sl.BalanceWeight })
+                        .FirstOrDefaultAsync();
+
+                    decimal prevQty = currentStockBal?.BalanceQty ?? 0;
+                    decimal prevWeight = currentStockBal?.BalanceWeight ?? 0;
+
+                    var stockLedger = new StockLedger
+                    {
+                        Id = Guid.NewGuid(),
+                        ItemId = stockItemId,
+                        TransactionDate = issue.IssueDate,
+                        TransactionType = "Adjustment",
+                        ReferenceNo = issue.IssueNo,
+                        BatchNo = "GREY-BATCH",
+                        TrackingNo = $"TRK-GREY-{Guid.NewGuid().ToString("N").Substring(0,8).ToUpper()}",
+                        InwardQty = 0,
+                        OutwardQty = detail.Qty,
+                        BalanceQty = prevQty - detail.Qty,
+                        UnitPrice = detail.Rate,
+                        InwardWeight = 0,
+                        OutwardWeight = detail.WeightKgs,
+                        BalanceWeight = prevWeight - detail.WeightKgs,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    };
+                    _context.StockLedgers.Add(stockLedger);
+
+                    // 2. Create Dyer Job Ledger Entry
+                    var lastJobBal = await _context.JobLedgers
+                        .Where(jl => jl.JobWorkerId == issue.DyerId)
+                        .OrderByDescending(jl => jl.TransactionDate)
+                        .ThenByDescending(jl => jl.CreatedAt)
+                        .Select(jl => jl.Balance)
+                        .FirstOrDefaultAsync();
+
+                    var jobLedger = new JobLedger
+                    {
+                        Id = Guid.NewGuid(),
+                        JobWorkerId = issue.DyerId,
+                        TransactionDate = issue.IssueDate,
+                        VoucherNo = issue.IssueNo,
+                        Particulars = $"Grey {detail.YarnType} Yarn issued | {spec}",
+                        IssueQty = detail.Qty,
+                        ReceiveQty = 0,
+                        IssueWeight = detail.WeightKgs,
+                        ReceiveWeight = 0,
+                        Debit = detail.Amount,
+                        Credit = 0,
+                        Balance = lastJobBal + detail.Amount,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    };
+                    _context.JobLedgers.Add(jobLedger);
+                }
+
+                await _context.SaveChangesAsync();
+                await trans.CommitAsync();
+                return Ok(existingIssue);
+            }
+            catch (Exception ex)
+            {
+                await trans.RollbackAsync();
+                return StatusCode(500, ex.Message);
+            }
+        }
+
         // ==========================================
         // DYEING RECEIVE
         // ==========================================
